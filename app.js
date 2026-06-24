@@ -83,7 +83,7 @@ function writeCachedFonts(fonts) {
 }
 
 function normalizeFontName(value) {
-  return String(value || '').trim().toLocaleLowerCase();
+  return String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 }
 
 function getFontSuggestions(query, limit = 200) {
@@ -290,7 +290,9 @@ document.addEventListener('click', (event) => {
 elements.fontInput.addEventListener('input', () => {
   preferences.font = elements.fontInput.value.trim();
   updateFontSuggestions(elements.fontInput.value);
-  applyPreferences(); savePreferences();
+  const safeFont = String(preferences.font || defaults.font).replace(/["'\\]/g, '');
+  root.style.setProperty('--reader-font', `"${safeFont}", serif`);
+  savePreferences();
 });
 elements.fontInput.addEventListener('focus', () => {
   void loadSystemFonts().then(() => updateFontSuggestions(elements.fontInput.value));
