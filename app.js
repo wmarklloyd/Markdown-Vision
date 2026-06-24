@@ -19,11 +19,7 @@ const elements = {
   readingWidthOutput: $('#readingWidthOutput'),
   readerShell: $('#readerShell'),
   markdownOutput: $('#markdownOutput'),
-  fileName: $('#fileName'),
-  pasteButton: $('#pasteButton'),
-  pasteDialog: $('#pasteDialog'),
-  markdownInput: $('#markdownInput'),
-  renderButton: $('#renderButton')
+  fileName: $('#fileName')
 };
 
 const legacyFonts = {
@@ -328,11 +324,6 @@ elements.fontSize.addEventListener('input', () => { preferences.size = elements.
 elements.lineHeight.addEventListener('input', () => { preferences.line = elements.lineHeight.value; applyPreferences(); savePreferences(); });
 elements.readingWidth.addEventListener('input', () => { preferences.width = elements.readingWidth.value; applyPreferences(); savePreferences(); });
 
-elements.pasteButton.addEventListener('click', () => elements.pasteDialog.showModal());
-elements.renderButton.addEventListener('click', (event) => {
-  if (!elements.markdownInput.value.trim()) { event.preventDefault(); elements.markdownInput.focus(); return; }
-  showDocument(elements.markdownInput.value); elements.pasteDialog.close();
-});
 document.addEventListener('keydown', (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'o') { event.preventDefault(); openPicker(); } });
 document.addEventListener('click', (event) => {
   if (!(event.target instanceof Element)) return;
