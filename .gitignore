@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dist-restored/
+_restored_asar/
+.tmp/
+
+*.log
+*.tmp
+*.png
+
+release/

@@ -1,0 +1,51 @@
+{
+  "name": "markdown-vision",
+  "version": "1.0.4",
+  "description": "Markdown Vision",
+  "main": "main.cjs",
+  "author": "Markdown Vision",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "installer": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  },
+  "build": {
+    "appId": "com.markdownvision.reader",
+    "productName": "Markdown Vision",
+    "asar": true,
+    "compression": "maximum",
+    "icon": "build/icon",
+    "files": [
+      "index.html",
+      "styles.css",
+      "app.js",
+      "main.cjs",
+      "preload.cjs"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown", "mdown", "mkd"],
+        "name": "Markdown document",
+        "role": "Viewer"
+      }
+    ],
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ],
+      "artifactName": "MarkdownVision-Portable-${version}.${ext}"
+    },
+    "nsis": {
+      "artifactName": "MarkdownVision-Setup-${version}.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
