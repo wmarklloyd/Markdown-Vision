@@ -1,11 +1,16 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
-const { execFile } = require('node:child_process');
+const { execFile, spawn } = require('node:child_process');
 const { promisify } = require('node:util');
 const execFileAsync = promisify(execFile);
 
-let mainWindow;
+const appTitle = 'Markdown Vision';
+const detachedLaunchFlag = '--markdown-vision-detached';
+const initialDocuments = new Map();
+const startupDocumentPath = getDocumentPath();
+const preferencesPath = path.join(app.getPath('appData'), 'Markdown Vision', 'preferences.json');
+const defaultPreferences = { theme: 'light', font: 'Georgia', size: '18', line: '1.75', width: '720' };
 
 function getDocumentPath(argv = process.argv) {
   return argv
@@ -14,7 +19,44 @@ function getDocumentPath(argv = process.argv) {
     .find((argument) => !argument.startsWith('-') && /\.(md|markdown|mdown|mkd|txt)$/i.test(argument));
 }
 
-let pendingFile = getDocumentPath();
+function detachFileLaunch() {
+  if (!startupDocumentPath || process.argv.includes(detachedLaunchFlag)) return;
+  const resolvedDocumentPath = path.resolve(startupDocumentPath);
+  const childArgs = process.defaultApp
+    ? [__dirname, detachedLaunchFlag, resolvedDocumentPath]
+    : [detachedLaunchFlag, resolvedDocumentPath];
+  const child = spawn(process.execPath, childArgs, {
+    cwd: process.cwd(),
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: false
+  });
+  child.unref();
+  process.exit(0);
+}
+
+function configureUserData() {
+  if (!startupDocumentPath) return;
+  const instanceUserData = path.join(app.getPath('temp'), 'Markdown Vision', `instance-${process.pid}`);
+  fs.mkdirSync(instanceUserData, { recursive: true });
+  app.setPath('userData', instanceUserData);
+}
+
+function configureChromiumCache() {
+  const cacheRoot = path.join(app.getPath('userData'), 'ChromiumCache');
+  try {
+    fs.mkdirSync(cacheRoot, { recursive: true });
+    app.commandLine.appendSwitch('disk-cache-dir', cacheRoot);
+    app.commandLine.appendSwitch('media-cache-dir', path.join(cacheRoot, 'Media'));
+  } catch {
+    app.commandLine.appendSwitch('disable-http-cache');
+  }
+  app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+}
+
+detachFileLaunch();
+configureUserData();
+configureChromiumCache();
 
 function readDocument(filePath) {
   const resolvedPath = path.resolve(filePath);
@@ -24,33 +66,51 @@ function readDocument(filePath) {
   };
 }
 
-function deliverDocument(filePath) {
-  if (!filePath) return;
-  const resolvedPath = path.resolve(filePath);
-  if (!fs.existsSync(resolvedPath)) return;
-  const document = readDocument(resolvedPath);
-  if (mainWindow?.webContents && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('document:opened', document);
-  } else {
-    pendingFile = resolvedPath;
+function readPreferences() {
+  try {
+    return { ...defaultPreferences, ...JSON.parse(fs.readFileSync(preferencesPath, 'utf8')) };
+  } catch {
+    return null;
   }
 }
 
-function focusWindow() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  mainWindow.show();
-  mainWindow.focus();
+function writePreferences(preferences) {
+  const nextPreferences = {
+    theme: preferences?.theme || defaultPreferences.theme,
+    font: preferences?.font || defaultPreferences.font,
+    size: String(preferences?.size || defaultPreferences.size),
+    line: String(preferences?.line || defaultPreferences.line),
+    width: String(preferences?.width || defaultPreferences.width)
+  };
+  fs.mkdirSync(path.dirname(preferencesPath), { recursive: true });
+  fs.writeFileSync(preferencesPath, JSON.stringify(nextPreferences, null, 2));
+  return nextPreferences;
 }
 
-function createWindow() {
-  mainWindow = new BrowserWindow({
+function getDocumentTitle(documentName) {
+  return documentName ? `${appTitle} - ${documentName}` : appTitle;
+}
+
+function deliverDocument(targetWindow, filePath) {
+  if (!targetWindow || targetWindow.isDestroyed() || !filePath) return;
+  const resolvedPath = path.resolve(filePath);
+  if (!fs.existsSync(resolvedPath)) return;
+  const document = readDocument(resolvedPath);
+  targetWindow.setTitle(getDocumentTitle(document.name));
+  targetWindow.webContents.send('document:opened', document);
+}
+
+function createWindow(filePath = null) {
+  const initialDocument = filePath && fs.existsSync(path.resolve(filePath))
+    ? readDocument(filePath)
+    : null;
+  const targetWindow = new BrowserWindow({
     width: 1180,
     height: 820,
     minWidth: 680,
     minHeight: 520,
     backgroundColor: '#f5f3ee',
-    title: 'Markdown Vision',
+    title: getDocumentTitle(initialDocument?.name),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -60,24 +120,32 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile('index.html');
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  targetWindow.loadFile(path.join(__dirname, 'index.html'));
+  targetWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
-  mainWindow.webContents.on('will-navigate', (event, url) => {
-    if (url !== mainWindow.webContents.getURL()) event.preventDefault();
+  targetWindow.webContents.on('will-navigate', (event, url) => {
+    if (url !== targetWindow.webContents.getURL()) event.preventDefault();
   });
-  mainWindow.webContents.once('did-finish-load', () => {
-    if (pendingFile) {
-      deliverDocument(pendingFile);
-      pendingFile = null;
-    }
-  });
+  if (initialDocument) {
+    const webContentsId = targetWindow.webContents.id;
+    initialDocuments.set(webContentsId, initialDocument);
+    targetWindow.on('closed', () => initialDocuments.delete(webContentsId));
+  }
+
+  return targetWindow;
 }
 
-ipcMain.handle('document:open', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
+ipcMain.handle('document:initial', (event) => {
+  const document = initialDocuments.get(event.sender.id) || null;
+  initialDocuments.delete(event.sender.id);
+  return document;
+});
+
+ipcMain.handle('document:open', async (event) => {
+  const targetWindow = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(targetWindow, {
     title: 'Open Markdown file',
     properties: ['openFile'],
     filters: [
@@ -85,8 +153,14 @@ ipcMain.handle('document:open', async () => {
       { name: 'Text', extensions: ['txt'] }
     ]
   });
-  return result.canceled ? null : readDocument(result.filePaths[0]);
+  if (result.canceled) return null;
+  const document = readDocument(result.filePaths[0]);
+  targetWindow?.setTitle(getDocumentTitle(document.name));
+  return document;
 });
+
+ipcMain.handle('preferences:get', () => readPreferences());
+ipcMain.handle('preferences:set', (_event, preferences) => writePreferences(preferences));
 
 ipcMain.handle('fonts:list', async () => {
   if (process.platform !== 'win32') return ['Arial', 'Georgia', 'Times New Roman'];
@@ -102,32 +176,15 @@ ipcMain.handle('fonts:list', async () => {
   }
 });
 
-if (!app.requestSingleInstanceLock()) {
-  app.quit();
-}
-
-app.on('second-instance', (_event, argv) => {
-  const filePath = getDocumentPath(argv);
-  if (filePath) pendingFile = filePath;
-  if (mainWindow) {
-    focusWindow();
-    if (pendingFile && mainWindow.webContents.isLoadingMainFrame()) return;
-    if (pendingFile) {
-      deliverDocument(pendingFile);
-      pendingFile = null;
-    }
-  }
-});
-
 app.whenReady().then(() => {
-  createWindow();
+  createWindow(startupDocumentPath);
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 
 app.on('open-file', (event, filePath) => {
   event.preventDefault();
-  pendingFile = filePath;
-  deliverDocument(filePath);
+  if (app.isReady()) createWindow(filePath);
+  else app.whenReady().then(() => createWindow(filePath));
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

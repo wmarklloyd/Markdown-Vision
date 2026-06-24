@@ -1,5 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('desktop', {
+  getInitialDocument: () => ipcRenderer.invoke('document:initial'),
+  getPreferences: () => ipcRenderer.invoke('preferences:get'),
+  savePreferences: (preferences) => ipcRenderer.invoke('preferences:set', preferences),
   openMarkdownFile: () => ipcRenderer.invoke('document:open'),
   listSystemFonts: () => ipcRenderer.invoke('fonts:list'),
   onOpenDocument: (callback) => ipcRenderer.on('document:opened', (_event, document) => callback(document)),

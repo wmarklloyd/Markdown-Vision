@@ -1,8 +1,8 @@
 {
-  "appId": "com.markdownvision.app",
-  "productName": "MarkdownVision",
+  "appId": "com.markdownvision.reader",
+  "productName": "Markdown Vision",
   "directories": {
-    "output": "release"
+    "output": "dist"
   },
   "files": [
     "index.html",
@@ -21,8 +21,20 @@
         ]
       }
     ],
-    "artifactName": "${productName}-Setup-${version}.${ext}"
+    "artifactName": "MarkdownVision-Setup-${version}.${ext}"
   },
+  "fileAssociations": [
+    {
+      "ext": [
+        "md",
+        "markdown",
+        "mdown",
+        "mkd"
+      ],
+      "name": "Markdown document",
+      "role": "Viewer"
+    }
+  ],
   "nsis": {
     "oneClick": false,
     "perMachine": false,
