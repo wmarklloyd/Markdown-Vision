@@ -32,8 +32,19 @@
           <button class="close-button" id="closeSettings" type="button" aria-label="Close settings">x</button>
         </div>
         <label for="fontInput">System font</label>
-        <input id="fontInput" type="text" list="systemFonts" autocomplete="off" placeholder="Enter any installed font" />
-        <datalist id="systemFonts"></datalist>
+        <div class="font-picker">
+          <input
+            id="fontInput"
+            type="text"
+            autocomplete="off"
+            placeholder="Enter any installed font"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="false"
+            aria-controls="fontSuggestions"
+          />
+          <div class="font-suggestions" id="fontSuggestions" role="listbox" hidden></div>
+        </div>
         <div class="font-status" id="fontStatus">Type a font name or choose an installed font.</div>
         <label for="fontSize">Text size <output id="fontSizeOutput">18px</output></label>
         <input id="fontSize" type="range" min="14" max="26" step="1" value="18" />

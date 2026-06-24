@@ -9,7 +9,7 @@ const elements = {
   closeSettings: $('#closeSettings'),
   themeButton: $('#themeButton'),
   fontInput: $('#fontInput'),
-  systemFonts: $('#systemFonts'),
+  fontSuggestions: $('#fontSuggestions'),
   fontStatus: $('#fontStatus'),
   fontSize: $('#fontSize'),
   fontSizeOutput: $('#fontSizeOutput'),
@@ -41,6 +41,7 @@ const preferences = { ...defaults, ...JSON.parse(storedPreferences) };
 preferences.font = legacyFonts[preferences.font] || preferences.font;
 let fontLoadPromise = null;
 let installedFonts = [];
+let fontSuggestionState = { items: [], activeIndex: -1, open: false };
 
 function savePreferences() {
   localStorage.setItem(preferenceStorageKey, JSON.stringify(preferences));
@@ -79,6 +80,114 @@ function writeCachedFonts(fonts) {
   if (Array.isArray(fonts) && fonts.length) {
     localStorage.setItem(fontCacheStorageKey, JSON.stringify({ fonts, savedAt: Date.now() }));
   }
+}
+
+function normalizeFontName(value) {
+  return String(value || '').trim().toLocaleLowerCase();
+}
+
+function getFontSuggestions(query, limit = 200) {
+  const normalizedQuery = normalizeFontName(query);
+  if (!installedFonts.length) return [];
+  if (!normalizedQuery) return installedFonts.slice(0, limit);
+
+  const startsWithMatches = [];
+  const wordMatches = [];
+  const containsMatches = [];
+
+  for (const font of installedFonts) {
+    const normalizedFont = normalizeFontName(font);
+    if (normalizedFont.startsWith(normalizedQuery)) {
+      startsWithMatches.push(font);
+      continue;
+    }
+    if (normalizedFont.split(/\s+/).some((word) => word.startsWith(normalizedQuery))) {
+      wordMatches.push(font);
+      continue;
+    }
+    if (normalizedFont.includes(normalizedQuery)) containsMatches.push(font);
+  }
+
+  return [...startsWithMatches, ...wordMatches, ...containsMatches].slice(0, limit);
+}
+
+function closeFontSuggestions() {
+  fontSuggestionState.open = false;
+  fontSuggestionState.activeIndex = -1;
+  elements.fontSuggestions.hidden = true;
+  elements.fontInput.setAttribute('aria-expanded', 'false');
+  elements.fontInput.removeAttribute('aria-activedescendant');
+}
+
+function openFontSuggestions() {
+  if (!fontSuggestionState.items.length) {
+    closeFontSuggestions();
+    return;
+  }
+  fontSuggestionState.open = true;
+  elements.fontSuggestions.hidden = false;
+  elements.fontInput.setAttribute('aria-expanded', 'true');
+}
+
+function renderFontSuggestions(items) {
+  fontSuggestionState.items = items;
+  if (!items.length) {
+    elements.fontSuggestions.replaceChildren();
+    closeFontSuggestions();
+    return;
+  }
+
+  const activeIndex = Math.min(fontSuggestionState.activeIndex, items.length - 1);
+  fontSuggestionState.activeIndex = activeIndex;
+  elements.fontSuggestions.replaceChildren(...items.map((font, index) => {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.id = `font-option-${index}`;
+    option.className = 'font-suggestion';
+    option.setAttribute('role', 'option');
+    option.setAttribute('aria-selected', String(index === activeIndex));
+    option.dataset.font = font;
+    option.textContent = font;
+    return option;
+  }));
+
+  if (activeIndex >= 0) elements.fontInput.setAttribute('aria-activedescendant', `font-option-${activeIndex}`);
+  else elements.fontInput.removeAttribute('aria-activedescendant');
+  openFontSuggestions();
+}
+
+function updateFontSuggestions(query = elements.fontInput.value) {
+  const suggestions = getFontSuggestions(query);
+  renderFontSuggestions(suggestions);
+  if (!installedFonts.length) {
+    elements.fontStatus.textContent = 'Loading installed fonts...';
+    return;
+  }
+  if (!normalizeFontName(query)) {
+    elements.fontStatus.textContent = `${installedFonts.length.toLocaleString()} installed fonts available.`;
+    return;
+  }
+  elements.fontStatus.textContent = `${suggestions.length.toLocaleString()} matches for "${query}".`;
+}
+
+function applySelectedFont(font) {
+  elements.fontInput.value = font;
+  preferences.font = font.trim();
+  applyPreferences();
+  savePreferences();
+  closeFontSuggestions();
+}
+
+function moveFontSuggestion(delta) {
+  if (!fontSuggestionState.items.length) return;
+  if (!fontSuggestionState.open) openFontSuggestions();
+  const lastIndex = fontSuggestionState.items.length - 1;
+  const nextIndex = fontSuggestionState.activeIndex < 0
+    ? (delta > 0 ? 0 : lastIndex)
+    : (fontSuggestionState.activeIndex + delta + fontSuggestionState.items.length) % fontSuggestionState.items.length;
+  fontSuggestionState.activeIndex = nextIndex;
+  renderFontSuggestions(fontSuggestionState.items);
+  document.getElementById(`font-option-${nextIndex}`)?.scrollIntoView({ block: 'nearest' });
 }
 
 function escapeHtml(value) {
@@ -162,24 +271,56 @@ elements.themeButton.addEventListener('click', () => {
 elements.settingsButton.addEventListener('click', () => {
   elements.settingsPanel.hidden = !elements.settingsPanel.hidden;
   elements.settingsButton.setAttribute('aria-expanded', String(!elements.settingsPanel.hidden));
+  if (!elements.settingsPanel.hidden) void loadSystemFonts().then(() => updateFontSuggestions(elements.fontInput.value));
+  else closeFontSuggestions();
 });
 elements.closeSettings.addEventListener('click', () => {
   elements.settingsPanel.hidden = true;
   elements.settingsButton.setAttribute('aria-expanded', 'false');
+  closeFontSuggestions();
 });
 document.addEventListener('click', (event) => {
   if (!elements.settingsPanel.hidden && !elements.settingsPanel.contains(event.target) && !elements.settingsButton.contains(event.target)) {
     elements.settingsPanel.hidden = true;
     elements.settingsButton.setAttribute('aria-expanded', 'false');
+    closeFontSuggestions();
   }
 });
 
 elements.fontInput.addEventListener('input', () => {
   preferences.font = elements.fontInput.value.trim();
+  updateFontSuggestions(elements.fontInput.value);
   applyPreferences(); savePreferences();
 });
 elements.fontInput.addEventListener('focus', () => {
-  void loadSystemFonts();
+  void loadSystemFonts().then(() => updateFontSuggestions(elements.fontInput.value));
+});
+elements.fontInput.addEventListener('keydown', (event) => {
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    moveFontSuggestion(1);
+    return;
+  }
+  if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    moveFontSuggestion(-1);
+    return;
+  }
+  if (event.key === 'Enter' && fontSuggestionState.open && fontSuggestionState.activeIndex >= 0) {
+    event.preventDefault();
+    applySelectedFont(fontSuggestionState.items[fontSuggestionState.activeIndex]);
+    return;
+  }
+  if (event.key === 'Escape' && fontSuggestionState.open) {
+    event.preventDefault();
+    closeFontSuggestions();
+  }
+});
+elements.fontSuggestions.addEventListener('mousedown', (event) => {
+  event.preventDefault();
+  const option = event.target.closest('.font-suggestion');
+  if (!option) return;
+  applySelectedFont(option.dataset.font || '');
 });
 elements.fontSize.addEventListener('input', () => { preferences.size = elements.fontSize.value; applyPreferences(); savePreferences(); });
 elements.lineHeight.addEventListener('input', () => { preferences.line = elements.lineHeight.value; applyPreferences(); savePreferences(); });
@@ -191,6 +332,10 @@ elements.renderButton.addEventListener('click', (event) => {
   showDocument(elements.markdownInput.value); elements.pasteDialog.close();
 });
 document.addEventListener('keydown', (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'o') { event.preventDefault(); openPicker(); } });
+document.addEventListener('click', (event) => {
+  if (!(event.target instanceof Element)) return;
+  if (!event.target.closest('.font-picker')) closeFontSuggestions();
+});
 
 async function loadSystemFonts() {
   if (fontLoadPromise) return fontLoadPromise;
@@ -199,12 +344,7 @@ async function loadSystemFonts() {
     const cachedFonts = readCachedFonts();
     if (cachedFonts?.length) {
       installedFonts = [...new Set(cachedFonts)].sort((a, b) => a.localeCompare(b));
-      elements.systemFonts.replaceChildren(...installedFonts.map((font) => {
-        const option = document.createElement('option');
-        option.value = font;
-        return option;
-      }));
-      elements.fontStatus.textContent = `${installedFonts.length.toLocaleString()} installed fonts available.`;
+      updateFontSuggestions(elements.fontInput.value);
       return cachedFonts;
     }
     try {
@@ -215,12 +355,7 @@ async function loadSystemFonts() {
         return null;
       }
       installedFonts = [...new Set(fonts)].sort((a, b) => a.localeCompare(b));
-      elements.systemFonts.replaceChildren(...installedFonts.map((font) => {
-        const option = document.createElement('option');
-        option.value = font;
-        return option;
-      }));
-      elements.fontStatus.textContent = `${installedFonts.length.toLocaleString()} installed fonts available.`;
+      updateFontSuggestions(elements.fontInput.value);
       writeCachedFonts(fonts);
       return fonts;
     } catch {
