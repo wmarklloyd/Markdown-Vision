@@ -4,7 +4,7 @@
   "description": "Markdown Vision",
   "main": "main.cjs",
   "author": "Markdown Vision",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win",
