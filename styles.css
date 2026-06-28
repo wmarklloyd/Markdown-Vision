@@ -17,14 +17,14 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #181917;
-  --surface: #20211e;
-  --text: #e5dfd1;
-  --muted: #b0aa9c;
-  --faint: #3a3b36;
+  --bg: #292826;
+  --surface: #32302e;
+  --text: #e8e6e2;
+  --muted: #b9b4ad;
+  --faint: #4a4743;
   --accent: #d47a5d;
   --accent-hover: #e58b6d;
-  --code-bg: #292a26;
+  --code-bg: #3b3936;
   --shadow: 0 18px 50px rgba(0, 0, 0, .35);
 }
 
