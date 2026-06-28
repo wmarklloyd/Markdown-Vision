@@ -11,3 +11,4 @@ _restored_asar/
 release/
 native-windows/bin/
 native-windows/obj/
+native-cpp/*.obj
