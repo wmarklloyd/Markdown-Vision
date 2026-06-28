@@ -9,3 +9,5 @@ _restored_asar/
 *.png
 
 release/
+native-windows/bin/
+native-windows/obj/
