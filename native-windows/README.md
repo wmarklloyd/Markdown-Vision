@@ -11,8 +11,16 @@ Install the .NET 8 SDK, then run:
 .\native-windows\build.ps1
 ```
 
+To publish a self-contained build that does not require the .NET runtime on the
+target machine, run:
+
+```powershell
+.\native-windows\build-self-contained.ps1
+```
+
 The application uses the Windows WebView2 runtime and links the existing
 Markdown Vision renderer files into its build output.
 
-The published package is framework-dependent. The target computer must have the
-Microsoft .NET 8 Desktop Runtime and Microsoft Edge WebView2 Runtime.
+The default published package is framework-dependent. The target computer must
+have the Microsoft .NET 8 Desktop Runtime and Microsoft Edge WebView2 Runtime.
+The self-contained package still requires Microsoft Edge WebView2 Runtime.

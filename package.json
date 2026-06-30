@@ -9,7 +9,8 @@
     "start": "electron .",
     "dist": "electron-builder --win",
     "installer": "electron-builder --win nsis",
-    "dist-native": "powershell -ExecutionPolicy Bypass -File native-windows\\build.ps1"
+    "dist-native": "powershell -ExecutionPolicy Bypass -File native-windows\\build.ps1",
+    "dist-native-self-contained": "powershell -ExecutionPolicy Bypass -File native-windows\\build-self-contained.ps1"
   },
   "devDependencies": {
     "electron": "latest",
