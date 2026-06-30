@@ -43,11 +43,13 @@ constexpr int kToolbarHeight = 44;
 constexpr int kMetaHeight = 28;
 constexpr int kSettingsWidth = 334;
 constexpr int kSettingsHeight = 286;
+constexpr int kToolbarButtonSize = 40;
 
 HWND g_window = nullptr;
 HWND g_reader = nullptr;
 HWND g_fileName = nullptr;
 HWND g_settingsPanel = nullptr;
+HWND g_settingsHeading = nullptr;
 HWND g_openButton = nullptr;
 HWND g_settingsButton = nullptr;
 HWND g_themeButton = nullptr;
@@ -434,6 +436,13 @@ void ApplyControlFont(HWND control) {
     SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
 }
 
+void ApplyIconFont(HWND control) {
+    static HFONT font = CreateFontW(-18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+        DEFAULT_PITCH, L"Segoe MDL2 Assets");
+    SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+}
+
 void UpdateTrackOutputs() {
     SetWindowTextW(g_sizeOutput, (std::to_wstring(g_fontSize) + L"px").c_str());
     std::wstring lineText = std::to_wstring(g_linePercent) + L"%";
@@ -588,26 +597,28 @@ void LayoutControls(HWND window) {
     GetClientRect(window, &client);
     const int width = client.right - client.left;
     const int height = client.bottom - client.top;
-    const int buttonW = 76;
-    const int buttonGap = 8;
+    const int buttonGap = 7;
     const int right = width - 12;
-    const int openX = right - buttonW * 3 - buttonGap * 2;
-    MoveWindow(g_openButton, openX, 8, buttonW, 28, TRUE);
-    MoveWindow(g_settingsButton, openX + buttonW + buttonGap, 8, buttonW, 28, TRUE);
-    MoveWindow(g_themeButton, openX + buttonW * 2 + buttonGap * 2, 8, buttonW, 28, TRUE);
+    const int themeX = right - kToolbarButtonSize;
+    const int settingsX = themeX - buttonGap - kToolbarButtonSize;
+    const int openX = settingsX - buttonGap - kToolbarButtonSize;
+    MoveWindow(g_openButton, openX, 4, kToolbarButtonSize, kToolbarButtonSize, TRUE);
+    MoveWindow(g_settingsButton, settingsX, 4, kToolbarButtonSize, kToolbarButtonSize, TRUE);
+    MoveWindow(g_themeButton, themeX, 4, kToolbarButtonSize, kToolbarButtonSize, TRUE);
 
-    MoveWindow(g_fileName, 24, kToolbarHeight + 8, std::max(200, width - 48), 24, TRUE);
-    MoveWindow(g_reader, 20, kToolbarHeight + kMetaHeight + 10, std::max(0, width - 40), std::max(0, height - (kToolbarHeight + kMetaHeight + 24)), TRUE);
+    MoveWindow(g_fileName, 24, kToolbarHeight + 4, std::max(200, width - 48), 24, TRUE);
+    MoveWindow(g_reader, 20, kToolbarHeight + kMetaHeight + 8, std::max(0, width - 40), std::max(0, height - (kToolbarHeight + kMetaHeight + 18)), TRUE);
     UpdateReaderMetrics();
 
     const int panelX = std::max(12, width - kSettingsWidth - 12);
-    MoveWindow(g_settingsPanel, panelX, 44, kSettingsWidth, kSettingsHeight, TRUE);
+    MoveWindow(g_settingsPanel, panelX, 48, kSettingsWidth, kSettingsHeight, TRUE);
     const int innerX = 14;
     const int innerW = kSettingsWidth - 28;
-    MoveWindow(g_closeSettings, kSettingsWidth - 40, 8, 24, 24, TRUE);
-    MoveWindow(g_fontLabel, innerX, 14, innerW - 32, 18, TRUE);
-    MoveWindow(g_fontCombo, innerX, 34, innerW, 24, TRUE);
-    MoveWindow(g_fontStatus, innerX, 60, innerW, 36, TRUE);
+    MoveWindow(g_settingsHeading, innerX, 12, innerW - 36, 20, TRUE);
+    MoveWindow(g_closeSettings, kSettingsWidth - 34, 10, 24, 24, TRUE);
+    MoveWindow(g_fontLabel, innerX, 40, innerW - 32, 18, TRUE);
+    MoveWindow(g_fontCombo, innerX, 60, innerW, 24, TRUE);
+    MoveWindow(g_fontStatus, innerX, 86, innerW, 36, TRUE);
     MoveWindow(g_sizeLabel, innerX, 104, innerW, 18, TRUE);
     MoveWindow(g_sizeTrack, innerX, 124, innerW, 24, TRUE);
     MoveWindow(g_sizeOutput, innerX + innerW - 60, 104, 60, 18, TRUE);
@@ -629,7 +640,7 @@ void UpdateFontStatus() {
 }
 
 void ApplyTheme() {
-    SetWindowTextW(g_themeButton, g_dark ? L"Light" : L"Dark");
+    SetWindowTextW(g_themeButton, g_dark ? L"\u263D" : L"\u263C");
     InvalidateRect(g_window, nullptr, TRUE);
     RenderDocument();
 }
@@ -641,12 +652,12 @@ void SetSliderRange(HWND slider, int minValue, int maxValue, int tickFreq) {
 }
 
 void CreateUi(HWND window) {
-    g_openButton = CreateWindowW(L"BUTTON", L"Open", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        0, 0, 76, 28, window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kOpenButton)), nullptr, nullptr);
-    g_settingsButton = CreateWindowW(L"BUTTON", L"Settings", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        0, 0, 76, 28, window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSettingsButton)), nullptr, nullptr);
-    g_themeButton = CreateWindowW(L"BUTTON", g_dark ? L"Light" : L"Dark", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        0, 0, 76, 28, window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kThemeButton)), nullptr, nullptr);
+    g_openButton = CreateWindowW(L"BUTTON", L"\uE8E5", WS_CHILD | WS_VISIBLE | BS_FLAT,
+        0, 0, kToolbarButtonSize, kToolbarButtonSize, window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kOpenButton)), nullptr, nullptr);
+    g_settingsButton = CreateWindowW(L"BUTTON", L"\uE713", WS_CHILD | WS_VISIBLE | BS_FLAT,
+        0, 0, kToolbarButtonSize, kToolbarButtonSize, window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSettingsButton)), nullptr, nullptr);
+    g_themeButton = CreateWindowW(L"BUTTON", g_dark ? L"\u263D" : L"\u263C", WS_CHILD | WS_VISIBLE | BS_FLAT,
+        0, 0, kToolbarButtonSize, kToolbarButtonSize, window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kThemeButton)), nullptr, nullptr);
 
     g_fileName = CreateWindowW(L"STATIC", L"", WS_CHILD | SS_LEFT, 0, 0, 100, 24, window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFileName)), nullptr, nullptr);
     g_reader = CreateWindowExW(0, MSFTEDIT_CLASS, L"",
@@ -658,6 +669,7 @@ void CreateUi(HWND window) {
     g_settingsPanel = CreateWindowExW(WS_EX_TOOLWINDOW, L"STATIC", L"",
         WS_CHILD | WS_BORDER,
         0, 0, kSettingsWidth, kSettingsHeight, window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSettingsPanel)), nullptr, nullptr);
+    g_settingsHeading = CreateWindowW(L"STATIC", L"Reading settings", WS_CHILD | WS_VISIBLE, 0, 0, 160, 20, g_settingsPanel, nullptr, nullptr, nullptr);
     g_closeSettings = CreateWindowW(L"BUTTON", L"x", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         0, 0, 24, 24, g_settingsPanel, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCloseSettings)), nullptr, nullptr);
     g_fontLabel = CreateWindowW(L"STATIC", L"System font", WS_CHILD | WS_VISIBLE, 0, 0, 100, 18, g_settingsPanel, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFontLabel)), nullptr, nullptr);
@@ -681,9 +693,13 @@ void CreateUi(HWND window) {
     g_widthOutput = CreateWindowW(L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_RIGHT, 0, 0, 60, 18, g_settingsPanel, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kWidthOutput)), nullptr, nullptr);
 
     for (HWND control : {g_openButton, g_settingsButton, g_themeButton, g_fileName, g_reader, g_settingsPanel,
-        g_closeSettings, g_fontLabel, g_fontCombo, g_fontStatus, g_sizeLabel, g_sizeTrack, g_sizeOutput,
+        g_settingsHeading, g_closeSettings, g_fontLabel, g_fontCombo, g_fontStatus, g_sizeLabel, g_sizeTrack, g_sizeOutput,
         g_lineLabel, g_lineTrack, g_lineOutput, g_widthLabel, g_widthTrack, g_widthOutput}) {
         ApplyControlFont(control);
+    }
+
+    for (HWND control : {g_openButton, g_settingsButton, g_themeButton, g_closeSettings}) {
+        ApplyIconFont(control);
     }
 
     SetSliderRange(g_sizeTrack, 14, 26, 1);
@@ -696,6 +712,7 @@ void CreateUi(HWND window) {
 
     SyncTrackPositions();
     UpdateFontStatus();
+    SetWindowTextW(g_themeButton, g_dark ? L"\u263D" : L"\u263C");
 }
 
 void ApplyLoadedPreferences() {
