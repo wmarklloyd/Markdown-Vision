@@ -1,6 +1,3 @@
-#define UNICODE
-#define _UNICODE
-
 #include <windows.h>
 #include <commctrl.h>
 #include <commdlg.h>
@@ -459,7 +456,7 @@ void UpdateReaderMetrics() {
         GetClientRect(g_window, &rect);
         return rect;
     }();
-    const int availableWidth = std::max(0, client.right - client.left - 48);
+    const int availableWidth = std::max(0, static_cast<int>(client.right - client.left) - 48);
     const int desired = std::clamp(g_width, 540, 920);
     const int margin = std::max(16, (availableWidth - desired) / 2);
     SendMessageW(g_reader, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(margin, margin));
