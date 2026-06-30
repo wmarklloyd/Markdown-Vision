@@ -192,75 +192,132 @@ bool IsSafeUrl(const std::wstring& value) {
         (!lower.empty() && lower[0] == L'#');
 }
 
-std::wstring SanitizeHtmlTag(const std::wstring& rawTag) {
+struct HtmlTag {
+    bool closing = false;
+    bool selfClosing = false;
+    std::wstring name;
+    std::wstring href;
+    std::wstring src;
+    std::wstring alt;
+};
+
+HtmlTag ParseHtmlTag(const std::wstring& rawTag) {
+    HtmlTag tag;
     const auto trimmed = Trim(rawTag);
-    if (trimmed.empty() || trimmed.front() != L'<') return {};
-    if (trimmed.size() >= 3 && trimmed[1] == L'/') {
-        auto tag = Lower(Trim(trimmed.substr(2, trimmed.size() - 3)));
-        const auto space = tag.find(L' ');
-        if (space != std::wstring::npos) tag.resize(space);
-        return L"</" + tag + L">";
+    if (trimmed.size() < 3 || trimmed.front() != L'<') return tag;
+
+    size_t index = 1;
+    if (trimmed[index] == L'/') {
+        tag.closing = true;
+        ++index;
     }
 
-    auto body = trimmed.substr(1, trimmed.size() - 2);
-    bool selfClosing = !body.empty() && body.back() == L'/';
-    if (selfClosing) body.pop_back();
+    auto body = trimmed.substr(index, trimmed.size() - index - (trimmed.back() == L'>' ? 1 : 0));
+    if (!body.empty() && body.back() == L'/') {
+        tag.selfClosing = true;
+        body.pop_back();
+    }
     body = Trim(body);
-    if (body.empty()) return {};
+    if (body.empty()) return tag;
 
-    size_t index = 0;
-    while (index < body.size() && !iswspace(body[index])) ++index;
-    auto tag = Lower(body.substr(0, index));
+    size_t nameEnd = 0;
+    while (nameEnd < body.size() && !iswspace(body[nameEnd])) ++nameEnd;
+    tag.name = Lower(body.substr(0, nameEnd));
+    if (tag.name.empty()) return tag;
 
     const std::vector<std::wstring> allowedTags = {
-        L"a", L"abbr", L"b", L"br", L"cite", L"code", L"div", L"em", L"i", L"img", L"mark", L"p",
-        L"picture", L"pre", L"s", L"small", L"span", L"strong", L"sub", L"sup", L"u", L"details",
-        L"summary", L"figure", L"figcaption", L"hr"
+        L"a", L"abbr", L"b", L"br", L"cite", L"code", L"del", L"details", L"div", L"em", L"figure",
+        L"figcaption", L"hr", L"i", L"img", L"mark", L"p", L"picture", L"pre", L"s", L"small",
+        L"span", L"strong", L"sub", L"summary", L"sup", L"u", L"blockquote", L"li", L"ol", L"ul"
     };
-    if (std::find(allowedTags.begin(), allowedTags.end(), tag) == allowedTags.end()) return {};
+    if (std::find(allowedTags.begin(), allowedTags.end(), tag.name) == allowedTags.end()) {
+        tag.name.clear();
+        return tag;
+    }
 
-    std::wstring attrs;
-    while (index < body.size()) {
-        while (index < body.size() && iswspace(body[index])) ++index;
-        if (index >= body.size()) break;
-        const size_t nameStart = index;
-        while (index < body.size() && body[index] != L'=' && !iswspace(body[index])) ++index;
-        auto name = Lower(body.substr(nameStart, index - nameStart));
-        while (index < body.size() && iswspace(body[index])) ++index;
-        std::wstring value;
-        if (index < body.size() && body[index] == L'=') {
-            ++index;
-            while (index < body.size() && iswspace(body[index])) ++index;
-            if (index < body.size() && (body[index] == L'"' || body[index] == L'\'')) {
-                const wchar_t quote = body[index++];
-                const size_t valueStart = index;
-                while (index < body.size() && body[index] != quote) ++index;
-                value = body.substr(valueStart, index - valueStart);
-                if (index < body.size()) ++index;
+    size_t index2 = nameEnd;
+    while (index2 < body.size()) {
+        while (index2 < body.size() && iswspace(body[index2])) ++index2;
+        if (index2 >= body.size()) break;
+        const size_t attrStart = index2;
+        while (index2 < body.size() && body[index2] != L'=' && !iswspace(body[index2])) ++index2;
+        const auto attrName = Lower(body.substr(attrStart, index2 - attrStart));
+        while (index2 < body.size() && iswspace(body[index2])) ++index2;
+
+        std::wstring attrValue;
+        if (index2 < body.size() && body[index2] == L'=') {
+            ++index2;
+            while (index2 < body.size() && iswspace(body[index2])) ++index2;
+            if (index2 < body.size() && (body[index2] == L'"' || body[index2] == L'\'')) {
+                const wchar_t quote = body[index2++];
+                const size_t valueStart = index2;
+                while (index2 < body.size() && body[index2] != quote) ++index2;
+                attrValue = body.substr(valueStart, index2 - valueStart);
+                if (index2 < body.size()) ++index2;
             } else {
-                const size_t valueStart = index;
-                while (index < body.size() && !iswspace(body[index])) ++index;
-                value = body.substr(valueStart, index - valueStart);
+                const size_t valueStart = index2;
+                while (index2 < body.size() && !iswspace(body[index2])) ++index2;
+                attrValue = body.substr(valueStart, index2 - valueStart);
             }
         }
 
-        if (name.rfind(L"on", 0) == 0) continue;
-        if (name == L"href" || name == L"src") {
-            if (!IsSafeUrl(value)) continue;
-        }
-        if (name == L"title" || name == L"alt" || name == L"class" || name == L"style" ||
-            name == L"width" || name == L"height" || name == L"target" || name == L"rel" ||
-            name == L"aria-label" || name == L"role") {
-            attrs += L" " + name + L"=\"" + value + L"\"";
-        }
+        if (attrName.rfind(L"on", 0) == 0) continue;
+        if ((attrName == L"href" || attrName == L"src") && !IsSafeUrl(attrValue)) continue;
+        if (attrName == L"href") tag.href = attrValue;
+        else if (attrName == L"src") tag.src = attrValue;
+        else if (attrName == L"alt") tag.alt = attrValue;
     }
 
-    if (tag == L"a") {
-        attrs += L" target=\"_blank\" rel=\"noopener noreferrer\"";
+    return tag;
+}
+
+std::wstring HtmlTagToRtf(const HtmlTag& tag, std::vector<std::wstring>& linkStack) {
+    if (tag.name.empty()) return {};
+
+    if (tag.closing) {
+        if (tag.name == L"a") {
+            if (!linkStack.empty()) linkStack.pop_back();
+            return L"\\ul0\\cf1 ";
+        }
+        if (tag.name == L"b" || tag.name == L"strong") return L"\\b0 ";
+        if (tag.name == L"i" || tag.name == L"em") return L"\\i0 ";
+        if (tag.name == L"u") return L"\\ul0 ";
+        if (tag.name == L"s" || tag.name == L"del") return L"\\strike0 ";
+        if (tag.name == L"code" || tag.name == L"pre") return L"\\f1\\highlight0 ";
+        if (tag.name == L"p" || tag.name == L"div" || tag.name == L"blockquote" ||
+            tag.name == L"figure" || tag.name == L"figcaption" || tag.name == L"details" ||
+            tag.name == L"summary" || tag.name == L"li") {
+            return L"\\par ";
+        }
+        return {};
     }
 
-    if (selfClosing || tag == L"br" || tag == L"hr" || tag == L"img") return L"<" + tag + attrs + L" />";
-    return L"<" + tag + attrs + L">";
+    if (tag.name == L"br") return L"\\line ";
+    if (tag.name == L"hr") return L"\\pard\\qc ________________________________\\par ";
+    if (tag.name == L"b" || tag.name == L"strong") return L"\\b ";
+    if (tag.name == L"i" || tag.name == L"em") return L"\\i ";
+    if (tag.name == L"u") return L"\\ul ";
+    if (tag.name == L"s" || tag.name == L"del") return L"\\strike ";
+    if (tag.name == L"code") return L"\\f2\\highlight3 ";
+    if (tag.name == L"pre") return L"\\pard\\f2\\highlight3 ";
+    if (tag.name == L"p" || tag.name == L"div" || tag.name == L"blockquote" ||
+        tag.name == L"figure" || tag.name == L"figcaption" || tag.name == L"details" ||
+        tag.name == L"summary" || tag.name == L"li") {
+        return L"\\par ";
+    }
+    if (tag.name == L"a") {
+        if (!tag.href.empty()) {
+            linkStack.push_back(tag.href);
+            return L"\\ul\\cf2 ";
+        }
+        return {};
+    }
+    if (tag.name == L"img") {
+        if (!tag.alt.empty()) return EscapeRtfText(tag.alt);
+        if (!tag.src.empty()) return EscapeRtfText(tag.src);
+        return {};
+    }
+    return {};
 }
 
 std::wstring RtfHyperlink(const std::wstring& text, const std::wstring& url) {
@@ -273,6 +330,7 @@ std::wstring InlineToRtf(const std::wstring& text) {
     bool bold = false;
     bool italic = false;
     bool code = false;
+    std::vector<std::wstring> linkStack;
 
     for (size_t i = 0; i < text.size();) {
         if (text.compare(i, 2, L"**") == 0 || text.compare(i, 2, L"__") == 0) {
@@ -309,9 +367,10 @@ std::wstring InlineToRtf(const std::wstring& text) {
         if (text[i] == L'<') {
             const auto close = text.find(L'>', i + 1);
             if (close != std::wstring::npos) {
-                auto tag = SanitizeHtmlTag(text.substr(i, close - i + 1));
-                if (!tag.empty()) {
-                    output += tag;
+                auto tag = ParseHtmlTag(text.substr(i, close - i + 1));
+                auto rtf = HtmlTagToRtf(tag, linkStack);
+                if (!rtf.empty()) {
+                    output += rtf;
                     i = close + 1;
                     continue;
                 }
