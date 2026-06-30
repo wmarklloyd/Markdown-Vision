@@ -8,7 +8,8 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win",
-    "installer": "electron-builder --win nsis"
+    "installer": "electron-builder --win nsis",
+    "dist-native": "powershell -ExecutionPolicy Bypass -File native-windows\\build.ps1"
   },
   "devDependencies": {
     "electron": "latest",

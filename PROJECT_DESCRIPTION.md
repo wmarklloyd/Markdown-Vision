@@ -194,6 +194,7 @@ Saved preferences include:
 ## Build and Packaging
 
 The project is configured with Electron Builder in `package.json`.
+The repository also contains a separate Windows-native WebView2 build in `native-windows` for users who want a smaller package and already have the required Windows runtimes installed.
 
 ### Windows Targets
 
