@@ -10,6 +10,16 @@ Build with Visual Studio 2022 C++ Build Tools:
 .\native-cpp\build.bat
 ```
 
+Build the replacement installer:
+
+```powershell
+.\native-cpp\build-installer.bat
+```
+
+The native installer uses the existing Markdown Vision product identity and
+installation directory, so it removes and replaces an installed Electron
+edition instead of installing side by side.
+
 The renderer uses the Electron edition's exact HTML, CSS, and JavaScript assets,
 including its settings panel, font picker, Markdown parser, and embedded HTML
 support.
