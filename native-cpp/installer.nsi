@@ -24,7 +24,10 @@ Function RemovePreviousInstall
   ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_ID}" "UninstallString"
   StrCmp $0 "" no_previous_install
   DetailPrint "Removing the currently installed Markdown Vision edition..."
-  ExecWait '$0 /S' $1
+  ExecWait '$0 /S _?=$INSTDIR' $1
+  StrCmp $1 "0" no_previous_install
+  MessageBox MB_ICONSTOP "The existing Markdown Vision installation could not be removed. Setup will stop without installing the native edition."
+  Abort
 no_previous_install:
 FunctionEnd
 
@@ -43,6 +46,10 @@ Section "Markdown Vision" SEC_APP
   File "${SOURCE_DIR}\web\styles.css"
   File "${SOURCE_DIR}\web\app.js"
 
+  IfFileExists "$INSTDIR\Markdown Vision.exe" native_executable_ready
+  MessageBox MB_ICONSTOP "Markdown Vision Native could not be installed. Setup will stop without registering an incomplete installation."
+  Abort
+native_executable_ready:
   WriteUninstaller "$INSTDIR\Uninstall Markdown Vision.exe"
 
   CreateDirectory "$SMPROGRAMS\Markdown Vision"
