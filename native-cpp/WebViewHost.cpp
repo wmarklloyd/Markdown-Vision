@@ -87,6 +87,13 @@ std::wstring DocumentJson(const std::wstring& path) {
         L",\"content\":" + JsonString(ReadTextFile(path)) + L"}";
 }
 
+void SetDocumentTitle(const std::wstring& path) {
+    const std::wstring title = path.empty()
+        ? kAppName
+        : std::wstring(kAppName) + L" - " + std::filesystem::path(path).filename().wstring();
+    SetWindowTextW(g_window, title.c_str());
+}
+
 std::wstring PickDocument() {
     wchar_t path[32768]{};
     OPENFILENAMEW dialog{sizeof(dialog)};
@@ -98,7 +105,9 @@ std::wstring PickDocument() {
         L"Text files (*.txt)\0*.txt\0\0";
     dialog.lpstrTitle = L"Open Markdown file";
     dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
-    return GetOpenFileNameW(&dialog) ? path : L"";
+    if (!GetOpenFileNameW(&dialog)) return {};
+    SetDocumentTitle(path);
+    return path;
 }
 
 int CALLBACK CollectFont(const LOGFONTW* font, const TEXTMETRICW*, DWORD, LPARAM value) {
@@ -283,6 +292,7 @@ LRESULT CALLBACK WindowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
     switch (message) {
     case WM_CREATE:
         g_window = window;
+        SetDocumentTitle(g_startupPath);
         ApplySystemWindowFrame(window);
         InitializeWebView();
         return 0;
