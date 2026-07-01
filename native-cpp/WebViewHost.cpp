@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <commdlg.h>
+#include <dwmapi.h>
 #include <shellapi.h>
 #include <shlobj.h>
 #include <wrl.h>
@@ -24,6 +25,21 @@ ComPtr<ICoreWebView2Controller> g_controller;
 ComPtr<ICoreWebView2> g_webView;
 std::wstring g_startupPath;
 bool g_initialTaken = false;
+
+bool SystemUsesDarkMode() {
+    DWORD lightTheme = 1;
+    DWORD size = sizeof(lightTheme);
+    RegGetValueW(HKEY_CURRENT_USER,
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+        L"AppsUseLightTheme", RRF_RT_REG_DWORD, nullptr, &lightTheme, &size);
+    return lightTheme == 0;
+}
+
+void ApplySystemWindowFrame(HWND window) {
+    const BOOL dark = SystemUsesDarkMode();
+    constexpr DWORD useImmersiveDarkMode = 20;
+    DwmSetWindowAttribute(window, useImmersiveDarkMode, &dark, sizeof(dark));
+}
 
 std::wstring Lower(std::wstring value) {
     std::transform(value.begin(), value.end(), value.begin(),
@@ -267,7 +283,11 @@ LRESULT CALLBACK WindowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
     switch (message) {
     case WM_CREATE:
         g_window = window;
+        ApplySystemWindowFrame(window);
         InitializeWebView();
+        return 0;
+    case WM_SETTINGCHANGE:
+        ApplySystemWindowFrame(window);
         return 0;
     case WM_SIZE:
         ResizeWebView();

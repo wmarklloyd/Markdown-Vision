@@ -17,7 +17,7 @@ cl /nologo /std:c++17 /O2 /EHsc /W4 /DUNICODE /D_UNICODE /DNOMINMAX ^
   /Fo:"%OUT%\MarkdownVision.obj" ^
   /Fe:"%OUT%\Markdown Vision Native.exe" ^
   /link /SUBSYSTEM:WINDOWS user32.lib gdi32.lib comctl32.lib comdlg32.lib ^
-  shell32.lib advapi32.lib ole32.lib shlwapi.lib "%WV2%\x64\WebView2LoaderStatic.lib"
+  shell32.lib advapi32.lib ole32.lib shlwapi.lib dwmapi.lib "%WV2%\x64\WebView2LoaderStatic.lib"
 if errorlevel 1 exit /b %errorlevel%
 
 del "%OUT%\MarkdownVision.res" 2>nul
