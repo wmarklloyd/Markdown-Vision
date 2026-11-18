@@ -4,13 +4,11 @@ A native Windows x64 Markdown reader and editor. Markdown Vision uses a Win32 C+
 
 ## Download for Windows
 
-**[Download the Markdown Vision 2.0.0 Windows installer (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.0.0/Markdown-Vision-Native-Setup-2.0.0.exe)**
+**[Windows installer (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.0.0/Markdown-Vision-Native-Setup-2.0.0.exe)** · **[Portable Windows x64 ZIP](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.0.0/MarkdownVision-Native-Editor-2.0.0-win-x64.zip)**
 
-Run setup to install `Markdown-Vision.exe`, add Markdown file associations, and register the Explorer Preview Pane handler.
+![Markdown Vision showing its own README five levels deep](docs/markdown-vision-recursive.png)
 
-**[Download the portable Windows x64 ZIP](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.0.0/MarkdownVision-Native-Editor-2.0.0-win-x64.zip)**
-
-Extract the ZIP and run `Markdown-Vision.exe` from the extracted folder. Keep the adjacent `web\` folder with the executable. You can also pass a Markdown file path as a command-line argument.
+Run setup to install `Markdown-Vision.exe`, add Markdown file associations, and register the Explorer Preview Pane handler. For the portable build, extract the ZIP and run `Markdown-Vision.exe` with the adjacent `web\` folder. You can pass a Markdown file path as a command-line argument.
 
 Both downloads use the Microsoft Edge WebView2 Runtime.
 
