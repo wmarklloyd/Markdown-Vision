@@ -214,6 +214,7 @@
     saveAsButton.disabled = saving;
     const text = source.value.trim();
     $('#editorStats').textContent = (text ? text.split(/\s+/).length : 0) + ' words';
+    window.markdownVisionReader.updatePrintButton();
     if (searchQuery && source.value !== searchDraft) {
       clearTimeout(searchRefreshTimer);
       searchRefreshTimer = setTimeout(() => window.markdownVisionReader.refreshEditorSearch({ preserve: true, scroll: false }), 100);
@@ -262,8 +263,9 @@
     }
   }
 
-  function needsMarkdown(text, referenceLabels) {
-    const inline = window.markdownVisionReader.withoutInlineCode(text);
+  function needsMarkdown(text, referenceLabels, table = false) {
+    let inline = window.markdownVisionReader.withoutInlineCode(text);
+    if (table) inline = inline.replace(/<br[ \t]*\/?>/gi, '');
     return /<\/?[a-z][\w:-]*(?=[ \t/>])[^>\n]*>|^[ \t]*\[[^\]]+\]:|\[[^\]\n]+\]\[[^\]\n]*\]/im.test(inline)
       || (referenceLabels.size > 0 && [...inline.matchAll(/\[([^\]\n]+)\](?!\()/g)]
         .some((match) => referenceLabels.has(match[1].trim().toLowerCase())));
@@ -290,7 +292,7 @@
         && block.start === previous.end + 1;
       const hasIndentedChild = following?.start === block.end + 1 && /^[ \t]+\S/.test(following.source);
       const nestedList = (block.kind === 'list' && (indented || hasIndentedChild)) || continuation;
-      const inlineMarkup = block.kind !== 'code' && needsMarkdown(block.source, referenceLabels);
+      const inlineMarkup = block.kind !== 'code' && needsMarkdown(block.source, referenceLabels, block.kind === 'table');
       const locked = block.kind === 'html'
         || (block.kind === 'code' && window.markdownVisionReader.readCodeFence(block.source.split('\n')[0])?.[2].trim())
         || inlineMarkup
@@ -441,7 +443,7 @@
           if (raw.cells.length !== line.cells.length) continue;
           for (const [column, cell] of [...line.cells].entries()) {
             const { start, end } = raw.cells[column];
-            const sourceOnly = needsMarkdown(raw.text.slice(start, end), referenceLabels);
+            const sourceOnly = needsMarkdown(raw.text.slice(start, end), referenceLabels, true);
             cell.tabIndex = 0;
             cell.title = sourceOnly ? 'Edit this cell in Markdown' : 'Edit table cell';
             cell.dataset.visualEdit = sourceOnly ? 'table-cell-source' : 'table-cell';
@@ -914,11 +916,21 @@
     error.hidden = true;
     inputs.replaceChildren();
     footer.replaceChildren();
-    for (const [name, label, value] of fields) {
+    for (const [name, label, value, multiline, caret] of fields) {
       const group = document.createElement('label');
-      const input = document.createElement('input');
+      const input = document.createElement(multiline ? 'textarea' : 'input');
       input.name = name;
       input.value = value;
+      if (multiline) {
+        input.rows = Math.min(10, Math.max(3, value.split('\n').length));
+        input.setSelectionRange(caret, caret);
+        input.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing) {
+            event.preventDefault();
+            form.requestSubmit();
+          }
+        });
+      }
       group.append(label, input);
       inputs.append(group);
     }
@@ -954,9 +966,9 @@
       if (patch) applyVisualPatch(...patch);
     };
     editDialog.showModal();
-    const first = inputs.querySelector('input');
+    const first = inputs.querySelector('input,textarea');
     first.focus();
-    first.select();
+    if (first.tagName !== 'TEXTAREA') first.select();
   }
 
   function editVisualListItem(span, index, allowStructure = true) {
@@ -1016,7 +1028,58 @@
     });
   }
 
-  function editVisualTableCell(span, control) {
+  function readMultilineCell(markdown) {
+    const visible = window.markdownVisionReader.withoutInlineCode(markdown);
+    const breaks = [];
+    let value = '';
+    let start = 0;
+    for (const match of visible.matchAll(/(\\*)<br[ \t]*\/?>/gi)) {
+      const slashes = match[1].length;
+      if (slashes % 2) continue;
+      const position = match.index + slashes;
+      const end = match.index + match[0].length;
+      value += markdown.slice(start, position) + '\n';
+      breaks.push(markdown.slice(position, end));
+      start = end;
+    }
+    return { value: value + markdown.slice(start), breaks };
+  }
+
+  function writeMultilineCell(value, breaks) {
+    const lines = value.replace(/\r\n?/g, '\n').split('\n');
+    return lines.map((line, index) => {
+      const precedingBreak = index ? breaks[index - 1] || '<br>' : '';
+      const slashes = line.match(/\\+$/)?.[0].length || 0;
+      const escape = index < lines.length - 1 && slashes % 2 ? '\\' : '';
+      return precedingBreak + line + escape;
+    })
+      .join('').trim().replace(/(\\*)\|/g, (match, slashes) => slashes.length % 2 ? match : slashes + '\\|');
+  }
+
+  function renderedCellText(root) {
+    let text = '';
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      if (node.nodeType === Node.TEXT_NODE) text += node.data;
+      else if (node.tagName === 'BR') text += '\n';
+    }
+    return text;
+  }
+
+  function tableEditCaret(control, value, event) {
+    if (!event) return 0;
+    const position = document.caretRangeFromPoint(event.clientX, event.clientY);
+    if (!position || !control.contains(position.startContainer)) return 0;
+    const parts = [...value.matchAll(/\\([\\\x60*_[\]{}()#+\-.!|<>~])|[\s\S]/g)];
+    if (parts.map((part) => part[1] || part[0]).join('') !== renderedCellText(control)) return 0;
+    const prefix = document.createRange();
+    prefix.setStart(control, 0);
+    prefix.setEnd(position.startContainer, position.startOffset);
+    return parts[renderedCellText(prefix.cloneContents()).length]?.index ?? value.length;
+  }
+
+  function editVisualTableCell(span, control, event) {
     const rows = editableTable(span.text);
     const rowIndex = Number(control.dataset.row);
     const column = Number(control.dataset.index);
@@ -1034,9 +1097,15 @@
       ['align-left', 'Align column left'], ['align-center', 'Center column'], ['align-right', 'Align column right']];
     if (index) operations.push(['remove-row', 'Remove row']);
     if (row.cells.length > 2) operations.push(['remove-column', 'Remove column']);
-    showVisualEdit('Edit table cell', [['cell', 'Cell text (Markdown)', row.text.slice(cell.start, cell.end)]], (data, action) => {
+    const { value, breaks } = readMultilineCell(row.text.slice(cell.start, cell.end));
+    const caret = tableEditCaret(control, value, event);
+    showVisualEdit('Edit table cell', [['cell', 'Cell text (Markdown)', value, true, caret]], (data, action) => {
       if (action === 'save') {
-        const text = data.cell.trim().replace(/(\\*)\|/g, (match, slashes) => slashes.length % 2 ? match : slashes + '\\|');
+        if (data.cell === value) return null;
+        const text = writeMultilineCell(data.cell, breaks);
+        if (readMultilineCell(text).breaks.length < data.cell.split('\n').length - 1) {
+          return 'Close inline code before adding a line break.';
+        }
         const next = row.text.slice(0, cell.start) + text + row.text.slice(cell.end);
         if (window.markdownVisionReader.tableCellRanges(next).length !== row.cells.length) {
           return 'This cell text would change the table structure. Add a space before the separator in Markdown.';
@@ -1098,7 +1167,7 @@
     });
   }
 
-  function runVisualEdit(target) {
+  function runVisualEdit(target, event) {
     const control = target.closest('[data-visual-edit]') || target.closest('a,img');
     if (!control) return;
     const span = displayedBlock(control);
@@ -1108,7 +1177,7 @@
       case 'source': focusBlockSource(span); break;
       case 'code-language': editVisualCodeLanguage(span); break;
       case 'table-cell-source': showRestriction(control); break;
-      case 'table-cell': editVisualTableCell(span, control); break;
+      case 'table-cell': editVisualTableCell(span, control, event); break;
       case 'list-item': editVisualListItem(span, index); break;
       case 'list-text': editVisualListItem(span, index, false); break;
       case 'task': toggleVisualTask(span, index); break;
@@ -1184,12 +1253,14 @@
     reader.hidden = value || !window.markdownVisionReader.getDocument();
     document.body.classList.toggle('is-editing', value);
     if (value) {
+      tools.scrollLeft = 0;
       selectView(panes.dataset.view);
     } else if (dirty || (saved && (window.markdownVisionReader.getDocument()?.content !== source.value
         || window.markdownVisionReader.getDocument()?.documentId !== documentId))) {
       showDraftInReader();
       updateDirty();
     } else window.markdownVisionReader.refreshEditorSearch();
+    window.markdownVisionReader.updatePrintButton();
   }
 
   function replaceSelection(transform, block = false) {
@@ -1924,6 +1995,7 @@
   toggle.addEventListener('click', () => setActive(!active));
   $('#editorSaveActions').hidden = !window.desktop?.saveMarkdownFile;
   window.markdownVisionReader.isSaving = () => saving;
+  window.markdownVisionReader.getPrintDraft = () => active ? { content: source.value, name: fileName } : null;
   saveButton.addEventListener('click', () => saveDraft());
   saveAsButton.addEventListener('click', () => saveDraft(true));
   document.addEventListener('keydown', (event) => {
@@ -2070,7 +2142,7 @@
     if (control?.dataset.visualEdit !== 'table-cell-source' || asset?.closest('a')) event.preventDefault();
     const target = !control && restrictionFor(event.target);
     if (target) showRestriction(target);
-    else runVisualEdit(event.target);
+    else runVisualEdit(event.target, event);
   });
   preview.addEventListener('dblclick', (event) => {
     if (event.target.closest('a,img,button,input,textarea,[data-visual-edit]')) return;

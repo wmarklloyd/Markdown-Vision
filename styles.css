@@ -181,9 +181,10 @@ body.is-editing .toolbar { width: 100%; }
 .visual-edit-dialog::backdrop { background: rgba(0, 0, 0, .4); }
 .visual-edit-dialog h2 { margin: 0 0 16px; font-size: 18px; }
 .visual-edit-dialog label { display: grid; gap: 5px; margin-bottom: 12px; font-size: 13px; }
-.visual-edit-dialog :is(input, select) {
+.visual-edit-dialog :is(input, select, textarea) {
   width: 100%; padding: 8px; border: 1px solid var(--faint); border-radius: 5px; background: var(--bg); color: var(--text);
 }
+.visual-edit-dialog textarea { min-height: 5em; max-height: 50vh; resize: vertical; line-height: 1.5; }
 .visual-edit-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .visual-edit-actions button:not(.primary-button) {
   padding: 8px 14px; border: 0; border-radius: 5px; background: var(--code-bg); cursor: pointer;
@@ -197,7 +198,14 @@ body.is-editing .reader-shell { display: none; }
 }
 .icon-button, .theme-button { width: 40px; height: 40px; }
 .icon-button:hover, .theme-button:hover, .close-button:hover { background: var(--code-bg); }
+.icon-button:disabled { opacity: .45; cursor: default; }
+.icon-button:disabled:hover { background: transparent; }
 .icon-button svg, .theme-button svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.print-status {
+  position: absolute; top: 48px; right: 0; width: max-content; max-width: min(340px, calc(100vw - 24px));
+  margin: 0; padding: 10px 12px; border: 1px solid var(--faint); border-radius: 6px;
+  background: var(--surface); color: var(--text); box-shadow: var(--shadow); font-size: 13px;
+}
 .theme-button .moon { display: none; }
 [data-theme="dark"] .theme-button .sun { display: none; }
 [data-theme="dark"] .theme-button .moon { display: block; }
@@ -327,6 +335,25 @@ kbd { background: var(--surface); border: 1px solid var(--faint); border-radius:
 .markdown-body hr { border: 0; border-top: 1px solid var(--faint); margin: 2.5em 0; }
 .markdown-body table { width: 100%; border-collapse: collapse; margin: 1.5em 0; font-size: .9em; }
 .markdown-body th, .markdown-body td { padding: .6em .8em; border: 1px solid var(--faint); text-align: left; }
+.print-document { display: none; }
+
+@media print {
+  @page { margin: 15mm; }
+  :root { color-scheme: light; }
+  body { min-height: 0; background: white; color: #161616; }
+  body > :not(.print-document), body::after { display: none !important; }
+  .print-document {
+    display: block; max-width: none; margin: 0; font-size: 11pt; line-height: 1.45;
+    --faint: #aaa; --accent: #222; --muted: #444; --code-bg: #f5f5f5;
+  }
+  .print-document :is(h1, h2, h3, h4, h5, h6) { break-after: avoid; }
+  .print-document :is(p, li) { orphans: 3; widows: 3; }
+  .print-document pre { white-space: pre-wrap; overflow: visible; overflow-wrap: anywhere; border: 1px solid var(--faint); }
+  .print-document table { table-layout: fixed; overflow-wrap: anywhere; }
+  .print-document thead { display: table-header-group; }
+  .print-document tr { break-inside: avoid; }
+  .print-document img { height: auto; max-height: 75vh; object-fit: contain; break-inside: avoid; }
+}
 
 @media (max-width: 600px) {
   .editor-header { flex-wrap: wrap; gap: 8px 12px; }

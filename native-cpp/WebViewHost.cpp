@@ -22,6 +22,7 @@ namespace {
 constexpr wchar_t kClassName[] = L"MarkdownVisionNativeWebView";
 constexpr wchar_t kAppName[] = L"Markdown Vision";
 constexpr wchar_t kDetachedFlag[] = L"--markdown-vision-detached";
+constexpr UINT kPrintShortcut = WM_APP + 1;
 
 HWND g_window = nullptr;
 ComPtr<ICoreWebView2Controller> g_controller;
@@ -378,8 +379,13 @@ void HandleMessage(ICoreWebView2WebMessageReceivedEventArgs* args) {
             DecodeSavePayload(message.substr(body + 1)), method == L"document.saveAs");
         g_saving = false;
         Resolve(id, result);
-    }
-    else if (method == L"fonts.list") Resolve(id, FontJson());
+    } else if (method == L"document.print") {
+        ComPtr<ICoreWebView2_16> printView;
+        const bool opened = !g_saving && IsLocalAppMessage(args)
+            && SUCCEEDED(g_webView.As(&printView)) && printView
+            && SUCCEEDED(printView->ShowPrintUI(COREWEBVIEW2_PRINT_DIALOG_KIND_SYSTEM));
+        Resolve(id, opened ? L"true" : L"false");
+    } else if (method == L"fonts.list") Resolve(id, FontJson());
     else Resolve(id, L"null");
 }
 
@@ -477,6 +483,7 @@ void InitializeWebView() {
     openMarkdownFile: () => request('document.open'),
     saveMarkdownFile: (documentId, content, saveAs) => request(saveAs ? 'document.saveAs' : 'document.save',
       '|' + (documentId || '') + '|' + content.replaceAll('%', '%25').replaceAll('\0', '%00')),
+    printMarkdown: () => request('document.print'),
     listSystemFonts: () => request('fonts.list'),
     onOpenDocument: () => {},
     onFullscreenChange: () => {}
@@ -486,6 +493,23 @@ void InitializeWebView() {
                             g_webView->AddScriptToExecuteOnDocumentCreated(bridge, nullptr);
 
                             EventRegistrationToken token{};
+                            controller->add_AcceleratorKeyPressed(
+                                Callback<ICoreWebView2AcceleratorKeyPressedEventHandler>(
+                                    [](ICoreWebView2Controller*, ICoreWebView2AcceleratorKeyPressedEventArgs* args) -> HRESULT {
+                                        UINT key = 0;
+                                        COREWEBVIEW2_KEY_EVENT_KIND kind{};
+                                        args->get_VirtualKey(&key);
+                                        args->get_KeyEventKind(&kind);
+                                        if (key == 'P' && kind == COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN
+                                            && GetKeyState(VK_CONTROL) < 0 && GetKeyState(VK_MENU) >= 0
+                                            && GetKeyState(VK_SHIFT) >= 0) {
+                                            args->put_Handled(TRUE);
+                                            COREWEBVIEW2_PHYSICAL_KEY_STATUS status{};
+                                            args->get_PhysicalKeyStatus(&status);
+                                            if (!status.WasKeyDown) PostMessageW(g_window, kPrintShortcut, 0, 0);
+                                        }
+                                        return S_OK;
+                                    }).Get(), &token);
                             g_webView->add_WebMessageReceived(
                                 Callback<ICoreWebView2WebMessageReceivedEventHandler>(
                                     [](ICoreWebView2*, ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT {
@@ -536,6 +560,9 @@ LRESULT CALLBACK WindowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         return 0;
     case WM_SIZE:
         ResizeWebView();
+        return 0;
+    case kPrintShortcut:
+        if (g_webView) g_webView->ExecuteScript(L"window.markdownVisionReader?.printDocument()", nullptr);
         return 0;
     case WM_GETMINMAXINFO:
         reinterpret_cast<MINMAXINFO*>(lParam)->ptMinTrackSize = {680, 520};

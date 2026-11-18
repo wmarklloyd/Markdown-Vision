@@ -4,6 +4,9 @@ const $ = (selector) => document.querySelector(selector);
 const elements = {
   openButton: $('#openButton'),
   fileInput: $('#fileInput'),
+  printButton: $('#printButton'),
+  printStatus: $('#printStatus'),
+  printDocument: $('#printDocument'),
   searchButton: $('#searchButton'),
   searchPanel: $('#searchPanel'),
   searchInput: $('#searchInput'),
@@ -55,6 +58,10 @@ const fontSuggestionStates = new Map(fontPickers.map((picker) => [picker.key, { 
 let searchMatchCount = 0;
 let activeSearchMatchIndex = -1;
 let currentDocument = null;
+let printPreparing = false;
+let printSnapshot = null;
+let renderedForPrint = null;
+let printStatusTimer = null;
 
 function readLocalPreferences() {
   try {
@@ -665,7 +672,7 @@ function parseMarkdown(markdown, describeBlocks = false) {
   return describeBlocks ? output : output.join('\n');
 }
 
-function syncPictureSourcesToTheme(container = elements.markdownOutput) {
+function syncPictureSourcesToTheme(container = elements.markdownOutput, theme = preferences.theme) {
   container.querySelectorAll('picture source[media]').forEach((source) => {
     const originalMedia = source.dataset.markdownVisionMedia || source.getAttribute('media') || '';
     source.dataset.markdownVisionMedia = originalMedia;
@@ -677,7 +684,7 @@ function syncPictureSourcesToTheme(container = elements.markdownOutput) {
     const channels = background.match(/\d+(?:\.\d+)?/g)?.slice(0, 3).map(Number);
     const backgroundTheme = channels && channels.length === 3
       ? ((channels[0] * 299 + channels[1] * 587 + channels[2] * 114) / 1000 > 160 ? 'light' : 'dark')
-      : preferences.theme;
+      : theme;
     source.media = colorScheme === backgroundTheme ? 'all' : 'not all';
   });
 }
@@ -826,9 +833,67 @@ function showDocument(markdown, name = 'Untitled.md', documentId = null) {
   document.title = `Markdown Vision - ${name}`;
   elements.readerShell.hidden = false;
   document.dispatchEvent(new CustomEvent('markdownvision:documentchanged', { detail: { ...currentDocument } }));
+  updatePrintButton();
   if (elements.searchInput.value.trim()) runSearch();
   else window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+function printableDocument() {
+  return window.markdownVisionReader?.getPrintDraft?.() || currentDocument;
+}
+
+function updatePrintButton() {
+  const draft = printableDocument();
+  elements.printButton.disabled = printPreparing || !draft?.content.trim();
+  if (!printPreparing && printSnapshot && printSnapshot.content !== draft?.content) printSnapshot = null;
+}
+
+function renderPrintDocument(document) {
+  const markdown = document?.content || '';
+  if (markdown === renderedForPrint) return;
+  renderedForPrint = markdown;
+  const target = elements.printDocument;
+  target.innerHTML = parseMarkdown(markdown);
+  target.querySelectorAll('details').forEach((details) => { details.open = true; });
+  target.querySelectorAll('img').forEach((image) => { image.loading = 'eager'; });
+  syncPictureSourcesToTheme(target, 'light');
+}
+
+async function printCurrentDocument() {
+  const draft = printableDocument();
+  if (printPreparing || !draft?.content.trim() || $('#visualEditDialog').open) return;
+  printPreparing = true;
+  printSnapshot = draft;
+  clearTimeout(printStatusTimer);
+  elements.printStatus.hidden = true;
+  updatePrintButton();
+  let timeout;
+  try {
+    renderPrintDocument(draft);
+    const images = [...elements.printDocument.querySelectorAll('img')];
+    await Promise.race([
+      Promise.allSettled([document.fonts?.ready, ...images.map((image) => image.decode())]),
+      new Promise((resolve) => { timeout = setTimeout(resolve, 2000); })
+    ]);
+    if (window.desktop?.printMarkdown) {
+      if (!await window.desktop.printMarkdown()) throw new Error('The native print dialog could not open.');
+    } else {
+      window.print();
+    }
+  } catch {
+    printSnapshot = null;
+    elements.printStatus.textContent = 'Windows could not open the print dialog.';
+    elements.printStatus.hidden = false;
+    printStatusTimer = setTimeout(() => { elements.printStatus.hidden = true; }, 6000);
+  } finally {
+    clearTimeout(timeout);
+    printPreparing = false;
+    updatePrintButton();
+  }
+}
+
+window.addEventListener('beforeprint', () => renderPrintDocument(printSnapshot || printableDocument()));
+window.addEventListener('afterprint', () => { printSnapshot = null; });
 
 // The editor uses the same renderer and document source as the reader.
 window.markdownVisionReader = {
@@ -840,6 +905,8 @@ window.markdownVisionReader = {
   tableCellRanges,
   readInlineAssets,
   withoutInlineCode,
+  printDocument: printCurrentDocument,
+  updatePrintButton,
   refreshEditorSearch(options) {
     if (!elements.searchPanel.hidden) runSearch(options);
   },
@@ -858,6 +925,7 @@ async function openPicker() {
 }
 
 elements.openButton.addEventListener('click', openPicker);
+elements.printButton.addEventListener('click', printCurrentDocument);
 elements.searchButton.addEventListener('click', () => {
   if (elements.searchPanel.hidden) openSearchPanel();
   else closeSearchPanel();
@@ -957,6 +1025,11 @@ elements.lineHeight.addEventListener('input', () => { preferences.line = element
 elements.readingWidth.addEventListener('input', () => { preferences.width = elements.readingWidth.value; applyPreferences(); savePreferences(); });
 
 document.addEventListener('keydown', (event) => {
+  if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'p') {
+    event.preventDefault();
+    if (!event.repeat) void printCurrentDocument();
+    return;
+  }
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'o') {
     event.preventDefault();
     openPicker();

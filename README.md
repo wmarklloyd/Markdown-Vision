@@ -1,10 +1,10 @@
 # Markdown Vision
 
-A native Windows x64 Markdown reader and editor. Markdown Vision uses a Win32 C++ executable with Microsoft Edge WebView2 and provides Visual, Split, and Markdown editing with Save and Save As.
+A native Windows x64 Markdown reader and editor. The Win32 C++ app uses Microsoft Edge WebView2 and supports Visual, Split, and Markdown editing, saving, and system printing.
 
 ## Download for Windows
 
-**[Windows installer (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.0.0/Markdown-Vision-Native-Setup-2.0.0.exe)** · **[Portable Windows x64 ZIP](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.0.0/MarkdownVision-Native-Editor-2.0.0-win-x64.zip)**
+**[Windows installer (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.1.0/Markdown-Vision-Native-Setup-2.1.0.exe)** · **[Portable Windows x64 ZIP](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.1.0/MarkdownVision-Native-Editor-2.1.0-win-x64.zip)**
 
 ![Markdown Vision showing its own README five levels deep](docs/markdown-vision-recursive.png)
 
