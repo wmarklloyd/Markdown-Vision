@@ -936,7 +936,8 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int showCommand) {
     windowClass.hInstance = instance;
     windowClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     windowClass.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
-    windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+    static HBRUSH startupBrush = CreateSolidBrush(RGB(45, 45, 44));
+    windowClass.hbrBackground = startupBrush;
     windowClass.lpszClassName = kClassName;
     RegisterClassExW(&windowClass);
 

@@ -1,26 +1,21 @@
 # Markdown Vision
 
-A focused standalone Markdown reader with light and dark themes and access to your installed system fonts.
+A Windows Markdown reader and editor with light and dark themes, configurable typography, and Visual, Split, and Markdown editing views. Version 2.0.0 uses the native C++ application with Microsoft Edge WebView2. The editor provides Save and Save As.
 
-## Run locally
-
-```powershell
-npm install
-npm start
-```
-
-## Build the portable Windows app
+## Build the native Windows app
 
 ```powershell
-npm run dist
+.\native-cpp\build.bat
 ```
 
-The standalone executable is written to `dist/MarkdownVision-Portable-1.0.4.exe`. It does not require installation. Markdown files can also be passed to the executable from the command line.
+Extract `dist/MarkdownVision-Native-Editor-2.0.0-win-x64.zip` and run `Markdown-Vision.exe`. Keep the adjacent `web/` directory with the executable. You can also pass a Markdown file path as a command-line argument.
 
-## Build the smaller Windows-native app
+## Build the Windows installer
 
 ```powershell
-npm run dist-native
+.\native-cpp\build-installer.bat
 ```
 
-This builds the separate WebView2-based Windows edition into `dist`. It is smaller than the Electron package, but it depends on the Microsoft Edge WebView2 Runtime and the .NET 8 Desktop Runtime on the target machine.
+The setup executable is written to `dist/Markdown-Vision-Native-Setup-2.0.0.exe`.
+
+See [the project description](PROJECT_DESCRIPTION.md) for architecture and verification status, and [the native build notes](native-cpp/README.md) for prerequisites.

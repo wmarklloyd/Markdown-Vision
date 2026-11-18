@@ -10,7 +10,7 @@ const detachedLaunchFlag = '--markdown-vision-detached';
 const initialDocuments = new Map();
 const startupDocumentPath = getDocumentPath();
 const preferencesPath = path.join(app.getPath('appData'), 'Markdown Vision', 'preferences.json');
-const defaultPreferences = { theme: 'light', font: 'Georgia', size: '18', line: '1.75', width: '720' };
+const defaultPreferences = { theme: 'light', font: 'Georgia', monoFont: 'Consolas', size: '18', line: '1.75', width: '720' };
 
 function getDocumentPath(argv = process.argv) {
   return argv
@@ -51,7 +51,6 @@ function configureChromiumCache() {
   } catch {
     app.commandLine.appendSwitch('disable-http-cache');
   }
-  app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 }
 
 detachFileLaunch();
@@ -78,6 +77,7 @@ function writePreferences(preferences) {
   const nextPreferences = {
     theme: preferences?.theme || defaultPreferences.theme,
     font: preferences?.font || defaultPreferences.font,
+    monoFont: preferences?.monoFont || defaultPreferences.monoFont,
     size: String(preferences?.size || defaultPreferences.size),
     line: String(preferences?.line || defaultPreferences.line),
     width: String(preferences?.width || defaultPreferences.width)
@@ -109,7 +109,7 @@ function createWindow(filePath = null) {
     height: 820,
     minWidth: 680,
     minHeight: 520,
-    backgroundColor: '#f5f3ee',
+    backgroundColor: '#1c1c1b',
     title: getDocumentTitle(initialDocument?.name),
     autoHideMenuBar: true,
     webPreferences: {

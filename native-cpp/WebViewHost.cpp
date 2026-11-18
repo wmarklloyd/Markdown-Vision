@@ -2,6 +2,7 @@
 #include <commdlg.h>
 #include <dwmapi.h>
 #include <shellapi.h>
+#include <shlwapi.h>
 #include <shlobj.h>
 #include <wrl.h>
 #include <WebView2.h>
@@ -9,6 +10,8 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <limits>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -25,6 +28,21 @@ ComPtr<ICoreWebView2Controller> g_controller;
 ComPtr<ICoreWebView2> g_webView;
 std::wstring g_startupPath;
 bool g_initialTaken = false;
+bool g_saving = false;
+unsigned long long g_documentSequence = 0;
+
+enum class LineEnding { lf, crlf, cr, mixed };
+
+struct OpenDocument {
+    std::wstring id;
+    std::wstring path;
+    std::string bytes;
+    LineEnding lineEnding = LineEnding::lf;
+    bool bom = false;
+    bool validUtf8 = true;
+};
+
+std::optional<OpenDocument> g_document;
 
 bool SystemUsesDarkMode() {
     DWORD lightTheme = 1;
@@ -47,17 +65,41 @@ std::wstring Lower(std::wstring value) {
     return value;
 }
 
-std::wstring ReadTextFile(const std::wstring& path) {
+bool ReadFileBytes(const std::wstring& path, std::string& bytes) {
     std::ifstream stream(std::filesystem::path(path), std::ios::binary);
-    if (!stream) return {};
-    std::string bytes((std::istreambuf_iterator<char>(stream)), {});
-    if (bytes.size() >= 3 && static_cast<unsigned char>(bytes[0]) == 0xef &&
-        static_cast<unsigned char>(bytes[1]) == 0xbb && static_cast<unsigned char>(bytes[2]) == 0xbf)
-        bytes.erase(0, 3);
-    if (bytes.empty()) return {};
-    const int count = MultiByteToWideChar(CP_UTF8, 0, bytes.data(), static_cast<int>(bytes.size()), nullptr, 0);
+    if (!stream) return false;
+    bytes.clear();
+    char buffer[16384];
+    while (stream.read(buffer, sizeof(buffer)) || stream.gcount()) {
+        bytes.append(buffer, static_cast<size_t>(stream.gcount()));
+    }
+    return stream.eof() && !stream.bad();
+}
+
+LineEnding DetectLineEnding(const std::string& bytes) {
+    bool crlf = false, cr = false, lf = false;
+    for (size_t i = 0; i < bytes.size(); ++i) {
+        if (bytes[i] == '\r') {
+            if (i + 1 < bytes.size() && bytes[i + 1] == '\n') { crlf = true; ++i; }
+            else cr = true;
+        } else if (bytes[i] == '\n') lf = true;
+    }
+    if (static_cast<int>(crlf) + static_cast<int>(cr) + static_cast<int>(lf) > 1) return LineEnding::mixed;
+    return crlf ? LineEnding::crlf : cr ? LineEnding::cr : LineEnding::lf;
+}
+
+std::wstring DecodeText(OpenDocument& document) {
+    document.bom = document.bytes.compare(0, 3, "\xef\xbb\xbf") == 0;
+    document.lineEnding = DetectLineEnding(document.bytes);
+    const size_t skip = document.bom ? 3 : 0;
+    if (document.bytes.size() == skip) return {};
+    const char* bytes = document.bytes.data() + skip;
+    const int length = static_cast<int>(document.bytes.size() - skip);
+    int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, bytes, length, nullptr, 0);
+    document.validUtf8 = count > 0;
+    if (!document.validUtf8) count = MultiByteToWideChar(CP_UTF8, 0, bytes, length, nullptr, 0);
     std::wstring result(count, L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, bytes.data(), static_cast<int>(bytes.size()), result.data(), count);
+    if (count) MultiByteToWideChar(CP_UTF8, 0, bytes, length, result.data(), count);
     return result;
 }
 
@@ -83,8 +125,19 @@ std::wstring JsonString(const std::wstring& value) {
 
 std::wstring DocumentJson(const std::wstring& path) {
     if (path.empty()) return L"null";
-    return L"{\"name\":" + JsonString(std::filesystem::path(path).filename().wstring()) +
-        L",\"content\":" + JsonString(ReadTextFile(path)) + L"}";
+    OpenDocument document;
+    if (!ReadFileBytes(path, document.bytes) ||
+        document.bytes.size() > static_cast<size_t>((std::numeric_limits<int>::max)())) {
+        MessageBoxW(g_window, L"Markdown Vision could not read this file.", kAppName, MB_OK | MB_ICONERROR);
+        return L"null";
+    }
+    document.id = std::to_wstring(++g_documentSequence);
+    document.path = path;
+    const auto text = DecodeText(document);
+    const auto json = L"{\"name\":" + JsonString(std::filesystem::path(path).filename().wstring()) +
+        L",\"documentId\":" + JsonString(document.id) + L",\"content\":" + JsonString(text) + L"}";
+    g_document = std::move(document);
+    return json;
 }
 
 void SetDocumentTitle(const std::wstring& path) {
@@ -104,10 +157,171 @@ std::wstring PickDocument() {
         L"Markdown files (*.md;*.markdown;*.mdown;*.mkd)\0*.md;*.markdown;*.mdown;*.mkd\0"
         L"Text files (*.txt)\0*.txt\0\0";
     dialog.lpstrTitle = L"Open Markdown file";
-    dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+    dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
     if (!GetOpenFileNameW(&dialog)) return {};
-    SetDocumentTitle(path);
     return path;
+}
+
+std::wstring PickSavePath(const OpenDocument* document) {
+    wchar_t path[32768] = L"Untitled.md";
+    const std::wstring directory = document ? std::filesystem::path(document->path).parent_path().wstring() : L"";
+    if (document) wcsncpy_s(path, document->path.c_str(), _TRUNCATE);
+    OPENFILENAMEW dialog{sizeof(dialog)};
+    dialog.hwndOwner = g_window;
+    dialog.lpstrFile = path;
+    dialog.nMaxFile = static_cast<DWORD>(std::size(path));
+    dialog.lpstrFilter = L"Markdown files (*.md;*.markdown;*.mdown;*.mkd)\0*.md;*.markdown;*.mdown;*.mkd\0"
+        L"Text files (*.txt)\0*.txt\0All files\0*.*\0\0";
+    dialog.lpstrTitle = L"Save Markdown file";
+    dialog.lpstrInitialDir = directory.empty() ? nullptr : directory.c_str();
+    dialog.lpstrDefExt = L"md";
+    dialog.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+    return GetSaveFileNameW(&dialog) ? std::wstring(path) : L"";
+}
+
+bool EncodeText(const std::wstring& text, LineEnding ending, bool bom, std::string& bytes) {
+    std::wstring normalized;
+    normalized.reserve(text.size());
+    for (size_t i = 0; i < text.size(); ++i) {
+        const wchar_t ch = text[i];
+        if (ch != L'\r' && ch != L'\n') {
+            normalized += ch;
+            continue;
+        }
+        if (ch == L'\r' && i + 1 < text.size() && text[i + 1] == L'\n') ++i;
+        if (ending == LineEnding::cr || ending == LineEnding::crlf) normalized += L'\r';
+        if (ending != LineEnding::cr) normalized += L'\n';
+    }
+    bytes = bom ? "\xef\xbb\xbf" : "";
+    if (normalized.empty()) return true;
+    if (normalized.size() > static_cast<size_t>((std::numeric_limits<int>::max)())) return false;
+    const int length = static_cast<int>(normalized.size());
+    const int count = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, normalized.data(), length, nullptr, 0, nullptr, nullptr);
+    if (!count) return false;
+    const size_t offset = bytes.size();
+    bytes.resize(offset + count);
+    return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, normalized.data(), length,
+        bytes.data() + offset, count, nullptr, nullptr) == count;
+}
+
+enum class FileWriteResult { saved, changed, error, recovery };
+
+FileWriteResult ReplaceDocument(const std::wstring& path, const std::string& bytes, const std::string* previous,
+    std::wstring& recoveryPath) {
+    GUID id{};
+    wchar_t suffix[40]{};
+    if (FAILED(CoCreateGuid(&id)) || !StringFromGUID2(id, suffix, static_cast<int>(std::size(suffix)))) return FileWriteResult::error;
+    const auto temporary = std::filesystem::path(path).parent_path() /
+        (std::wstring(L".markdown-vision-") + suffix + L".tmp");
+    const HANDLE file = CreateFileW(temporary.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return FileWriteResult::error;
+    size_t offset = 0;
+    while (offset < bytes.size()) {
+        const DWORD count = static_cast<DWORD>(std::min<size_t>(bytes.size() - offset, 1048576));
+        DWORD written = 0;
+        if (!WriteFile(file, bytes.data() + offset, count, &written, nullptr) || !written) break;
+        offset += written;
+    }
+    const bool flushed = offset == bytes.size() && FlushFileBuffers(file);
+    const bool closed = CloseHandle(file);
+    auto result = FileWriteResult::error;
+    if (flushed && closed) {
+        if (previous) {
+            std::string current;
+            if (!ReadFileBytes(path, current) || current != *previous) {
+                result = FileWriteResult::changed;
+            } else {
+                const std::wstring backup = temporary.wstring() + L".bak";
+                if (ReplaceFileW(path.c_str(), temporary.c_str(), backup.c_str(), 0, nullptr, nullptr)) {
+                    DeleteFileW(backup.c_str());
+                    result = FileWriteResult::saved;
+                } else if (GetLastError() == ERROR_UNABLE_TO_MOVE_REPLACEMENT_2
+                    && !MoveFileExW(backup.c_str(), path.c_str(), MOVEFILE_WRITE_THROUGH)) {
+                    recoveryPath = backup;
+                    result = FileWriteResult::recovery;
+                }
+            }
+        } else if (MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_WRITE_THROUGH)) {
+            result = FileWriteResult::saved;
+        }
+    }
+    if (result != FileWriteResult::saved) DeleteFileW(temporary.c_str());
+    return result;
+}
+
+std::wstring SaveError(const std::wstring& message) {
+    return L"{\"status\":\"error\",\"message\":" + JsonString(message) + L"}";
+}
+
+std::wstring SaveDocument(const std::wstring& id, const std::wstring& text, bool saveAs) {
+    const OpenDocument* current = g_document && g_document->id == id ? &*g_document : nullptr;
+    if (!id.empty() && !current && !saveAs) return SaveError(L"This document is no longer open. Reopen the file or use Save As.");
+    const bool choosePath = saveAs || !current;
+    if (!choosePath && !current->validUtf8) return SaveError(L"Use Save As to create a UTF-8 copy of this file.");
+    if (!choosePath && current->lineEnding == LineEnding::mixed) {
+        return SaveError(L"This file uses mixed line endings. Use Save As to create a copy with consistent line endings.");
+    }
+
+    OpenDocument next;
+    next.path = choosePath ? PickSavePath(current) : current->path;
+    if (next.path.empty()) {
+        if (CommDlgExtendedError()) return SaveError(L"Windows could not open the Save As dialog.");
+        return L"{\"status\":\"canceled\"}";
+    }
+    if (current && current->validUtf8 && current->lineEnding != LineEnding::mixed) {
+        next.lineEnding = current->lineEnding;
+        next.bom = current->bom;
+    }
+    if (!EncodeText(text, next.lineEnding, next.bom, next.bytes)) return SaveError(L"The draft could not be encoded as UTF-8.");
+
+    std::string confirmed;
+    const std::string* previous = !choosePath ? &current->bytes : nullptr;
+    if (choosePath && GetFileAttributesW(next.path.c_str()) != INVALID_FILE_ATTRIBUTES) {
+        if (!ReadFileBytes(next.path, confirmed)) return SaveError(L"Windows could not read the selected destination.");
+        previous = &confirmed;
+    }
+    std::wstring recoveryPath;
+    switch (ReplaceDocument(next.path, next.bytes, previous, recoveryPath)) {
+    case FileWriteResult::changed:
+        return SaveError(L"The file changed on disk or is unavailable. Use Save As to keep your edits in a separate copy.");
+    case FileWriteResult::error:
+        return SaveError(L"Windows could not save the file. Check that the file is writable, or use Save As.");
+    case FileWriteResult::recovery:
+        return SaveError(L"Windows could not restore the original file during the save. The original is at " + recoveryPath);
+    case FileWriteResult::saved:
+        break;
+    }
+    next.id = choosePath ? std::to_wstring(++g_documentSequence) : current->id;
+    const auto json = L"{\"status\":\"saved\",\"documentId\":" + JsonString(next.id) + L",\"name\":" +
+        JsonString(std::filesystem::path(next.path).filename().wstring()) + L"}";
+    g_document = std::move(next);
+    return json;
+}
+
+std::wstring DecodeSavePayload(const std::wstring& text) {
+    std::wstring output;
+    output.reserve(text.size());
+    for (size_t i = 0; i < text.size(); ++i) {
+        if (text[i] == L'%' && i + 2 < text.size()) {
+            if (text.compare(i, 3, L"%00") == 0) { output += L'\0'; i += 2; continue; }
+            if (text.compare(i, 3, L"%25") == 0) { output += L'%'; i += 2; continue; }
+        }
+        output += text[i];
+    }
+    return output;
+}
+
+std::wstring ModuleDirectory();
+
+bool IsLocalAppMessage(ICoreWebView2WebMessageReceivedEventArgs* args) {
+    LPWSTR url = nullptr;
+    if (FAILED(args->get_Source(&url)) || !url) return false;
+    wchar_t path[32768]{};
+    DWORD length = static_cast<DWORD>(std::size(path));
+    const HRESULT parsed = PathCreateFromUrlW(url, path, &length, 0);
+    CoTaskMemFree(url);
+    const auto expected = std::filesystem::path(ModuleDirectory()) / L"web" / L"index.html";
+    return SUCCEEDED(parsed) && _wcsicmp(path, expected.c_str()) == 0;
 }
 
 int CALLBACK CollectFont(const LOGFONTW* font, const TEXTMETRICW*, DWORD, LPARAM value) {
@@ -147,11 +361,24 @@ void HandleMessage(ICoreWebView2WebMessageReceivedEventArgs* args) {
     const size_t separator = message.find(L'|');
     if (separator == std::wstring::npos) return;
     const auto id = message.substr(0, separator);
-    const auto method = message.substr(separator + 1);
+    const size_t argument = message.find(L'|', separator + 1);
+    const auto method = message.substr(separator + 1, argument == std::wstring::npos ? argument : argument - separator - 1);
     if (method == L"document.initial") {
         Resolve(id, g_initialTaken ? L"null" : DocumentJson(g_startupPath));
         g_initialTaken = true;
-    } else if (method == L"document.open") Resolve(id, DocumentJson(PickDocument()));
+    } else if (method == L"document.open") Resolve(id, g_saving ? L"null" : DocumentJson(PickDocument()));
+    else if (method == L"document.save" || method == L"document.saveAs") {
+        const size_t body = argument == std::wstring::npos ? argument : message.find(L'|', argument + 1);
+        if (g_saving || body == std::wstring::npos || !IsLocalAppMessage(args)) {
+            Resolve(id, SaveError(L"The save request could not be completed."));
+            return;
+        }
+        g_saving = true;
+        const auto result = SaveDocument(message.substr(argument + 1, body - argument - 1),
+            DecodeSavePayload(message.substr(body + 1)), method == L"document.saveAs");
+        g_saving = false;
+        Resolve(id, result);
+    }
     else if (method == L"fonts.list") Resolve(id, FontJson());
     else Resolve(id, L"null");
 }
@@ -221,6 +448,12 @@ void InitializeWebView() {
                             controller->get_CoreWebView2(&g_webView);
                             ResizeWebView();
 
+                            ComPtr<ICoreWebView2Controller2> controller2;
+                            if (SUCCEEDED(controller->QueryInterface(IID_PPV_ARGS(&controller2))) && controller2) {
+                                COREWEBVIEW2_COLOR background{255, 28, 28, 27};
+                                controller2->put_DefaultBackgroundColor(background);
+                            }
+
                             ComPtr<ICoreWebView2Settings> settings;
                             g_webView->get_Settings(&settings);
                             settings->put_AreDevToolsEnabled(FALSE);
@@ -234,14 +467,16 @@ void InitializeWebView() {
     const resolve = pending.get(id);
     if (resolve) { pending.delete(id); resolve(result); }
   };
-  const request = (method) => new Promise((resolve) => {
+  const request = (method, payload = '') => new Promise((resolve) => {
     const id = String(nextId++);
     pending.set(id, resolve);
-    chrome.webview.postMessage(id + '|' + method);
+    chrome.webview.postMessage(id + '|' + method + payload);
   });
   window.desktop = {
     getInitialDocument: () => request('document.initial'),
     openMarkdownFile: () => request('document.open'),
+    saveMarkdownFile: (documentId, content, saveAs) => request(saveAs ? 'document.saveAs' : 'document.save',
+      '|' + (documentId || '') + '|' + content.replaceAll('%', '%25').replaceAll('\0', '%00')),
     listSystemFonts: () => request('fonts.list'),
     onOpenDocument: () => {},
     onFullscreenChange: () => {}
@@ -332,7 +567,8 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int showCommand) {
     windowClass.hIconSm = static_cast<HICON>(LoadImageW(
         instance, MAKEINTRESOURCEW(101), IMAGE_ICON,
         GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
-    windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+    static HBRUSH startupBrush = CreateSolidBrush(RGB(28, 28, 27));
+    windowClass.hbrBackground = startupBrush;
     windowClass.lpszClassName = kClassName;
     RegisterClassExW(&windowClass);
 

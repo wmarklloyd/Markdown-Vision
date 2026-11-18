@@ -38,6 +38,7 @@ public partial class MainWindow : Window
                 "Markdown Vision Native",
                 "WebView2");
             var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder);
+            Browser.DefaultBackgroundColor = System.Drawing.Color.FromArgb(0xFF, 0x1C, 0x1C, 0x1B);
             await Browser.EnsureCoreWebView2Async(environment);
             await Browser.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(BridgeScript);
 

@@ -7,7 +7,7 @@
         Height="820"
         MinWidth="680"
         MinHeight="520"
-        Background="#F5F3EE">
+        Background="#1C1C1B">
   <Grid>
     <wv2:WebView2 x:Name="Browser" />
   </Grid>
