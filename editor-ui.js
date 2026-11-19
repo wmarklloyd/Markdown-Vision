@@ -179,8 +179,19 @@
         }
         const codeEditor = original?.kind === 'code' && node.querySelector('.visual-code-editor');
         const span = codeEditor && visualRanges.get(id);
-        const text = span ? updateCodeBody(source.value.slice(span.start, span.end), codeEditor.value)
+        let text = span ? updateCodeBody(source.value.slice(span.start, span.end), codeEditor.value)
           : original && (original.locked || node.outerHTML === original.html) ? original.source : block(node, original);
+        if (original?.editableLinkLabels) {
+          for (const label of [...original.editableLinkLabels].reverse()) {
+            const field = node.querySelector('[data-editable-list-link="' + label.index + '"]');
+            if (!field || field.textContent === label.text) continue;
+            let value = field.textContent.replace(/([\\\x60*_[\]<>!&#])/g, '\\$1');
+            if (label.quote) {
+              value = value.replace(/^(\s*)([-+])/,'$1\\$2').replace(/^(\s*\d+)([.)])(?=\s)/, '$1\\$2');
+            }
+            text = text.slice(0, label.start) + value + text.slice(label.end);
+          }
+        }
         paragraphs.push({ text, original, id });
         if (id) used.add(id);
       } else {
@@ -335,6 +346,9 @@
         });
       }
       configureVisualBlock(record, rendered, { inlineMarkup, nestedList, referenceLabels });
+      if (block.kind === 'complex' && /^ {0,3}>/m.test(block.source)) {
+        configureQuotedText(record, rendered);
+      }
       visualBlocks.set(id, record);
       visualRanges.set(id, { start: block.start, end: block.end });
       previousLocked = protectedBlock;
@@ -422,7 +436,32 @@
       reason = nestedList
         ? 'Use Edit item to change the text. To change the nesting, edit the list in Markdown.'
         : 'Use Edit item or the checkboxes to change this list.';
-      for (const [index, item] of [...rendered.querySelectorAll('li')].entries()) {
+      const lines = blockLines(block.source);
+      const items = [...rendered.querySelectorAll('li')];
+      const linkLabels = [];
+      for (const [index, item] of items.entries()) {
+        const line = lines[index];
+        const parsed = line && window.markdownVisionReader.readListItem(line.text);
+        const match = parsed?.body.match(/^\[((?:\\[\\\x60*_[\]<>!&#]|[^\[\]\\*_\x60<>!&])+)\]\((#[\w-]+)\)([ \t]*)$/);
+        const link = item.querySelector(':scope > a');
+        const text = match?.[1].replace(/\\([\\\x60*_[\]<>!&#])/g, '$1');
+        if (match && link && link.textContent === text && link.getAttribute('href') === match[2]) {
+          const start = line.start + parsed.bodyStart + 1;
+          linkLabels.push({ index, start, end: start + match[1].length, text, link });
+        }
+      }
+      if (linkLabels.length === items.length && items.length === lines.length) {
+        block.editableLinkLabels = linkLabels.map(({ link, ...label }) => label);
+        for (const label of linkLabels) {
+          label.link.contentEditable = 'plaintext-only';
+          label.link.dataset.editableListLink = String(label.index);
+          label.link.setAttribute('aria-label', 'Edit list item text');
+          label.link.setAttribute('role', 'textbox');
+          label.link.spellcheck = true;
+        }
+        reason = 'Edit the linked item text directly. Edit the link or list structure in Markdown.';
+      }
+      for (const [index, item] of items.entries()) {
         if (nestedList) {
           item.dataset.visualRestriction = reason;
           item.dataset.sourceListItem = String(index);
@@ -434,8 +473,10 @@
           checkbox.dataset.visualEdit = 'task';
           checkbox.dataset.index = String(index);
         }
-        item.insertBefore(visualAction('Edit item', nestedList ? 'list-text' : 'list-item', index),
-          item.querySelector(':scope > ul, :scope > ol'));
+        if (!block.editableLinkLabels) {
+          item.insertBefore(visualAction('Edit item', nestedList ? 'list-text' : 'list-item', index),
+            item.querySelector(':scope > ul, :scope > ol'));
+        }
       }
     } else if (block.kind === 'table') {
       reason = 'This table needs to be edited in Markdown.';
@@ -475,6 +516,36 @@
     sourceAction.title = reason;
     actions.append(sourceAction);
     block.node.append(actions);
+  }
+
+  function configureQuotedText(block, rendered) {
+    const lines = blockLines(block.source);
+    const candidates = lines.flatMap((line) => {
+      const match = line.text.match(/^( {0,3}(?:>[ \t]?)+(?:#{1,6}[ \t]+|\d+[.)][ \t]+|[-+*][ \t]+)?)(.*?)([ \t]*)$/);
+      if (!match || !match[2]) return [];
+      return [{ start: line.start + match[1].length, end: line.start + match[1].length + match[2].length, text: match[2] }];
+    });
+    const labels = [];
+    for (const element of rendered.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li')) {
+      if (element.childNodes.length !== 1 || element.firstChild.nodeType !== Node.TEXT_NODE) continue;
+      const text = element.textContent;
+      const matching = candidates.filter((candidate) => candidate.text === text);
+      if (matching.length !== 1) continue;
+      const index = labels.length;
+      const field = document.createElement('span');
+      field.textContent = text;
+      field.contentEditable = 'plaintext-only';
+      field.dataset.editableListLink = String(index);
+      field.setAttribute('aria-label', 'Edit quoted text');
+      field.setAttribute('role', 'textbox');
+      field.spellcheck = true;
+      element.replaceChildren(field);
+      labels.push({ ...matching[0], index, quote: true });
+    }
+    if (labels.length) {
+      block.editableLinkLabels = labels;
+      block.node.dataset.visualRestriction = 'Edit the plain text directly. Edit the quote structure in Markdown.';
+    }
   }
 
   function displayedBlock(target) {
@@ -1970,6 +2041,7 @@
   });
   document.addEventListener('keydown', (event) => {
     if (!active || editDialog.open || event.isComposing) return;
+    if (event.target.matches('[data-editable-list-link]')) return;
     if (event.key === 'Escape' && restrictionAnchor) {
       event.preventDefault();
       hideRestriction(restriction.contains(document.activeElement));
@@ -1993,6 +2065,7 @@
   for (const eventType of ['cut', 'paste']) {
     document.addEventListener(eventType, (event) => {
       if (!active || editDialog.open || (!preview.contains(event.target) && event.target !== document.body)) return;
+      if (event.target.matches('[data-editable-list-link]')) return;
       if (event.target.matches('.visual-code-editor')) return;
       const target = protectedEditTarget(event.target);
       if (target) {
@@ -2079,6 +2152,19 @@
       visualInput = visualSnapshot(lastVisualHtml);
       return;
     }
+    if (event.target.matches('[data-editable-list-link]')) {
+      if (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') {
+        event.preventDefault();
+        return;
+      }
+      const selection = window.getSelection();
+      if (event.inputType.startsWith('delete') && event.target.textContent.length <= Math.max(1, selection.toString().length)) {
+        event.preventDefault();
+        return;
+      }
+      visualInput = visualSnapshot(lastVisualHtml);
+      return;
+    }
     const boundary = event.getTargetRanges?.()[0];
     let range = currentVisualRange();
     if (boundary && preview.contains(boundary.startContainer) && preview.contains(boundary.endContainer)) {
@@ -2106,6 +2192,10 @@
     updateTools();
   });
   preview.addEventListener('keydown', (event) => {
+    if (event.target.matches('[data-editable-list-link]') && event.key === 'Enter') {
+      event.preventDefault();
+      return;
+    }
     if (event.target.matches('.visual-code-editor')
         && (!(event.ctrlKey || event.metaKey) || !['y', 'z'].includes(event.key.toLowerCase()))) return;
     if (!event.isComposing && event.altKey && event.key === 'Enter') {
@@ -2140,13 +2230,20 @@
     if (event.target.matches('.visual-code-editor')) return;
     event.preventDefault();
     visualInput = visualSnapshot(lastVisualHtml);
-    document.execCommand('insertText', false, event.clipboardData.getData('text/plain'));
+    const text = event.clipboardData.getData('text/plain');
+    document.execCommand('insertText', false, event.target.matches('[data-editable-list-link]')
+      ? text.replace(/[\r\n]+/g, ' ') : text);
     visualInput = null;
   });
   preview.addEventListener('drop', (event) => {
     if (!event.target.matches('.visual-code-editor')) event.preventDefault();
   });
   preview.addEventListener('click', (event) => {
+    if (event.target.closest('[data-editable-list-link]')) {
+      event.preventDefault();
+      hideRestriction();
+      return;
+    }
     const control = event.target.closest('[data-visual-edit]');
     const asset = event.target.closest('a,img');
     if (!control && !asset) return;
