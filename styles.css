@@ -334,7 +334,7 @@ kbd { background: var(--surface); border: 1px solid var(--faint); border-radius:
 .markdown-body img { max-width: 100%; border-radius: 5px; }
 .markdown-body hr { border: 0; border-top: 1px solid var(--faint); margin: 2.5em 0; }
 .markdown-body table { width: 100%; table-layout: fixed; overflow-wrap: anywhere; border-collapse: collapse; margin: 1.5em 0; font-size: .9em; }
-.markdown-body th, .markdown-body td { padding: .6em .8em; border: 1px solid var(--faint); text-align: left; }
+.markdown-body th, .markdown-body td { padding: .6em clamp(2px, .8vw, .8em); border: 1px solid var(--faint); text-align: left; }
 .print-document { display: none; }
 
 @media print {
