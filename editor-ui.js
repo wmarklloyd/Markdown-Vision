@@ -192,6 +192,24 @@
             text = text.slice(0, label.start) + value + text.slice(label.end);
           }
         }
+        if (original?.editableCells) {
+          for (const cell of [...original.editableCells].reverse()) {
+            const field = node.querySelector('[data-direct-table-cell="' + cell.index + '"]');
+            if (!field) continue;
+            const value = field.innerText.replace(/\r\n?/g, '\n').replace(/\u00a0/g, ' ');
+            if (value === cell.text) continue;
+            let prefix = 0;
+            while (prefix < cell.text.length && prefix < value.length && cell.text[prefix] === value[prefix]) prefix += 1;
+            let suffix = 0;
+            while (suffix < cell.text.length - prefix && suffix < value.length - prefix
+                && cell.text[cell.text.length - suffix - 1] === value[value.length - suffix - 1]) suffix += 1;
+            const from = cell.positions[prefix];
+            const to = cell.positions[cell.text.length - suffix];
+            const inserted = value.slice(prefix, value.length - suffix)
+              .replace(/([\\\x60*_[\]<>!&#~|])/g, '\\$1').replace(/\n/g, '<br>');
+            text = text.slice(0, cell.start + from) + inserted + text.slice(cell.start + to);
+          }
+        }
         paragraphs.push({ text, original, id });
         if (id) used.add(id);
       } else {
@@ -486,6 +504,7 @@
       if (rows && displayed.length === rows.length - 1 && displayed.every((row) => row.cells.length === rows[0].cells.length)
           && !/<\/?(?:table|tbody|thead|tfoot|tr|th|td|caption|col|colgroup)\b/i.test(markup)) {
         const allowStructure = !inlineMarkup && rows.every((row) => row.cells.length === rows[0].cells.length);
+        const editableCells = [];
         for (const [row, line] of displayed.entries()) {
           const raw = rows[row ? row + 1 : 0];
           if (raw.cells.length !== line.cells.length) continue;
@@ -505,8 +524,31 @@
             cell.dataset.row = String(row);
             cell.dataset.index = String(column);
             if (allowStructure) cell.dataset.tableStructure = 'true';
+            if (!sourceOnly && [...cell.childNodes].every((child) =>
+              child.nodeType === Node.TEXT_NODE || child.nodeName === 'BR')) {
+              const markdown = raw.text.slice(start, end);
+              const parts = [...markdown.matchAll(/<br[ \t]*\/?>|\\([\\\x60*_[\]{}()#+\-.!|<>~&])|[\s\S]/gi)];
+              const visible = parts.map((part) => /^<br/i.test(part[0]) ? '\n' : part[1] || part[0]).join('');
+              const safe = parts.every((part) => part[1] || /^<br/i.test(part[0])
+                || !/[\\\x60*_[\]<>!&#~]/.test(part[0]));
+              if (safe && visible === renderedCellText(cell)) {
+                const positions = parts.map((part) => part.index);
+                positions.push(markdown.length);
+                const index = editableCells.length;
+                editableCells.push({ index, start: raw.start + start, text: visible, positions });
+                cell.dataset.directTableCell = String(index);
+                cell.contentEditable = 'plaintext-only';
+                cell.setAttribute('role', 'textbox');
+                cell.setAttribute('aria-label', 'Edit table cell');
+                cell.setAttribute('aria-multiline', 'true');
+                cell.title = 'Type to edit this cell. Press Alt+Enter for table options.';
+                reason = 'Type directly in plain cells. Use table options or edit the Markdown for more complex content.';
+              }
+            }
           }
         }
+        if (editableCells.length) block.editableCells = editableCells;
+        if (allowStructure) actions.append(visualAction('Table options', 'table-options'));
       }
     } else if (block.kind === 'html') {
       reason = 'This layout uses HTML. Edit it in Markdown.';
@@ -1002,6 +1044,7 @@
       if (multiline) {
         input.rows = Math.min(10, Math.max(3, value.split('\n').length));
         input.setSelectionRange(caret, caret);
+        input.addEventListener('input', () => resizeDialogTextarea(input));
         input.addEventListener('keydown', (event) => {
           if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing) {
             event.preventDefault();
@@ -1044,9 +1087,15 @@
       if (patch) applyVisualPatch(...patch);
     };
     editDialog.showModal();
+    inputs.querySelectorAll('textarea').forEach(resizeDialogTextarea);
     const first = inputs.querySelector('input,textarea');
     first.focus();
     if (first.tagName !== 'TEXTAREA') first.select();
+  }
+
+  function resizeDialogTextarea(input) {
+    input.style.height = 'auto';
+    input.style.height = input.scrollHeight + 2 + 'px';
   }
 
   function editVisualListItem(span, index, allowStructure = true) {
@@ -1256,6 +1305,12 @@
       case 'code-language': editVisualCodeLanguage(span); break;
       case 'table-cell-source': showRestriction(control); break;
       case 'table-cell': editVisualTableCell(span, control, event); break;
+      case 'table-options': {
+        const cell = span.node.querySelector('[data-table-selected="true"]')
+          || span.node.querySelector('[data-visual-edit="table-cell"]');
+        if (cell) editVisualTableCell(span, cell);
+        break;
+      }
       case 'list-item': editVisualListItem(span, index); break;
       case 'list-text': editVisualListItem(span, index, false); break;
       case 'task': toggleVisualTask(span, index); break;
@@ -2041,7 +2096,7 @@
   });
   document.addEventListener('keydown', (event) => {
     if (!active || editDialog.open || event.isComposing) return;
-    if (event.target.matches('[data-editable-list-link]')) return;
+    if (event.target.matches('[data-editable-list-link],[data-direct-table-cell]')) return;
     if (event.key === 'Escape' && restrictionAnchor) {
       event.preventDefault();
       hideRestriction(restriction.contains(document.activeElement));
@@ -2065,7 +2120,7 @@
   for (const eventType of ['cut', 'paste']) {
     document.addEventListener(eventType, (event) => {
       if (!active || editDialog.open || (!preview.contains(event.target) && event.target !== document.body)) return;
-      if (event.target.matches('[data-editable-list-link]')) return;
+      if (event.target.matches('[data-editable-list-link],[data-direct-table-cell]')) return;
       if (event.target.matches('.visual-code-editor')) return;
       const target = protectedEditTarget(event.target);
       if (target) {
@@ -2132,6 +2187,12 @@
   });
   preview.addEventListener('focusin', (event) => {
     updatePreview();
+    if (event.target.matches('[data-direct-table-cell]')) {
+      const block = event.target.closest('[data-visual-block]');
+      block.querySelectorAll('[data-table-selected]').forEach((cell) => delete cell.dataset.tableSelected);
+      event.target.dataset.tableSelected = 'true';
+      hideRestriction();
+    }
     if (event.target.matches('.visual-code-editor')) {
       visitedCodeEditors.add(event.target);
       hideRestriction();
@@ -2146,6 +2207,10 @@
         event.preventDefault();
         stepVisualHistory(event.inputType === 'historyUndo' ? 'undo' : 'redo');
       }
+      return;
+    }
+    if (event.target.matches('[data-direct-table-cell]')) {
+      visualInput = visualSnapshot(lastVisualHtml);
       return;
     }
     if (event.target.matches('.visual-code-editor')) {
@@ -2192,6 +2257,15 @@
     updateTools();
   });
   preview.addEventListener('keydown', (event) => {
+    if (event.target.matches('[data-direct-table-cell]')) {
+      if (event.altKey && event.key === 'Enter') {
+        event.preventDefault();
+        const span = displayedBlock(event.target);
+        if (span) editVisualTableCell(span, event.target);
+        return;
+      }
+      if (!(event.ctrlKey || event.metaKey) || !['z', 'y'].includes(event.key.toLowerCase())) return;
+    }
     if (event.target.matches('[data-editable-list-link]') && event.key === 'Enter') {
       event.preventDefault();
       return;
@@ -2239,6 +2313,10 @@
     if (!event.target.matches('.visual-code-editor')) event.preventDefault();
   });
   preview.addEventListener('click', (event) => {
+    if (event.target.closest('[data-direct-table-cell]')) {
+      hideRestriction();
+      return;
+    }
     if (event.target.closest('[data-editable-list-link]')) {
       event.preventDefault();
       hideRestriction();

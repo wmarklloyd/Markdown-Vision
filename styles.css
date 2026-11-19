@@ -149,6 +149,8 @@ body.is-editing .toolbar { width: 100%; }
 .editor-preview-content[contenteditable="true"] { cursor: text; }
 .editor-preview-content [data-editable-list-link] { cursor: text; border-radius: 2px; }
 .editor-preview-content [data-editable-list-link]:focus { outline: 1px solid var(--accent); outline-offset: 2px; }
+.editor-preview-content [data-direct-table-cell] { cursor: text; white-space: pre-wrap; }
+.editor-preview-content [data-direct-table-cell]:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
 .editor-preview-content [data-unfenced] { white-space: pre-wrap; overflow-wrap: anywhere; }
 .editor-notice { margin: 0; padding: 8px 12px; color: var(--muted); border-bottom: 1px solid var(--faint); font-size: 12px; }
 .visual-protected-block { border: 1px dashed var(--faint); padding: 8px; margin: 0 0 1em; }
@@ -177,6 +179,7 @@ body.is-editing .toolbar { width: 100%; }
 .visual-protected-block [data-visual-edit^="table-cell"]:is(:hover, :focus-visible) { background: var(--code-bg); }
 .visual-edit-dialog {
   width: min(620px, calc(100vw - 32px)); border: 1px solid var(--faint); border-radius: 10px;
+  max-height: calc(100vh - 32px); overflow: auto;
   padding: 20px; background: var(--surface); color: var(--text); box-shadow: var(--shadow);
 }
 .visual-edit-dialog::backdrop { background: rgba(0, 0, 0, .4); }
@@ -185,7 +188,7 @@ body.is-editing .toolbar { width: 100%; }
 .visual-edit-dialog :is(input, select, textarea) {
   width: 100%; padding: 8px; border: 1px solid var(--faint); border-radius: 5px; background: var(--bg); color: var(--text);
 }
-.visual-edit-dialog textarea { min-height: 5em; max-height: 50vh; resize: vertical; line-height: 1.5; }
+.visual-edit-dialog textarea { min-height: 8em; max-height: 50vh; resize: vertical; line-height: 1.5; }
 .visual-edit-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .visual-edit-actions button:not(.primary-button) {
   padding: 8px 14px; border: 0; border-radius: 5px; background: var(--code-bg); cursor: pointer;
