@@ -185,8 +185,8 @@
           for (const label of [...original.editableLinkLabels].reverse()) {
             const field = node.querySelector('[data-editable-list-link="' + label.index + '"]');
             if (!field || field.textContent === label.text) continue;
-            let value = field.textContent.replace(/([\\\x60*_[\]<>!&#])/g, '\\$1');
-            if (label.quote) {
+            let value = field.textContent.replace(/([\\\x60*_[\]<>!&#~])/g, '\\$1');
+            if (label.quote || label.listPlain) {
               value = value.replace(/^(\s*)([-+])/,'$1\\$2').replace(/^(\s*\d+)([.)])(?=\s)/, '$1\\$2');
             }
             text = text.slice(0, label.start) + value + text.slice(label.end);
@@ -460,15 +460,30 @@
       for (const [index, item] of items.entries()) {
         const line = lines[index];
         const parsed = line && window.markdownVisionReader.readListItem(line.text);
-        const match = parsed?.body.match(/^\[((?:\\[\\\x60*_[\]<>!&#]|[^\[\]\\*_\x60<>!&])+)\]\((#[\w-]+)\)([ \t]*)$/);
+        const match = parsed?.body.match(/^\[((?:\\[\\\x60*_[\]<>!&#~]|[^\[\]\\*_\x60<>!&])+)\]\((#[\w-]+)\)([ \t]*)$/);
         const link = item.querySelector(':scope > a');
-        const text = match?.[1].replace(/\\([\\\x60*_[\]<>!&#])/g, '$1');
+        const text = match?.[1].replace(/\\([\\\x60*_[\]<>!&#~])/g, '$1');
         if (match && link && link.textContent === text && link.getAttribute('href') === match[2]) {
           const start = line.start + parsed.bodyStart + 1;
           linkLabels.push({ index, start, end: start + match[1].length, text, link });
+          continue;
         }
+        if (!parsed || parsed.task) continue;
+        const rawText = parsed.body.trimEnd();
+        if (!/^(?:\\[\\\x60*_[\]<>!&#~+.)-]|[^\\\x60*_[\]<>!&#~])+$/.test(rawText)) continue;
+        const plain = rawText.replace(/\\([\\\x60*_[\]<>!&#~+.)-])/g, '$1');
+        const textNodes = [...item.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE && node.data.trim());
+        if (!plain || textNodes.length !== 1 || textNodes[0].data.trim() !== plain) continue;
+        const node = textNodes[0];
+        const content = node.splitText(node.data.indexOf(plain));
+        content.splitText(plain.length);
+        const field = document.createElement('span');
+        field.textContent = plain;
+        content.replaceWith(field);
+        const start = line.start + parsed.bodyStart;
+        linkLabels.push({ index, start, end: start + rawText.length, text: plain, listPlain: true, link: field });
       }
-      if (linkLabels.length === items.length && items.length === lines.length) {
+      if (linkLabels.length) {
         block.editableLinkLabels = linkLabels.map(({ link, ...label }) => label);
         for (const label of linkLabels) {
           label.link.contentEditable = 'plaintext-only';
@@ -477,7 +492,7 @@
           label.link.setAttribute('role', 'textbox');
           label.link.spellcheck = true;
         }
-        reason = 'Edit the linked item text directly. Edit the link or list structure in Markdown.';
+        reason = 'Edit item text directly. Edit the list structure in Markdown.';
       }
       for (const [index, item] of items.entries()) {
         if (nestedList) {
@@ -491,7 +506,7 @@
           checkbox.dataset.visualEdit = 'task';
           checkbox.dataset.index = String(index);
         }
-        if (!block.editableLinkLabels) {
+        if (!linkLabels.some((label) => label.index === index)) {
           item.insertBefore(visualAction('Edit item', nestedList ? 'list-text' : 'list-item', index),
             item.querySelector(':scope > ul, :scope > ol'));
         }
@@ -2318,7 +2333,7 @@
       return;
     }
     if (event.target.closest('[data-editable-list-link]')) {
-      event.preventDefault();
+      if (event.target.closest('a')) event.preventDefault();
       hideRestriction();
       return;
     }
@@ -2331,7 +2346,7 @@
     else runVisualEdit(event.target, event);
   });
   preview.addEventListener('dblclick', (event) => {
-    if (event.target.closest('a,img,button,input,textarea,[data-visual-edit]')) return;
+    if (event.target.closest('a,img,button,input,textarea,[data-visual-edit],[data-editable-list-link]')) return;
     const target = restrictionFor(event.target);
     if (target) showRestriction(target);
     else editDirectListItem(event.target);
