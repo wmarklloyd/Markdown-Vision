@@ -293,7 +293,7 @@
       const hasIndentedChild = following?.start === block.end + 1 && /^[ \t]+\S/.test(following.source);
       const nestedList = (block.kind === 'list' && (indented || hasIndentedChild)) || continuation;
       const inlineMarkup = block.kind !== 'code' && needsMarkdown(block.source, referenceLabels, block.kind === 'table');
-      const locked = block.kind === 'html'
+      const locked = ['html', 'complex', 'footnotes', 'definitions'].includes(block.kind)
         || (block.kind === 'code' && window.markdownVisionReader.readCodeFence(block.source.split('\n')[0])?.[2].trim())
         || inlineMarkup
         || (block.kind !== 'code' && /^>[ \t]*(?:>|[-+*][ \t]|\d+[.)][ \t])/m.test(block.source))
@@ -309,6 +309,7 @@
         if (previousLocked) appendTypingLine();
         node.contentEditable = 'false';
         node.className = 'visual-protected-block';
+        if (block.kind === 'definitions') node.hidden = true;
         if (template.content.childNodes.length) node.append(template.content);
         else node.textContent = 'Embedded content';
       }
@@ -413,10 +414,7 @@
       reason = nestedList
         ? 'Use Edit item to change the text. To change the nesting, edit the list in Markdown.'
         : 'Use Edit item or the checkboxes to change this list.';
-      const lines = block.source.split('\n');
-      for (const [index, item] of [...rendered.children].entries()) {
-        const indent = window.markdownVisionReader.readListItem(lines[index]).indent.replaceAll('\t', '    ').length;
-        if (indent) item.style.marginInlineStart = Math.min(indent, 16) + 'ch';
+      for (const [index, item] of [...rendered.querySelectorAll('li')].entries()) {
         if (nestedList) {
           item.dataset.visualRestriction = reason;
           item.dataset.sourceListItem = String(index);
@@ -428,7 +426,8 @@
           checkbox.dataset.visualEdit = 'task';
           checkbox.dataset.index = String(index);
         }
-        item.append(visualAction('Edit item', nestedList ? 'list-text' : 'list-item', index));
+        item.insertBefore(visualAction('Edit item', nestedList ? 'list-text' : 'list-item', index),
+          item.querySelector(':scope > ul, :scope > ol'));
       }
     } else if (block.kind === 'table') {
       reason = 'This table needs to be edited in Markdown.';

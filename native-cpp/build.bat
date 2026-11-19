@@ -2,7 +2,7 @@
 setlocal
 
 set "ROOT=%~dp0.."
-set "OUT_NAME=MarkdownVision-Native-Editor-2.1.0"
+set "OUT_NAME=MarkdownVision-Native-Editor-2.2.0"
 if not "%~1"=="" set "OUT_NAME=%~1"
 set "OUT=%ROOT%\dist\%OUT_NAME%"
 set "WV2=%USERPROFILE%\.nuget\packages\microsoft.web.webview2\1.0.3537.50\build\native"
@@ -41,6 +41,9 @@ copy /y "%ROOT%\index.html" "%OUT%\web\index.html" >nul
 copy /y "%ROOT%\styles.css" "%OUT%\web\styles.css" >nul
 copy /y "%ROOT%\app.js" "%OUT%\web\app.js" >nul
 copy /y "%ROOT%\editor-ui.js" "%OUT%\web\editor-ui.js" >nul
+if not exist "%OUT%\web\vendor" mkdir "%OUT%\web\vendor"
+copy /y "%ROOT%\vendor\*" "%OUT%\web\vendor\" >nul
+if errorlevel 1 exit /b %errorlevel%
 
 set "ARCHIVE=%ROOT%\dist\%OUT_NAME%-win-x64.zip"
 if exist "%ARCHIVE%" del "%ARCHIVE%"

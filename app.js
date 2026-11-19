@@ -285,26 +285,24 @@ function escapeHtml(value) {
 }
 
 const allowedHtmlTags = new Set([
-  'a', 'abbr', 'b', 'br', 'caption', 'cite', 'code', 'col', 'colgroup', 'dd', 'del', 'details', 'div', 'dl', 'dt',
-  'em', 'figcaption', 'figure', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'kbd', 'li', 'mark', 'ol',
-  'p', 'picture', 'pre', 's', 'small', 'source', 'span', 'strong', 'sub', 'summary', 'sup', 'table', 'tbody',
+  'a', 'abbr', 'b', 'blockquote', 'br', 'caption', 'cite', 'code', 'col', 'colgroup', 'dd', 'del', 'details', 'div', 'dl', 'dt',
+  'em', 'figcaption', 'figure', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'input', 'kbd', 'li', 'mark', 'ol',
+  'p', 'picture', 'pre', 's', 'section', 'small', 'source', 'span', 'strong', 'sub', 'summary', 'sup', 'table', 'tbody',
   'td', 'tfoot', 'th', 'thead', 'tr', 'u', 'ul'
 ]);
 const allowedHtmlAttributes = new Set([
   'align', 'alt', 'aria-label', 'class', 'colspan', 'height', 'href', 'media', 'rel', 'rowspan', 'src', 'srcset',
-  'style', 'target', 'title', 'width'
+  'checked', 'data-section-anchor', 'disabled', 'id', 'open', 'start', 'style', 'target', 'title', 'type', 'width'
 ]);
 const allowedStyleProperties = new Set([
   'align-items', 'background', 'background-color', 'color', 'display', 'font-size', 'font-weight', 'height',
   'justify-content', 'margin', 'margin-bottom', 'margin-left', 'margin-right', 'margin-top', 'max-width', 'padding',
   'padding-bottom', 'padding-left', 'padding-right', 'padding-top', 'text-align', 'text-decoration', 'width'
 ]);
-const htmlBlockTags = new Set([
-  'blockquote', 'details', 'div', 'figure', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'ol', 'p', 'pre', 'table', 'ul'
-]);
-
 function isSafeUrl(value) {
-  return /^(https?:|mailto:|#|\/(?!\/))/i.test(String(value || '').trim());
+  const url = String(value || '').trim();
+  if (!url || /[\x00-\x1f\\]/.test(url) || url.startsWith('//')) return false;
+  return /^(https?:|mailto:)/i.test(url) || !/^[a-z][a-z\d+.-]*:/i.test(url);
 }
 
 function sanitizeStyle(value) {
@@ -364,7 +362,11 @@ function sanitizeHtml(rawHtml) {
       }
     }
 
-    if (tagName === 'a') {
+    if (tagName === 'input') {
+      if (node.getAttribute('type') !== 'checkbox') node.remove();
+      else node.disabled = true;
+    }
+    if (tagName === 'a' && !node.getAttribute('href')?.startsWith('#')) {
       node.setAttribute('target', '_blank');
       node.setAttribute('rel', 'noopener noreferrer');
     }
@@ -375,57 +377,6 @@ function sanitizeHtml(rawHtml) {
   while (walker.nextNode()) nodes.push(walker.currentNode);
   nodes.forEach(cleanNode);
   return template.innerHTML;
-}
-
-function sanitizeInlineHtmlTag(rawTag) {
-  const closing = rawTag.match(/^<\/\s*([a-z][\w:-]*)\s*>$/i);
-  if (closing) {
-    const tagName = closing[1].toLowerCase();
-    return allowedHtmlTags.has(tagName) ? `</${tagName}>` : '';
-  }
-
-  const template = document.createElement('template');
-  template.innerHTML = rawTag;
-  const element = template.content.firstElementChild;
-  if (!element) return '';
-
-  const tagName = element.tagName.toLowerCase();
-  if (!allowedHtmlTags.has(tagName)) return '';
-
-  const attributes = [];
-  for (const attribute of [...element.attributes]) {
-    const name = attribute.name.toLowerCase();
-    let value = attribute.value;
-    if (name.startsWith('on') || !allowedHtmlAttributes.has(name)) continue;
-    if ((name === 'href' || name === 'src') && !isSafeUrl(value)) continue;
-    if (name === 'srcset' && /javascript:/i.test(value)) continue;
-    if (name === 'style') {
-      value = sanitizeStyle(value);
-      if (!value) continue;
-    }
-    attributes.push(`${name}="${escapeHtml(value)}"`);
-  }
-
-  if (tagName === 'a') {
-    attributes.push('target="_blank"', 'rel="noopener noreferrer"');
-  }
-
-  const suffix = ['br', 'col', 'hr', 'img', 'source'].includes(tagName) ? ' />' : '>';
-  return `<${tagName}${attributes.length ? ` ${attributes.join(' ')}` : ''}${suffix}`;
-}
-
-function createHtmlTokenStore() {
-  const values = [];
-  return {
-    add(html) {
-      const token = `\u0000HTML_${values.length}\u0000`;
-      values.push(html);
-      return token;
-    },
-    restore(text) {
-      return text.replace(/\u0000HTML_(\d+)\u0000/g, (_match, index) => values[Number(index)] || '');
-    }
-  };
 }
 
 const inlineCodePattern = /(?<![\\\x60])(\x60+)(?!\x60)([^\n]*?)(?<!\x60)\1(?!\x60)/g;
@@ -443,40 +394,6 @@ function readInlineAssets(text) {
     if (linkUrl) return [{ ...range, type: 'linked-image', label: text.slice(...match.indices[1]), imageUrl, url: linkUrl }];
     return image || label ? [{ ...range, type: image ? 'image' : 'link', label: text.slice(...match.indices[5]), url }] : [];
   });
-}
-
-function inlineMarkdown(text, htmlTokens = createHtmlTokenStore(), inTable = false) {
-  const code = text.replace(inlineCodePattern, (_match, _delimiter, value) => {
-    const literal = inTable ? value.replace(/\\\|/g, '|') : value;
-    const body = literal.startsWith(' ') && literal.endsWith(' ') && literal.trim() ? literal.slice(1, -1) : literal;
-    return htmlTokens.add('<code>' + escapeHtml(body) + '</code>');
-  });
-  // Keep escaped punctuation literal until after inline formatting.
-  const escaped = code.replace(/\\([\\\x60*_[\]{}()#+\-.!|<>~])/g,
-    (_match, character) => htmlTokens.add(escapeHtml(character)));
-  const protectedText = escaped.replace(inlineHtmlPattern, (tag) => htmlTokens.add(sanitizeInlineHtmlTag(tag)));
-  let encoded = escapeHtml(protectedText);
-  for (const asset of readInlineAssets(encoded).reverse()) {
-    if (asset.type !== 'linked-image' || [asset.url, asset.imageUrl, asset.label].some((value) => value.includes('\u0000'))) continue;
-    const badge = '<a href="' + asset.url + '" target="_blank" rel="noopener noreferrer"><img src="'
-      + asset.imageUrl + '" alt="' + asset.label + '" loading="lazy"></a>';
-    encoded = encoded.slice(0, asset.start) + htmlTokens.add(badge) + encoded.slice(asset.end);
-  }
-  const rendered = encoded
-    .replace(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g, '<img src="$2" alt="$1" loading="lazy">')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/__([^_]+)__/g, '<strong>$1</strong>')
-    .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>')
-    .replace(/~~([^~]+)~~/g, '<del>$1</del>');
-  return htmlTokens.restore(rendered);
-}
-
-function getHtmlBlockTag(line) {
-  const match = line.trim().match(/^<([a-z][\w:-]*)(?:\s|>|\/>)/i);
-  if (!match) return null;
-  const tagName = match[1].toLowerCase();
-  return htmlBlockTags.has(tagName) ? tagName : null;
 }
 
 function tableCellRanges(line) {
@@ -517,39 +434,6 @@ function readListItem(line) {
   return { indent, marker, prefix, task, taskSpacing, body, bodyStart: line.length - body.length };
 }
 
-function isTableDivider(line) {
-  return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
-}
-
-function parseTable(lines, startIndex, htmlTokens) {
-  if (!lines[startIndex]?.includes('|') || !isTableDivider(lines[startIndex + 1] || '')) return null;
-  const headers = splitTableRow(lines[startIndex]);
-  const alignments = splitTableRow(lines[startIndex + 1]).map((cell) => {
-    const value = cell.trim();
-    if (value.startsWith(':') && value.endsWith(':')) return 'center';
-    if (value.endsWith(':')) return 'right';
-    return 'left';
-  });
-  const rows = [];
-  let index = startIndex + 2;
-  while (index < lines.length && lines[index].includes('|') && lines[index].trim()) {
-    rows.push(splitTableRow(lines[index]));
-    index += 1;
-  }
-
-  const renderCell = (tag, cell, columnIndex) => {
-    const alignment = alignments[columnIndex] || 'left';
-    const style = alignment === 'left' ? '' : ` style="text-align: ${alignment}"`;
-    return `<${tag}${style}>${inlineMarkdown(cell || '', htmlTokens, true)}</${tag}>`;
-  };
-
-  const thead = `<thead><tr>${headers.map((cell, columnIndex) => renderCell('th', cell, columnIndex)).join('')}</tr></thead>`;
-  const tbody = rows.length
-    ? `<tbody>${rows.map((row) => `<tr>${headers.map((_header, columnIndex) => renderCell('td', row[columnIndex] || '', columnIndex)).join('')}</tr>`).join('')}</tbody>`
-    : '';
-  return { html: `<table>${thead}${tbody}</table>`, nextIndex: index };
-}
-
 function readCodeFence(line, opening = '') {
   const match = line.match(/^(\x60{3,}|~{3,})(.*)$/);
   if (!match) return null;
@@ -560,117 +444,167 @@ function readCodeFence(line, opening = '') {
   return delimiter[0] === '\x60' && info.includes('\x60') ? null : match;
 }
 
+const markdownParser = window.markdownit({ html: true, linkify: true, maxNesting: 100 })
+  .use(window.markdownitFootnote);
+
+markdownParser.renderer.rules.softbreak = () => ' ';
+markdownParser.renderer.rules.fence = (tokens, index) =>
+  '<pre><code>' + escapeHtml(tokens[index].content.replace(/\n$/, '')) + '</code></pre>\n';
+
+function decorateMarkdown(tokens, lines) {
+  const aliases = new Map();
+  const usedIds = new Set();
+  for (const token of tokens) {
+    if (token.type !== 'inline') continue;
+    const children = token.children;
+    for (let index = 0; index < children.length - 2; index += 1) {
+      const link = children[index];
+      const label = children[index + 1];
+      const href = link.type === 'link_open' && link.attrGet('href');
+      if (href && /^#[\w-]+$/.test(href) && label.type === 'text' && children[index + 2].type === 'link_close') {
+        aliases.set(label.content.toLowerCase(), href.slice(1));
+      }
+    }
+  }
+
+  for (const [index, token] of tokens.entries()) {
+    if (token.type === 'heading_open') {
+      const text = tokens[index + 1].children.map(({ type, content }) =>
+        ['text', 'code_inline', 'image'].includes(type) ? content : '').join('').trim().toLowerCase();
+      const slug = text.replace(/[^\p{L}\p{N}_ -]/gu, '').replace(/\s+/g, '-');
+      const section = text.match(/^(\d+)\.\s/);
+      const base = aliases.get(text) || slug || 'section';
+      let id = base;
+      for (let suffix = 1; usedIds.has(id); suffix += 1) id = base + '-' + suffix;
+      usedIds.add(id);
+      token.attrSet('id', id);
+      if (section) {
+        const shortId = 'section-' + section[1];
+        if (!usedIds.has(shortId)) {
+          usedIds.add(shortId);
+          token.attrSet('data-section-anchor', shortId);
+        }
+      }
+    }
+
+    if (token.type !== 'list_item_open' || !token.map) continue;
+    const item = readListItem(lines[token.map[0]]);
+    const inline = tokens[index + 2];
+    const text = inline?.children?.[0];
+    if (!item?.task || tokens[index + 1]?.type !== 'paragraph_open' || text?.type !== 'text'
+        || !text.content.startsWith(item.task)) continue;
+    token.attrJoin('class', 'markdown-task');
+    text.content = text.content.slice(item.task.length).trimStart();
+    const checkbox = Object.assign(new token.constructor('html_inline', '', 0), {
+      content: '<input type="checkbox" aria-label="Task" disabled'
+        + (item.task === '[ ]' ? '' : ' checked') + '> '
+    });
+    inline.children.unshift(checkbox);
+  }
+}
+
 function parseMarkdown(markdown, describeBlocks = false) {
-  const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
+  const source = markdown.replace(/\r\n?/g, '\n');
+  const lines = source.split('\n');
+  const env = {};
+  const tokens = markdownParser.parse(source, env);
+  decorateMarkdown(tokens, lines);
+  const render = (group) => sanitizeHtml(markdownParser.renderer.render(group, markdownParser.options, env)).trim();
+  if (!describeBlocks) return render(tokens);
+
   let offset = 0;
-  const offsets = describeBlocks ? lines.map((line) => {
+  const offsets = lines.map((line) => {
     const start = offset;
     offset += line.length + 1;
     return start;
-  }) : null;
-  const htmlTokens = createHtmlTokenStore();
-  const output = [];
-  let paragraph = [], listType = null, listStart = '', fence = '', code = [], quote = [], items = [];
-  let start = 0;
-  const emit = (html, end, kind = '') => output.push(describeBlocks
-    ? { html, source: lines.slice(start, end).join('\n'), kind, start: offsets[start],
-        end: (offsets[end] ?? offset) - 1 }
-    : html);
-  const flushParagraph = (end) => {
-    if (!paragraph.length) return;
-    const text = paragraph.map((line, index) => {
-      if (index === paragraph.length - 1) return line.trim();
-      return line.trim() + (/ {2,}$/.test(line) ? '<br>' : ' ');
-    }).join('');
-    emit(`<p>${inlineMarkdown(text, htmlTokens)}</p>`, end);
-    paragraph = [];
+  });
+  const blocks = [];
+  let nextLine = 0;
+  const add = (startLine, endLine, kind, html) => {
+    const start = offsets[startLine] ?? source.length;
+    const end = Math.max(start, (offsets[endLine] ?? offset) - 1);
+    blocks.push({ kind, start, end, source: source.slice(start, end), html });
   };
-  const closeList = (end) => {
-    if (!listType) return;
-    const attributes = listType === 'ol' && listStart !== '1' ? ` start="${listStart}"` : '';
-    emit(`<${listType}${attributes}>\n${items.join('\n')}\n</${listType}>`, end, 'list');
-    listType = null;
-    items = [];
+  const addDefinitions = (endLine) => {
+    if (lines.slice(nextLine, endLine).some((line) => line.trim())) {
+      add(nextLine, endLine, 'definitions', '<div hidden></div>');
+    }
   };
-  const flushQuote = (end) => { if (quote.length) { emit(`<blockquote>${inlineMarkdown(quote.join('<br>'), htmlTokens)}</blockquote>`, end); quote = []; } };
-  const flush = (end) => { flushParagraph(end); closeList(end); flushQuote(end); };
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const delimiter = readCodeFence(line, fence)?.[1];
-    if (fence) {
-      if (delimiter) {
-        emit(`<pre><code>${code.join('\n')}</code></pre>`, index + 1, 'code');
-        code = [];
-        fence = '';
-      } else code.push(escapeHtml(line));
-      continue;
+  for (let first = 0; first < tokens.length;) {
+    const token = tokens[first];
+    let last = first + 1;
+    if (token.nesting === 1) {
+      let nesting = 1;
+      while (nesting && last < tokens.length) nesting += tokens[last++].nesting;
     }
-    if (delimiter) {
-      flush(index);
-      start = index;
-      fence = delimiter;
-      continue;
+    if (token.type === 'footnote_block_open') {
+      add(nextLine, lines.length, 'footnotes', render(tokens.slice(first, last)));
+      return blocks;
     }
-
-    const htmlBlockTag = getHtmlBlockTag(line);
-    if (htmlBlockTag) {
-      flush(index);
-      start = index;
-      const htmlBlock = [line];
-      if (!line.includes(`</${htmlBlockTag}>`) && !/\/>\s*$/.test(line.trim())) {
-        while (index + 1 < lines.length) {
-          index += 1;
-          htmlBlock.push(lines[index]);
-          if (lines[index].toLowerCase().includes(`</${htmlBlockTag}>`)) break;
+    if (token.map) {
+      const start = token.map[0];
+      let end = token.map[1];
+      addDefinitions(start);
+      let kind = '';
+      if (token.type === 'fence') kind = 'code';
+      else if (token.type === 'table_open') kind = 'table';
+      else if (token.type === 'html_block') {
+        kind = 'html';
+        // Keep Markdown between the two halves of a raw container inside the same
+        // protected Visual block. The reader renders the full token stream at once.
+        const open = token.content.match(/^\s*<(div|details|figure)\b/i);
+        if (open) {
+          const tags = new RegExp('<(/?)' + open[1] + '\\b[^>]*>', 'gi');
+          const balance = (html) => [...html.matchAll(tags)].reduce((depth, match) =>
+            depth + (match[1] ? -1 : match[0].endsWith('/>') ? 0 : 1), 0);
+          let depth = balance(token.content);
+          for (let cursor = last; depth > 0 && cursor < tokens.length; cursor += 1) {
+            const closing = tokens[cursor];
+            if (closing.type !== 'html_block' || closing.level !== 0) continue;
+            depth += balance(closing.content);
+            if (depth <= 0) {
+              last = cursor + 1;
+              end = closing.map[1];
+            }
+          }
         }
       }
-      emit(sanitizeHtml(htmlBlock.join('\n')), index + 1, 'html');
-      continue;
+      else if (['bullet_list_open', 'ordered_list_open'].includes(token.type)) {
+        while (end > start && !lines[end - 1].trim()) end -= 1;
+        const itemCount = tokens.slice(first, last).filter((entry) => entry.type === 'list_item_open').length;
+        kind = itemCount === end - start && lines.slice(start, end).every((line) => readListItem(line))
+          ? 'list' : 'complex';
+      } else if (token.type === 'code_block' || token.markup === '=' || token.markup === '-'
+          || (token.type === 'blockquote_open' && tokens.slice(first + 1, last - 1).some((entry) => entry.block &&
+            !['paragraph_open', 'paragraph_close', 'inline'].includes(entry.type)))) kind = 'complex';
+      add(start, end, kind, render(tokens.slice(first, last)));
+      nextLine = end;
     }
-
-    const table = parseTable(lines, index, htmlTokens);
-    if (table) {
-      flush(index);
-      start = index;
-      emit(table.html, table.nextIndex, 'table');
-      index = table.nextIndex - 1;
-      continue;
-    }
-
-    const heading = line.match(/^(#{1,6})\s+(.+)$/);
-    const item = readListItem(line);
-    const quoted = line.match(/^>\s?(.*)$/);
-    if (heading) {
-      flush(index);
-      start = index;
-      const level = heading[1].length;
-      emit(`<h${level}>${inlineMarkdown(heading[2], htmlTokens)}</h${level}>`, index + 1);
-    }
-    else if (item) {
-      flushParagraph(index); flushQuote(index); const type = /^\d/.test(item.marker) ? 'ol' : 'ul';
-      if (listType !== type) { closeList(index); start = index; listType = type; listStart = item.marker.slice(0, -1); }
-      const task = item.task;
-      const checkbox = task ? `<input type="checkbox" aria-label="Task" disabled${task === '[ ]' ? '' : ' checked'}> ` : '';
-      items.push(`<li${task ? ' class="markdown-task"' : ''}>${checkbox}${inlineMarkdown(item.body, htmlTokens)}</li>`);
-    }
-    else if (quoted) {
-      flushParagraph(index); closeList(index);
-      if (!quote.length) start = index;
-      quote.push(quoted[1]);
-    }
-    else if (/^\s*([-*_])(?:\s*\1){2,}\s*$/.test(line)) { flush(index); start = index; emit('<hr>', index + 1); }
-    else if (!line.trim()) flush(index);
-    else {
-      closeList(index); flushQuote(index);
-      if (!paragraph.length) start = index;
-      paragraph.push(line);
-    }
+    first = last;
   }
-  if (fence) emit(`<pre><code>${code.join('\n')}</code></pre>`, lines.length, 'code');
-  flush(lines.length);
-  return describeBlocks ? output : output.join('\n');
+  addDefinitions(lines.length);
+  return blocks;
 }
+
+document.addEventListener('click', (event) => {
+  const link = event.target.closest?.('.markdown-body a[href^="#"]');
+  if (!link) return;
+  const container = link.closest('.markdown-body');
+  let fragment;
+  try {
+    fragment = CSS.escape(decodeURIComponent(link.getAttribute('href').slice(1)));
+  } catch {
+    return;
+  }
+  if (!fragment) return;
+  const target = container.querySelector('#' + fragment)
+    || container.querySelector('[data-section-anchor=' + fragment + ']');
+  if (!target) return;
+  event.preventDefault();
+  target.scrollIntoView({ block: 'start' });
+});
+
+
 
 function syncPictureSourcesToTheme(container = elements.markdownOutput, theme = preferences.theme) {
   container.querySelectorAll('picture source[media]').forEach((source) => {

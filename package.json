@@ -1,6 +1,6 @@
 {
   "name": "markdown-vision",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Markdown Vision",
   "main": "main.cjs",
   "author": "Markdown Vision",
@@ -26,6 +26,7 @@
     "files": [
       "index.html",
       "styles.css",
+      "vendor/**/*",
       "app.js",
       "editor-ui.js",
       "main.cjs",
