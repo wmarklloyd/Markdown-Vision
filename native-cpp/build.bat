@@ -2,7 +2,7 @@
 setlocal
 
 set "ROOT=%~dp0.."
-set "OUT_NAME=MarkdownVision-Native-Editor-2.3.0"
+set "OUT_NAME=MarkdownVision-Native-Editor-2.4.0"
 if not "%~1"=="" set "OUT_NAME=%~1"
 set "OUT=%ROOT%\dist\%OUT_NAME%"
 set "WV2=%USERPROFILE%\.nuget\packages\microsoft.web.webview2\1.0.3537.50\build\native"

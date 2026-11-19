@@ -148,7 +148,6 @@ body.is-editing .toolbar { width: 100%; }
 }
 .editor-preview-content[contenteditable="true"] { cursor: text; }
 .editor-preview-content [data-unfenced] { white-space: pre-wrap; overflow-wrap: anywhere; }
-.editor-preview-content[contenteditable="true"]:empty::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
 .editor-notice { margin: 0; padding: 8px 12px; color: var(--muted); border-bottom: 1px solid var(--faint); font-size: 12px; }
 .visual-protected-block { border: 1px dashed var(--faint); padding: 8px; margin: 0 0 1em; }
 .markdown-body pre.visual-code-frame { overflow: hidden; }

@@ -27,6 +27,7 @@ constexpr UINT kPrintShortcut = WM_APP + 1;
 HWND g_window = nullptr;
 ComPtr<ICoreWebView2Controller> g_controller;
 ComPtr<ICoreWebView2> g_webView;
+ComPtr<ICoreWebView2Environment> g_environment;
 std::wstring g_startupPath;
 bool g_initialTaken = false;
 bool g_saving = false;
@@ -44,6 +45,51 @@ struct OpenDocument {
 };
 
 std::optional<OpenDocument> g_document;
+std::wstring Lower(std::wstring value);
+
+std::wstring MapDocumentImages(const OpenDocument& document) {
+    return L"https://markdownvision-images.invalid/" + document.id + L"/";
+}
+
+void ServeDocumentImage(ICoreWebView2WebResourceRequestedEventArgs* args) {
+    ComPtr<ICoreWebView2WebResourceRequest> request;
+    LPWSTR rawUri = nullptr;
+    if (FAILED(args->get_Request(&request)) || FAILED(request->get_Uri(&rawUri)) || !rawUri) return;
+    std::wstring uri(rawUri);
+    CoTaskMemFree(rawUri);
+    const std::wstring prefix = L"https://markdownvision-images.invalid/";
+    ComPtr<IStream> stream;
+    std::wstring mime;
+    if (g_document && uri.rfind(prefix + g_document->id + L"/", 0) == 0) {
+        std::wstring path = uri.substr(prefix.size() + g_document->id.size() + 1);
+        const auto query = path.find_first_of(L"?#");
+        if (query != std::wstring::npos) path.resize(query);
+        std::vector<wchar_t> decoded(path.size() + 1);
+        DWORD size = static_cast<DWORD>(decoded.size());
+        if (SUCCEEDED(UrlUnescapeW(path.data(), decoded.data(), &size, URL_UNESCAPE_AS_UTF8))) {
+            std::error_code error;
+            const auto root = std::filesystem::weakly_canonical(
+                std::filesystem::path(g_document->path).parent_path(), error);
+            const auto file = std::filesystem::weakly_canonical(root / decoded.data(), error);
+            const auto relative = file.lexically_relative(root);
+            if (!error && !relative.empty() && !relative.is_absolute() && *relative.begin() != L"..") {
+                const auto extension = Lower(file.extension().wstring());
+                if (extension == L".png") mime = L"image/png";
+                else if (extension == L".jpg" || extension == L".jpeg") mime = L"image/jpeg";
+                else if (extension == L".gif") mime = L"image/gif";
+                else if (extension == L".webp") mime = L"image/webp";
+                else if (extension == L".bmp") mime = L"image/bmp";
+                else if (extension == L".svg") mime = L"image/svg+xml";
+                if (!mime.empty()) SHCreateStreamOnFileEx(file.c_str(), STGM_READ | STGM_SHARE_DENY_NONE,
+                    FILE_ATTRIBUTE_NORMAL, FALSE, nullptr, &stream);
+            }
+        }
+    }
+    ComPtr<ICoreWebView2WebResourceResponse> response;
+    const std::wstring headers = L"Content-Type: " + mime + L"\r\nCache-Control: no-store\r\n";
+    if (SUCCEEDED(g_environment->CreateWebResourceResponse(stream.Get(), stream ? 200 : 404,
+        stream ? L"OK" : L"Not Found", headers.c_str(), &response))) args->put_Response(response.Get());
+}
 
 bool SystemUsesDarkMode() {
     DWORD lightTheme = 1;
@@ -136,7 +182,8 @@ std::wstring DocumentJson(const std::wstring& path) {
     document.path = path;
     const auto text = DecodeText(document);
     const auto json = L"{\"name\":" + JsonString(std::filesystem::path(path).filename().wstring()) +
-        L",\"documentId\":" + JsonString(document.id) + L",\"content\":" + JsonString(text) + L"}";
+        L",\"documentId\":" + JsonString(document.id) + L",\"imageBase\":" +
+        JsonString(MapDocumentImages(document)) + L",\"content\":" + JsonString(text) + L"}";
     g_document = std::move(document);
     return json;
 }
@@ -294,7 +341,8 @@ std::wstring SaveDocument(const std::wstring& id, const std::wstring& text, bool
     }
     next.id = choosePath ? std::to_wstring(++g_documentSequence) : current->id;
     const auto json = L"{\"status\":\"saved\",\"documentId\":" + JsonString(next.id) + L",\"name\":" +
-        JsonString(std::filesystem::path(next.path).filename().wstring()) + L"}";
+        JsonString(std::filesystem::path(next.path).filename().wstring()) + L",\"imageBase\":" +
+        JsonString(MapDocumentImages(next)) + L"}";
     g_document = std::move(next);
     return json;
 }
@@ -446,12 +494,22 @@ void InitializeWebView() {
                     MessageBoxW(g_window, L"Microsoft Edge WebView2 Runtime is required.", kAppName, MB_OK | MB_ICONERROR);
                     return result;
                 }
+                g_environment = environment;
                 return environment->CreateCoreWebView2Controller(g_window,
                     Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
                         [](HRESULT result2, ICoreWebView2Controller* controller) -> HRESULT {
                             if (FAILED(result2) || !controller) return result2;
                             g_controller = controller;
                             controller->get_CoreWebView2(&g_webView);
+                            g_webView->AddWebResourceRequestedFilter(L"https://markdownvision-images.invalid/*",
+                                COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE);
+                            EventRegistrationToken imageToken{};
+                            g_webView->add_WebResourceRequested(
+                                Callback<ICoreWebView2WebResourceRequestedEventHandler>(
+                                    [](ICoreWebView2*, ICoreWebView2WebResourceRequestedEventArgs* args) -> HRESULT {
+                                        ServeDocumentImage(args);
+                                        return S_OK;
+                                    }).Get(), &imageToken);
                             ResizeWebView();
 
                             ComPtr<ICoreWebView2Controller2> controller2;

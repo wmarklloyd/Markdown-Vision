@@ -305,6 +305,18 @@ function isSafeUrl(value) {
   return /^(https?:|mailto:)/i.test(url) || !/^[a-z][a-z\d+.-]*:/i.test(url);
 }
 
+function resolveDocumentImage(value) {
+  const base = currentDocument?.imageBase;
+  if (!base || !value || /^(?:[a-z][a-z\d+.-]*:|[\\/]|#)/i.test(value)) return value;
+  const path = value.replace(/%5c/gi, '/').replace(/\\/g, '/');
+  try {
+    const resolved = new URL(path, base);
+    return resolved.origin === new URL(base).origin ? resolved.href : value;
+  } catch {
+    return value;
+  }
+}
+
 function sanitizeStyle(value) {
   return String(value || '')
     .split(';')
@@ -342,14 +354,18 @@ function sanitizeHtml(rawHtml) {
 
     for (const attribute of [...node.attributes]) {
       const name = attribute.name.toLowerCase();
-      const value = attribute.value;
+      let value = attribute.value;
       if (name.startsWith('on') || !allowedHtmlAttributes.has(name)) {
         node.removeAttribute(attribute.name);
         continue;
       }
+      if (tagName === 'img' && name === 'src') value = resolveDocumentImage(value);
       if ((name === 'href' || name === 'src') && !isSafeUrl(value)) {
         node.removeAttribute(attribute.name);
         continue;
+      }
+      if (tagName === 'img' && name === 'src') {
+        node.setAttribute('src', value);
       }
       if (name === 'srcset' && /javascript:/i.test(value)) {
         node.removeAttribute(attribute.name);
@@ -758,8 +774,9 @@ function openSearchPanel() {
   if (editorSearch()) runSearch({ preserve: true });
 }
 
-function showDocument(markdown, name = 'Untitled.md', documentId = null) {
-  currentDocument = { content: markdown, name, documentId };
+function showDocument(markdown, name = 'Untitled.md', documentId = null, imageBase = '') {
+  currentDocument = { content: markdown, name, documentId, imageBase };
+  renderedForPrint = null;
   clearSearchHighlights();
   elements.markdownOutput.innerHTML = parseMarkdown(markdown);
   syncPictureSourcesToTheme();
@@ -852,7 +869,7 @@ async function openPicker() {
   if (window.markdownVisionReader.isSaving?.()) return;
   if (window.desktop?.openMarkdownFile) {
     const document = await window.desktop.openMarkdownFile();
-    if (document) showDocument(document.content, document.name, document.documentId);
+    if (document) showDocument(document.content, document.name, document.documentId, document.imageBase);
     return;
   }
   elements.fileInput.click();
@@ -1008,7 +1025,7 @@ async function loadSystemFonts() {
 }
 
 if (window.desktop?.onOpenDocument) {
-  window.desktop.onOpenDocument((document) => showDocument(document.content, document.name, document.documentId));
+  window.desktop.onOpenDocument((document) => showDocument(document.content, document.name, document.documentId, document.imageBase));
 }
 
 if (window.desktop?.onFullscreenChange) {
@@ -1020,8 +1037,9 @@ if (window.desktop?.onFullscreenChange) {
 applyPreferences();
 void loadPreferences();
 
-if (window.desktop?.getInitialDocument) {
-  void window.desktop.getInitialDocument().then((document) => {
-    if (document) showDocument(document.content, document.name, document.documentId);
-  });
-}
+window.addEventListener('load', async () => {
+  const initialDocument = await window.desktop?.getInitialDocument?.();
+  if (currentDocument) return;
+  if (initialDocument) showDocument(initialDocument.content, initialDocument.name, initialDocument.documentId, initialDocument.imageBase);
+  else $('#editorToggle').click();
+});

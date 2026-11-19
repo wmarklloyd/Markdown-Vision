@@ -22,6 +22,7 @@
   let original = current?.content || '';
   let fileName = current?.name || 'Untitled.md';
   let documentId = current?.documentId || null;
+  let imageBase = current?.imageBase || '';
   let documentGeneration = 0;
   let saving = false;
   let saved = false;
@@ -224,7 +225,7 @@
   function showDraftInReader() {
     showingDraft = true;
     try {
-      window.markdownVisionReader.showDocument(source.value, fileName, documentId);
+      window.markdownVisionReader.showDocument(source.value, fileName, documentId, imageBase);
     } finally {
       showingDraft = false;
     }
@@ -246,12 +247,19 @@
         return;
       }
       original = snapshot;
+      const previousImageBase = imageBase;
       documentId = result.documentId;
+      imageBase = result.imageBase || '';
       fileName = result.name;
       saved = true;
       $('#editorFileName').textContent = fileName;
       document.title = 'Markdown Vision - ' + fileName;
-      if (!active) showDraftInReader();
+      if (!active || imageBase !== previousImageBase) showDraftInReader();
+      if (active && imageBase !== previousImageBase) {
+        reader.hidden = true;
+        previewSource = null;
+        updatePreview(false);
+      }
     } catch {
       if (generation === documentGeneration) {
         saveError.textContent = 'Windows could not save the draft. Your edits are still open.';
@@ -1243,6 +1251,10 @@
 
   function setActive(value) {
     hideRestriction();
+    const newDocument = value && !window.markdownVisionReader.getDocument();
+    if (newDocument) {
+      window.markdownVisionReader.showDocument('', 'Untitled.md');
+    }
     active = value;
     toggle.setAttribute('aria-pressed', String(value));
     toggle.setAttribute('aria-label', value ? 'Return to reader' : 'Edit Markdown');
@@ -1253,7 +1265,7 @@
     document.body.classList.toggle('is-editing', value);
     if (value) {
       tools.scrollLeft = 0;
-      selectView(panes.dataset.view);
+      selectView(newDocument ? 'visual' : panes.dataset.view);
     } else if (dirty || (saved && (window.markdownVisionReader.getDocument()?.content !== source.value
         || window.markdownVisionReader.getDocument()?.documentId !== documentId))) {
       showDraftInReader();
@@ -2183,6 +2195,7 @@
     $('#editorFileName').textContent = fileName;
     if (showingDraft) return;
     documentId = event.detail.documentId || null;
+    imageBase = event.detail.imageBase || '';
     documentGeneration += 1;
     saved = false;
     saveError.hidden = true;
