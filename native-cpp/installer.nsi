@@ -36,6 +36,40 @@ UninstPage instfiles
 Var DefaultMarkdownCheckbox
 Var SetAsDefaultMarkdown
 
+Function CloseRunningApp
+check_running:
+  nsExec::ExecToStack 'powershell.exe -NoProfile -NonInteractive -Command "if (Get-Process -Name Markdown-Vision -ErrorAction SilentlyContinue) { exit 1 }"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" done
+  StrCmp $0 "1" running
+  SetErrorLevel 1
+  Abort
+running:
+  IfSilent silent_running
+  MessageBox MB_YESNO|MB_ICONQUESTION "Markdown Vision is running. Save any unsaved documents before continuing. Close Markdown Vision and continue setup?" IDYES close_app
+  SetErrorLevel 1
+  Abort
+close_app:
+  nsExec::ExecToStack 'powershell.exe -NoProfile -NonInteractive -Command "Get-Process -Name Markdown-Vision -ErrorAction SilentlyContinue | ForEach-Object { [void]$$_.CloseMainWindow() }; Start-Sleep -Seconds 2"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" check_after_close
+  MessageBox MB_ICONSTOP "Setup could not close Markdown Vision. Close it manually and run setup again."
+  SetErrorLevel 1
+  Abort
+check_after_close:
+  nsExec::ExecToStack 'powershell.exe -NoProfile -NonInteractive -Command "if (Get-Process -Name Markdown-Vision -ErrorAction SilentlyContinue) { exit 1 }"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" done
+  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Markdown Vision is still running. Close it and select Retry, or cancel setup." IDRETRY check_running
+silent_running:
+  SetErrorLevel 1
+  Abort
+done:
+FunctionEnd
+
 Function RemovePreviousInstall
   SetRegView 64
   ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_ID}" "UninstallString"
@@ -74,6 +108,7 @@ Function DefaultMarkdownPageLeave
 FunctionEnd
 
 Section "Markdown Vision" SEC_APP
+  Call CloseRunningApp
   Call RemovePreviousInstall
   SetRegView 64
   SetShellVarContext all
