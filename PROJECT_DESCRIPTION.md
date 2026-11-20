@@ -4,7 +4,7 @@
 
 Markdown Vision is a reading-first Windows desktop application for Markdown and plain-text documents. It combines a formatted reader, configurable typography, document search, and an in-memory Markdown editor. The primary application is the x64 Win32 C++ build in `native-cpp/`. It uses Microsoft Edge WebView2 to display the bundled interface and needs no Electron, Node.js, or .NET runtime.
 
-The current version is **2.8.0**. It expands direct Visual editing of headings, code, lists, tasks, and tables, and highlights corresponding text across Split view while editing.
+The current version is **2.8.1**. It opens in reader view; the Edit button starts a new document when no file is open. Version 2.8.0 expanded direct Visual editing and added corresponding text highlights across Split view.
 
 | Area | Current state |
 | --- | --- |
@@ -17,7 +17,7 @@ The current version is **2.8.0**. It expands direct Visual editing of headings, 
 
 ## User experience
 
-The reader opens `.md`, `.markdown`, `.mdown`, `.mkd`, and `.txt` files. It shows the file name in the document header and native window title. Reading settings include a proportional font, a separate fixed-width font for source and code, font size, line spacing, and page width. The defaults are Georgia and Consolas at 18 px, with 1.75 line spacing and a 720 px reading width. Ctrl+F opens case-insensitive search with previous and next navigation.
+The application starts in reader view, including when no document is open. The Edit button creates an untitled document when needed. The reader opens `.md`, `.markdown`, `.mdown`, `.mkd`, and `.txt` files. It shows the file name in the document header and native window title. Reading settings include a proportional font, a separate fixed-width font for source and code, font size, line spacing, and page width. The defaults are Georgia and Consolas at 18 px, with 1.75 line spacing and a 720 px reading width. Ctrl+F opens case-insensitive search with previous and next navigation.
 
 The editor offers three views:
 
@@ -77,11 +77,11 @@ The primary build script targets x64, uses the configured Visual Studio Communit
 .\native-cpp\build-installer.bat
 ```
 
-The default output directory is `dist\MarkdownVision-Native-Editor-2.8.0\`. Its archive is `dist\MarkdownVision-Native-Editor-2.8.0-win-x64.zip`. The optional build argument names an isolated output directory and its matching archive. The bundle includes `Markdown-Vision.exe`, `MarkdownVisionPreviewHandler.dll`, `LICENSE`, and `web\` with `index.html`, `styles.css`, `app.js`, and `editor-ui.js`, plus the bundled parser and license notices in `vendor\`. Keep `web\` beside the executable when running an extracted build.
+The default output directory is `dist\MarkdownVision-Native-Editor-2.8.1\`. Its archive is `dist\MarkdownVision-Native-Editor-2.8.1-win-x64.zip`. The optional build argument names an isolated output directory and its matching archive. The bundle includes `Markdown-Vision.exe`, `MarkdownVisionPreviewHandler.dll`, `LICENSE`, and `web\` with `index.html`, `styles.css`, `app.js`, and `editor-ui.js`, plus the bundled parser and license notices in `vendor\`. Keep `web\` beside the executable when running an extracted build.
 
 The [native installer entry point](native-cpp/build-installer.bat) invokes the standalone build and then uses the cached NSIS compiler. The script currently locates that compiler under an Electron Builder cache path. That path is a build-time dependency only. The setup defaults to `%ProgramFiles%\MarkdownVision`, uses the previous product's uninstall identity for replacement, and registers the app and Explorer handler for the four Markdown extensions. The setup checkbox controls the registry association written for `.md`.
 
-NSIS reads the default 2.8.0 build directory and includes the complete web asset list. Its output is `dist\Markdown-Vision-Native-Setup-2.8.0.exe`. The executable and installer expose version 2.8.0 in Windows file properties.
+NSIS reads the default 2.8.1 build directory and includes the complete web asset list. Its output is `dist\Markdown-Vision-Native-Setup-2.8.1.exe`. The executable and installer expose version 2.8.1 in Windows file properties.
 
 ## Repository and integration status
 

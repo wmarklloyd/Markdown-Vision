@@ -1041,5 +1041,4 @@ window.addEventListener('load', async () => {
   const initialDocument = await window.desktop?.getInitialDocument?.();
   if (currentDocument) return;
   if (initialDocument) showDocument(initialDocument.content, initialDocument.name, initialDocument.documentId, initialDocument.imageBase);
-  else $('#editorToggle').click();
 });
