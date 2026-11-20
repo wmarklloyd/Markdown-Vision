@@ -854,6 +854,7 @@ window.markdownVisionReader = {
   readCodeFence,
   readListItem,
   tableCellRanges,
+  decodeMarkdownEntity: (entity) => markdownParser.utils.unescapeAll(entity),
   readInlineAssets,
   withoutInlineCode,
   printDocument: printCurrentDocument,

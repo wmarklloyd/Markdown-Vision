@@ -230,9 +230,10 @@
               const marker = '\x60'.repeat(Math.max(label.codeSpan.length, longest + 1));
               const padded = /^\x60|\x60$/.test(raw) || (/^ .* $/.test(raw) && /[^ ]/.test(raw));
               value = marker + (padded ? ' ' + raw + ' ' : raw) + marker;
-            } else value = field.textContent.replace(/([\\\x60*_[\]<>!&#~])/g, '\\$1');
+            } else if (label.htmlText) value = field.textContent.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            else value = field.textContent.replace(/([\\\x60*_[\]<>!&#~|])/g, '\\$1');
             if (label.quote || label.listPlain) {
-              value = value.replace(/^(\s*)([-+])/,'$1\\$2').replace(/^(\s*\d+)([.)])(?=\s)/, '$1\\$2');
+              value = value.replace(/^(\s*)([-+=])/,'$1\\$2').replace(/^(\s*\d+)([.)])(?=\s|$)/, '$1\\$2');
             }
             text = text.slice(0, label.start) + value + text.slice(label.end);
           }
@@ -248,6 +249,8 @@
             let suffix = 0;
             while (suffix < cell.text.length - prefix && suffix < value.length - prefix
                 && cell.text[cell.text.length - suffix - 1] === value[value.length - suffix - 1]) suffix += 1;
+            while (cell.positions[prefix] === null) prefix -= 1;
+            while (cell.positions[cell.text.length - suffix] === null) suffix -= 1;
             const from = cell.positions[prefix];
             const to = cell.positions[cell.text.length - suffix];
             const inserted = value.slice(prefix, value.length - suffix)
@@ -279,7 +282,9 @@
       markdown += text;
       previous = { original };
     }
-    return markdown + (originals.length ? baseline.slice(originals.at(-1).end) : '');
+    if (!originals.length) return markdown;
+    const trailing = baseline.slice(previous?.original?.end ?? originals.at(-1).end);
+    return markdown + (trailing.trim() ? baseline.slice(originals.at(-1).end) : trailing);
   }
 
   function updateDirty() {
@@ -363,6 +368,7 @@
     visualRanges = new Map();
     visualCodeOrigins = new Map();
     const blocks = window.markdownVisionReader.renderBlocks(previewSource);
+    const mappedBlocks = [];
     const referenceLabels = new Set(blocks.filter(({ kind }) => !['code', 'indented-code'].includes(kind)).flatMap(({ source }) =>
       [...source.matchAll(/^[ \t]*\[([^\]\n]+)\]:/gm)].map((match) => match[1].trim().toLowerCase())));
     let previousLocked = true;
@@ -420,6 +426,14 @@
       if (block.kind === 'complex' && /^H[12]$/.test(rendered?.tagName || '')) {
         configureSetextHeading(record, rendered);
       }
+      const markdownDiv = block.kind === 'html' && rendered?.tagName === 'DIV'
+        && /^ {0,3}<div(?:[ \t][^>]*)?>[ \t]*\n[ \t]*\n[\s\S]*\n[ \t]*\n<\/div>[ \t]*$/i.test(block.source)
+        && !/<\/?[a-z][\w:-]*(?=[ \t/>])/i.test(block.source.replace(/^.*?\n[ \t]*\n|\n[ \t]*\n<\/div>[ \t]*$/gis, ''));
+      const editableHtml = block.kind === 'html' && ['DETAILS', 'PRE'].includes(rendered?.tagName);
+      if (protectedBlock && ((!block.kind && rendered?.tagName === 'P') || editableHtml || markdownDiv)) {
+        const candidates = mappedInlineCandidates(record, rendered);
+        if (candidates.length) mappedBlocks.push({ block: record, rendered, candidates });
+      }
       if ((['code', 'indented-code'].includes(block.kind) && rendered?.querySelector('.visual-code-editor'))
           || (block.kind === 'complex' && /^H[12]$/.test(rendered?.tagName || '')
             && rendered.querySelector('[data-editable-list-link]') && rendered.textContent === block.source.split('\n')[0])) {
@@ -432,11 +446,11 @@
       previousLocked = protectedBlock;
     }
     if (previousLocked && visualBlocks.size) appendTypingLine();
+    configureMappedInlineBlocks(mappedBlocks, previewSource);
     window.markdownVisionReader.syncPictureSourcesToTheme(preview);
     for (const block of visualBlocks.values()) block.html = block.node.outerHTML;
     preview.contentEditable = 'true';
     preview.tabIndex = 0;
-    $('#visualEditorNotice').hidden = ![...visualBlocks.values()].some((block) => block.locked);
     visualBaseline = { html: preview.innerHTML, source: previewSource };
     lastVisualHtml = visualBaseline.html;
     if (resetHistory) {
@@ -604,12 +618,20 @@
             if (!sourceOnly && [...cell.childNodes].every((child) =>
               child.nodeType === Node.TEXT_NODE || child.nodeName === 'BR')) {
               const markdown = raw.text.slice(start, end);
-              const parts = [...markdown.matchAll(/<br[ \t]*\/?>|\\([\\\x60*_[\]{}()#+\-.!|<>~&])|[\s\S]/gi)];
-              const visible = parts.map((part) => /^<br/i.test(part[0]) ? '\n' : part[1] || part[0]).join('');
-              const safe = parts.every((part) => part[1] || /^<br/i.test(part[0])
-                || !/[\\\x60*_[\]<>!&#~]/.test(part[0]));
+              const parts = [...markdown.matchAll(/<br[ \t]*\/?>|\\([\\\x60*_[\]{}()#+\-.!|<>~&])|&(?:#[0-9]{1,7}|#x[0-9a-f]{1,6}|[a-z][a-z0-9]*);|[\s\S]/gi)];
+              const decoded = parts.map(([raw, escaped]) => {
+                if (escaped) return escaped;
+                if (/^<br/i.test(raw)) return '\n';
+                if (raw.startsWith('&') && raw.endsWith(';')) {
+                  const value = window.markdownVisionReader.decodeMarkdownEntity(raw);
+                  if (value !== raw && !/[\r\n\t\u00a0]/.test(value)) return value;
+                }
+                return /[\\\x60*_[\]<>!&#~]/.test(raw) ? null : raw;
+              });
+              const visible = decoded.join('');
+              const safe = decoded.every((part) => part !== null);
               if (safe && visible === renderedCellText(cell)) {
-                const positions = parts.map((part) => part.index);
+                const positions = parts.flatMap((part, index) => [part.index, ...Array(decoded[index].length - 1).fill(null)]);
                 positions.push(markdown.length);
                 const index = editableCells.length;
                 editableCells.push({ index, start: raw.start + start, text: visible, positions });
@@ -698,7 +720,8 @@
   function configureComplexListText(block, rendered) {
     const candidates = blockLines(block.source).flatMap((line) => {
       const item = window.markdownVisionReader.readListItem(line.text);
-      const offset = item ? item.bodyStart : (line.text.match(/^[ \t]*/)?.[0].length || 0);
+      const quote = !item && line.text.match(/^[ \t]*(?:>[ \t]?)+/);
+      const offset = item ? item.bodyStart : quote ? quote[0].length : (line.text.match(/^[ \t]*/)?.[0].length || 0);
       const text = line.text.slice(offset).trimEnd();
       if (text.length < 8 || !text.trim() || /[\\\x60*_[\]<>!&#~]/.test(text)
           || /^(?:[-+][ \t]|\d+[.)][ \t]|#{1,6}[ \t]|={3,}|-{3,})/.test(text)) return [];
@@ -763,6 +786,111 @@
       checkbox.dataset.index = String(lineIndex);
     }
     block.node.dataset.visualRestriction = 'Edit the plain list text directly. Edit the list structure in Markdown.';
+  }
+
+  function mappedInlineCandidates(block, rendered) {
+    const candidates = [];
+    const rawPre = rendered.tagName === 'PRE';
+    const walker = document.createTreeWalker(rendered, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      const parent = node.parentElement;
+      if (!parent || parent.closest('script,style,button')) continue;
+      if (rawPre) {
+        if (parent !== rendered && !parent.matches('b,strong,i,em,code,span')) continue;
+      } else {
+        if (parent.closest('code,pre,table,sup')) continue;
+        if (block.kind === 'html' && !parent.closest('summary,p')) continue;
+        if (!parent.matches('p,a,strong,em,del,summary')) continue;
+      }
+      const anchor = parent.closest('a');
+      const fragments = rawPre ? /[^<>&\n]+/g : /[^\\\x60*_[\]<>!&#~\n]+/g;
+      for (const chunk of node.data.matchAll(fragments)) {
+        const text = chunk[0].trim();
+        if (text.length < 2) continue;
+        const at = block.source.indexOf(text);
+        if (at < 0 || block.source.indexOf(text, at + 1) !== -1) continue;
+        if (anchor && (node.data.trim() !== text || block.source[at - 1] !== '[' || block.source[at + text.length] !== ']')) continue;
+        if (!anchor && block.source[at - 1] === '[' && block.source[at + text.length] === ']') continue;
+        if (block.source.lastIndexOf('<', at) > block.source.lastIndexOf('>', at)) continue;
+        const htmlText = rawPre || Boolean(parent.closest('summary'));
+        candidates.push({ node, offset: chunk.index + chunk[0].indexOf(text), start: at, end: at + text.length,
+          text, htmlText, listPlain: !htmlText, fieldLabel: rawPre ? 'Edit preformatted text' : htmlText ? 'Edit disclosure title' : 'Edit text' });
+      }
+    }
+    return candidates.filter((candidate, index) => !candidates.some((other, otherIndex) => otherIndex !== index
+      && other.start < candidate.end && candidate.start < other.end));
+  }
+
+  function configureMappedInlineBlocks(mappedBlocks, documentSource) {
+    if (!mappedBlocks.length) return;
+    // A unique spelling can still be inside a destination or a comment while the
+    // visible copy came from an entity. Check where an interior marker renders.
+    let marker = '\uE000';
+    while (documentSource.includes(marker)) marker += '\uE000';
+    let markedSource = '';
+    let previous = 0;
+    let inserted = 0;
+    for (const entry of mappedBlocks) {
+      const { block, rendered, candidates } = entry;
+      entry.markedStart = block.start + inserted;
+      candidates.sort((left, right) => left.start - right.start);
+      entry.expectedOffsets = candidates.map((candidate, index) => {
+        const width = candidate.text.codePointAt(0) > 0xffff ? 2 : 1;
+        const at = block.start + candidate.start + width;
+        const token = marker + index + '\uE001';
+        markedSource += documentSource.slice(previous, at) + token;
+        inserted += token.length;
+        previous = at;
+        const prefix = document.createRange();
+        prefix.selectNodeContents(rendered);
+        prefix.setEnd(candidate.node, candidate.offset + width);
+        return prefix.toString().length;
+      });
+    }
+    markedSource += documentSource.slice(previous);
+    const tracedBlocks = new Map(window.markdownVisionReader.renderBlocks(markedSource).map((block) => [block.start, block]));
+    const template = document.createElement('template');
+    const pattern = new RegExp(marker + '(\\d+)\uE001', 'g');
+    for (const { block, rendered, candidates, markedStart, expectedOffsets } of mappedBlocks) {
+      const tracedBlock = tracedBlocks.get(markedStart);
+      if (!tracedBlock) continue;
+      template.innerHTML = tracedBlock.html;
+      const traced = template.content.firstElementChild?.textContent || '';
+      const confirmed = new Set();
+      let removed = 0;
+      const unmarked = traced.replace(pattern, (token, index, offset) => {
+        if (expectedOffsets[Number(index)] === offset - removed) confirmed.add(Number(index));
+        removed += token.length;
+        return '';
+      });
+      if (unmarked !== rendered.textContent) continue;
+      const safe = candidates.filter((_, index) => confirmed.has(index));
+      if (safe.length) attachMappedInlineFields(block, safe);
+    }
+  }
+
+  function attachMappedInlineFields(block, safe) {
+    block.editableLinkLabels = safe.map(({ node, offset, ...label }, index) => ({ ...label, index }));
+    for (const candidate of [...safe].sort((left, right) => right.offset - left.offset)) {
+      const index = safe.indexOf(candidate);
+      const content = candidate.node.splitText(candidate.offset);
+      content.splitText(candidate.text.length);
+      const field = document.createElement('span');
+      field.textContent = candidate.text;
+      field.contentEditable = 'plaintext-only';
+      field.dataset.editableListLink = String(index);
+      field.setAttribute('aria-label', candidate.fieldLabel);
+      field.setAttribute('role', 'textbox');
+      field.spellcheck = true;
+      content.replaceWith(field);
+    }
+    block.node.dataset.visualRestriction = 'Edit the text directly. Edit the surrounding structure in Markdown.';
+    const action = block.node.querySelector('.visual-block-actions [data-visual-edit="source"]');
+    if (action) {
+      action.textContent = 'Edit structure in Markdown';
+      action.title = block.node.dataset.visualRestriction;
+    }
   }
 
   function configureQuotedText(block, rendered) {
@@ -2119,7 +2247,6 @@
     visualCodeOrigins = snapshot.origins;
     visualBaseline = snapshot.baseline;
     restoreCodeEditors();
-    $('#visualEditorNotice').hidden = !preview.querySelector('.visual-protected-block');
     const caret = snapshot.codeSelection;
     const field = caret && preview.querySelector('[data-visual-block="' + caret.id + '"] .visual-code-editor');
     if (field) {
@@ -2703,7 +2830,7 @@
       return;
     }
     if (event.target.closest('[data-editable-list-link]')) {
-      if (event.target.closest('a')) event.preventDefault();
+      if (event.target.closest('a,summary')) event.preventDefault();
       hideRestriction();
       return;
     }

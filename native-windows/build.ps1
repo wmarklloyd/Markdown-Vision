@@ -4,7 +4,7 @@ $repositoryRoot = Split-Path $PSScriptRoot -Parent
 $localDotnet = Join-Path $repositoryRoot '.tmp\dotnet\dotnet.exe'
 $dotnet = if (Test-Path $localDotnet) { $localDotnet } else { 'dotnet' }
 $project = Join-Path $PSScriptRoot 'MarkdownVision.Native.csproj'
-$output = Join-Path $repositoryRoot 'dist\MarkdownVision-Native-2.8.1-win-x64'
+$output = Join-Path $repositoryRoot 'dist\MarkdownVision-Native-2.8.3-win-x64'
 
 & $dotnet publish $project `
   --configuration Release `

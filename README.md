@@ -4,7 +4,7 @@ A native Windows x64 Markdown reader and editor. The Win32 C++ app uses Microsof
 
 ## Download for Windows
 
-**[Windows installer (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.1/Markdown-Vision-Native-Setup-2.8.1.exe)** · **[Portable Windows x64 ZIP](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.1/MarkdownVision-Native-Editor-2.8.1-win-x64.zip)**
+**[Windows installer (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.3/Markdown-Vision-Native-Setup-2.8.3.exe)** · **[Portable Windows x64 ZIP](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.3/MarkdownVision-Native-Editor-2.8.3-win-x64.zip)**
 
 ![Markdown Vision showing its own README five levels deep](docs/markdown-vision-recursive.png)
 

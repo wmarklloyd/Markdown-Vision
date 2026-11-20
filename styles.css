@@ -154,7 +154,6 @@ body.is-editing .toolbar { width: 100%; }
 .editor-preview-content [data-direct-table-cell] { cursor: text; white-space: pre-wrap; }
 .editor-preview-content [data-direct-table-cell]:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
 .editor-preview-content [data-unfenced] { white-space: pre-wrap; overflow-wrap: anywhere; }
-.editor-notice { margin: 0; padding: 8px 12px; color: var(--muted); border-bottom: 1px solid var(--faint); font-size: 12px; }
 .visual-protected-block { border: 1px dashed var(--faint); padding: 8px; margin: 0 0 1em; }
 .markdown-body pre.visual-code-frame { overflow: hidden; }
 .editor-pane .visual-code-editor {
