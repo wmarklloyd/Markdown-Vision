@@ -137,6 +137,8 @@ body.is-editing .toolbar { width: 100%; }
 .editor-search-overlay .is-active { background: #f4a32880; outline: 1px solid #d89225; }
 ::highlight(editor-search) { background: #f4c04b55; }
 ::highlight(editor-search-active) { background: #f4a32880; }
+::highlight(editor-counterpart) { background: #6aabff80; }
+.editor-counterpart-overlay span { background: #6aabff80; outline: 1px solid #4b87cb; }
 .editor-preview-content.markdown-body {
   flex: 1;
   min-height: 0;

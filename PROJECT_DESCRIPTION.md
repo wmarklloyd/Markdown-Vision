@@ -4,7 +4,7 @@
 
 Markdown Vision is a reading-first Windows desktop application for Markdown and plain-text documents. It combines a formatted reader, configurable typography, document search, and an in-memory Markdown editor. The primary application is the x64 Win32 C++ build in `native-cpp/`. It uses Microsoft Edge WebView2 to display the bundled interface and needs no Electron, Node.js, or .NET runtime.
 
-The current version is **2.7.0**. It adds direct Visual editing of plain text in nested list items while preserving their Markdown markers and indentation.
+The current version is **2.8.0**. It expands direct Visual editing of headings, code, lists, tasks, and tables, and highlights corresponding text across Split view while editing.
 
 | Area | Current state |
 | --- | --- |
@@ -21,8 +21,8 @@ The reader opens `.md`, `.markdown`, `.mdown`, `.mkd`, and `.txt` files. It show
 
 The editor offers three views:
 
-- **Visual** presents editable rendered Markdown. Closed, labeled code blocks accept direct typing. Structured controls edit task and list items, code languages, links, images and linked badges, and rectangular tables. Nested list text and ordinary cells in mixed tables can be edited in place. Blocked edits show a nearby explanation. Edit in Markdown opens Split view and jumps to the matching block, cell, or nested item. From a code block already being edited, it carries the caret or selection into Markdown.
-- **Split** shows Markdown on the left and Visual on the right. The divider starts at 50/50 and supports dragging or keyboard resizing. Toolbar actions follow the pane with focus.
+- **Visual** presents editable rendered Markdown. Code blocks accept direct typing. Structured controls edit task and list items, links, images and linked badges, and tables. Supported headings, nested and multiline list text, link labels, inline code, and ordinary table cells can be edited in place. Blocked edits show a nearby explanation and provide navigation to the relevant Markdown.
+- **Split** shows Markdown on the left and Visual on the right. The divider starts at 50/50 and supports dragging or keyboard resizing. Toolbar actions follow the pane with focus. The matching word or selection is highlighted in the other pane when it can be mapped to rendered text.
 - **Markdown** exposes the raw source in a textarea. It shows line and column position and supports the full set of current toolbar commands.
 
 Both editing surfaces offer undo and redo, heading cycling, bold, italic, strikethrough, bulleted and numbered lists, quotes, inline code, fenced code blocks, and links. Task-list and table insertion are available in the source pane. The Visual cell editor accepts multiple lines and stores line breaks as `<br>` inside the Markdown row. Existing task lists show interactive checkboxes in Visual and read-only checkboxes in the reader. Markdown view can continue list and task markers on Enter and inserts two spaces on Tab. The status bar shows the draft word count.
@@ -77,11 +77,11 @@ The primary build script targets x64, uses the configured Visual Studio Communit
 .\native-cpp\build-installer.bat
 ```
 
-The default output directory is `dist\MarkdownVision-Native-Editor-2.7.0\`. Its archive is `dist\MarkdownVision-Native-Editor-2.7.0-win-x64.zip`. The optional build argument names an isolated output directory and its matching archive. The bundle includes `Markdown-Vision.exe`, `MarkdownVisionPreviewHandler.dll`, `LICENSE`, and `web\` with `index.html`, `styles.css`, `app.js`, and `editor-ui.js`, plus the bundled parser and license notices in `vendor\`. Keep `web\` beside the executable when running an extracted build.
+The default output directory is `dist\MarkdownVision-Native-Editor-2.8.0\`. Its archive is `dist\MarkdownVision-Native-Editor-2.8.0-win-x64.zip`. The optional build argument names an isolated output directory and its matching archive. The bundle includes `Markdown-Vision.exe`, `MarkdownVisionPreviewHandler.dll`, `LICENSE`, and `web\` with `index.html`, `styles.css`, `app.js`, and `editor-ui.js`, plus the bundled parser and license notices in `vendor\`. Keep `web\` beside the executable when running an extracted build.
 
 The [native installer entry point](native-cpp/build-installer.bat) invokes the standalone build and then uses the cached NSIS compiler. The script currently locates that compiler under an Electron Builder cache path. That path is a build-time dependency only. The setup defaults to `%ProgramFiles%\MarkdownVision`, uses the previous product's uninstall identity for replacement, and registers the app and Explorer handler for the four Markdown extensions. The setup checkbox controls the registry association written for `.md`.
 
-NSIS reads the default 2.7.0 build directory and includes the complete web asset list. Its output is `dist\Markdown-Vision-Native-Setup-2.7.0.exe`. The executable and installer expose version 2.7.0 in Windows file properties.
+NSIS reads the default 2.8.0 build directory and includes the complete web asset list. Its output is `dist\Markdown-Vision-Native-Setup-2.8.0.exe`. The executable and installer expose version 2.8.0 in Windows file properties.
 
 ## Repository and integration status
 

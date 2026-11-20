@@ -446,7 +446,6 @@ function readListItem(line) {
   if (!item) return null;
   const [, indent, marker, spacing, task, taskSpacing, body] = item;
   const prefix = indent + marker + spacing;
-  if (task && /^\d/.test(marker)) return { indent, marker, prefix, body: line.slice(prefix.length), bodyStart: prefix.length };
   return { indent, marker, prefix, task, taskSpacing, body, bodyStart: line.length - body.length };
 }
 
@@ -564,6 +563,7 @@ function parseMarkdown(markdown, describeBlocks = false) {
       let kind = '';
       if (token.type === 'fence') kind = 'code';
       else if (token.type === 'table_open') kind = 'table';
+      else if (token.type === 'code_block') kind = 'indented-code';
       else if (token.type === 'html_block') {
         kind = 'html';
         // Keep Markdown between the two halves of a raw container inside the same
@@ -590,7 +590,7 @@ function parseMarkdown(markdown, describeBlocks = false) {
         const itemCount = tokens.slice(first, last).filter((entry) => entry.type === 'list_item_open').length;
         kind = itemCount === end - start && lines.slice(start, end).every((line) => readListItem(line))
           ? 'list' : 'complex';
-      } else if (token.type === 'code_block' || token.markup === '=' || token.markup === '-'
+      } else if (token.markup === '=' || token.markup === '-'
           || (token.type === 'blockquote_open' && tokens.slice(first + 1, last - 1).some((entry) => entry.block &&
             !['paragraph_open', 'paragraph_close', 'inline'].includes(entry.type)))) kind = 'complex';
       add(start, end, kind, render(tokens.slice(first, last)));

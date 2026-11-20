@@ -4,8 +4,8 @@
 101 ICON "MarkdownVision.ico"
 
 1 VERSIONINFO
- FILEVERSION 2,7,0,0
- PRODUCTVERSION 2,7,0,0
+ FILEVERSION 2,8,0,0
+ PRODUCTVERSION 2,8,0,0
  FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
  FILEFLAGS 0
  FILEOS VOS_NT_WINDOWS32
@@ -17,10 +17,10 @@ BEGIN
         BLOCK "040904B0"
         BEGIN
             VALUE "FileDescription", "Markdown Vision\0"
-            VALUE "FileVersion", "2.7.0\0"
+            VALUE "FileVersion", "2.8.0\0"
             VALUE "OriginalFilename", "Markdown-Vision.exe\0"
             VALUE "ProductName", "Markdown Vision\0"
-            VALUE "ProductVersion", "2.7.0\0"
+            VALUE "ProductVersion", "2.8.0\0"
         END
     END
     BLOCK "VarFileInfo"

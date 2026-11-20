@@ -59,6 +59,12 @@
   let searchPaintFrame = null;
   let searchNeedsMeasurement = false;
   let searchFields = new Map();
+  let counterpartTimer = null;
+  const counterpartOverlay = document.createElement('div');
+  counterpartOverlay.className = 'editor-search-overlay editor-counterpart-overlay';
+  counterpartOverlay.setAttribute('aria-hidden', 'true');
+  document.body.append(counterpartOverlay);
+  let counterpartFieldMark = null;
 
   function fenceCode(text) {
     const length = (text.match(/\x60+/g) || []).reduce((max, run) => Math.max(max, run.length + 1), 3);
@@ -70,20 +76,52 @@
     const lines = text.split('\n');
     const opener = window.markdownVisionReader.readCodeFence(lines[0]);
     const closer = opener && lines.length > 1 && window.markdownVisionReader.readCodeFence(lines.at(-1), opener[1]);
-    return closer ? { opener, closer, body: lines.slice(1, -1).join('\n') } : null;
+    if (closer) return { opener, closer, body: lines.slice(1, -1).join('\n') };
+    if (opener) return { opener, closer: null, body: lines.slice(1).join('\n') };
+    if (lines.length && lines.every((line) => !line.trim() || codeIndentWidth(line))) {
+      return { indented: true, body: lines.map((line) => {
+        const width = codeIndentWidth(line);
+        return width ? line.slice(width) : '';
+      }).join('\n') };
+    }
+    return null;
+  }
+
+  function codeIndentWidth(line) {
+    return line.startsWith('\t') ? 1 : line.startsWith('    ') ? 4 : 0;
   }
 
   function updateCodeBody(text, body) {
     const code = closedCodeBlock(text);
     if (!code || code.body === body) return text;
+    if (code.indented) {
+      const original = text.split('\n');
+      const before = code.body.split('\n');
+      const firstIndented = original.find((line) => codeIndentWidth(line));
+      const defaultIndent = firstIndented?.slice(0, codeIndentWidth(firstIndented)) || '    ';
+      const after = body.split('\n');
+      let prefix = 0;
+      while (prefix < before.length && prefix < after.length && before[prefix] === after[prefix]) prefix += 1;
+      let suffix = 0;
+      while (suffix < before.length - prefix && suffix < after.length - prefix
+          && before[before.length - suffix - 1] === after[after.length - suffix - 1]) suffix += 1;
+      return after.map((line, index) => {
+        if (index < prefix) return original[index];
+        if (index >= after.length - suffix) return original[before.length - (after.length - index)];
+        const oldLine = index < before.length - suffix ? original[index] : '';
+        return (oldLine?.slice(0, codeIndentWidth(oldLine)) || defaultIndent) + line;
+      }).join('\n');
+    }
     const { opener, closer } = code;
     const marker = opener[1][0];
     const width = body.split('\n').reduce((longest, line) => {
       const run = line.match(/^(\x60+|~+)[ \t]*$/)?.[1];
       return run?.[0] === marker ? Math.max(longest, run.length + 1) : longest;
     }, opener[1].length);
+    const opening = marker.repeat(width) + opener[2];
+    if (!closer) return opening + '\n' + body;
     const closingWidth = Math.max(width, closer[1].length);
-    return [marker.repeat(width) + opener[2], body, marker.repeat(closingWidth) + closer[2]].join('\n');
+    return [opening, body, marker.repeat(closingWidth) + closer[2]].join('\n');
   }
 
   function resizeCodeEditor(field) {
@@ -177,7 +215,7 @@
           id = 'draft-' + nextDraftBlock++;
           node.dataset.visualBlock = id;
         }
-        const codeEditor = original?.kind === 'code' && node.querySelector('.visual-code-editor');
+        const codeEditor = ['code', 'indented-code'].includes(original?.kind) && node.querySelector('.visual-code-editor');
         const span = codeEditor && visualRanges.get(id);
         let text = span ? updateCodeBody(source.value.slice(span.start, span.end), codeEditor.value)
           : original && (original.locked || node.outerHTML === original.html) ? original.source : block(node, original);
@@ -185,7 +223,14 @@
           for (const label of [...original.editableLinkLabels].reverse()) {
             const field = node.querySelector('[data-editable-list-link="' + label.index + '"]');
             if (!field || field.textContent === label.text) continue;
-            let value = field.textContent.replace(/([\\\x60*_[\]<>!&#~])/g, '\\$1');
+            let value;
+            if (label.codeSpan) {
+              const raw = field.textContent;
+              const longest = Math.max(0, ...[...raw.matchAll(/\x60+/g)].map((match) => match[0].length));
+              const marker = '\x60'.repeat(Math.max(label.codeSpan.length, longest + 1));
+              const padded = /^\x60|\x60$/.test(raw) || (/^ .* $/.test(raw) && /[^ ]/.test(raw));
+              value = marker + (padded ? ' ' + raw + ' ' : raw) + marker;
+            } else value = field.textContent.replace(/([\\\x60*_[\]<>!&#~])/g, '\\$1');
             if (label.quote || label.listPlain) {
               value = value.replace(/^(\s*)([-+])/,'$1\\$2').replace(/^(\s*\d+)([.)])(?=\s)/, '$1\\$2');
             }
@@ -318,7 +363,7 @@
     visualRanges = new Map();
     visualCodeOrigins = new Map();
     const blocks = window.markdownVisionReader.renderBlocks(previewSource);
-    const referenceLabels = new Set(blocks.filter(({ kind }) => kind !== 'code').flatMap(({ source }) =>
+    const referenceLabels = new Set(blocks.filter(({ kind }) => !['code', 'indented-code'].includes(kind)).flatMap(({ source }) =>
       [...source.matchAll(/^[ \t]*\[([^\]\n]+)\]:/gm)].map((match) => match[1].trim().toLowerCase())));
     let previousLocked = true;
     for (const [index, block] of blocks.entries()) {
@@ -330,8 +375,9 @@
       const hasIndentedChild = following?.start === block.end + 1 && /^[ \t]+\S/.test(following.source);
       const nestedList = (block.kind === 'list' && (indented || hasIndentedChild)) || continuation;
       const inlineMarkup = block.kind !== 'code' && needsMarkdown(block.source, referenceLabels, block.kind === 'table');
-      const locked = ['html', 'complex', 'footnotes', 'definitions'].includes(block.kind)
-        || (block.kind === 'code' && window.markdownVisionReader.readCodeFence(block.source.split('\n')[0])?.[2].trim())
+      const locked = ['html', 'complex', 'indented-code', 'footnotes', 'definitions'].includes(block.kind)
+        || (block.kind === 'code' && (window.markdownVisionReader.readCodeFence(block.source.split('\n')[0])?.[2].trim()
+          || !closedCodeBlock(block.source)?.closer))
         || inlineMarkup
         || (block.kind !== 'code' && /^>[ \t]*(?:>|[-+*][ \t]|\d+[.)][ \t])/m.test(block.source))
         || nestedList;
@@ -364,8 +410,22 @@
         });
       }
       configureVisualBlock(record, rendered, { inlineMarkup, nestedList, referenceLabels });
-      if (block.kind === 'complex' && /^ {0,3}>/m.test(block.source)) {
+      if (block.kind === 'list' && protectedBlock && !inlineMarkup) configureListSegments(record, rendered);
+      if (block.kind === 'complex' && /^(UL|OL)$/.test(rendered?.tagName || '')) {
+        configureComplexListText(record, rendered);
+      }
+      if (block.kind === 'complex' && rendered?.tagName === 'BLOCKQUOTE') {
         configureQuotedText(record, rendered);
+      }
+      if (block.kind === 'complex' && /^H[12]$/.test(rendered?.tagName || '')) {
+        configureSetextHeading(record, rendered);
+      }
+      if ((['code', 'indented-code'].includes(block.kind) && rendered?.querySelector('.visual-code-editor'))
+          || (block.kind === 'complex' && /^H[12]$/.test(rendered?.tagName || '')
+            && rendered.querySelector('[data-editable-list-link]') && rendered.textContent === block.source.split('\n')[0])) {
+        node.querySelector('.visual-block-actions [data-visual-edit="source"]')?.remove();
+        const actions = node.querySelector('.visual-block-actions');
+        if (actions && !actions.children.length) actions.remove();
       }
       visualBlocks.set(id, record);
       visualRanges.set(id, { start: block.start, end: block.end });
@@ -386,6 +446,7 @@
     visualInput = null;
     lastTyping = null;
     updateTools();
+    scheduleCounterpart();
   }
 
   function appendTypingLine() {
@@ -417,9 +478,8 @@
       ...line, cells: window.markdownVisionReader.tableCellRanges(line.text)
     }));
     const columns = rows[0].cells.length;
-    if (columns < 2 || rows.length < 2 || rows.some((row, index) => row.cells.length !== columns
-        && !(index > 1 && /^\|[ \t]*\|$/.test(row.text.trim())))
-        || !rows[1].cells.every(({ start, end }) => /^:?-{3,}:?$/.test(rows[1].text.slice(start, end)))) return null;
+    if (columns < 1 || rows.length < 2 || rows[1].cells.length !== columns
+        || !rows[1].cells.every(({ start, end }) => /^:?-+:?$/.test(rows[1].text.slice(start, end)))) return null;
     return rows;
   }
 
@@ -434,7 +494,7 @@
     const actions = document.createElement('div');
     actions.className = 'visual-block-actions';
     let reason = 'This block contains formatting that needs to be edited in Markdown.';
-    if (block.kind === 'code') {
+    if (block.kind === 'code' || block.kind === 'indented-code') {
       const code = closedCodeBlock(block.source);
       if (code) {
         const field = document.createElement('textarea');
@@ -447,8 +507,9 @@
         resizeCodeEditor(field);
         rendered.classList.add('visual-code-frame');
         rendered.replaceChildren(field);
-        actions.append(visualAction('Change language', 'code-language'));
-        reason = 'Type directly in the code block to edit its contents. Use Markdown to edit the lines that mark where it starts and ends.';
+        reason = code.indented
+          ? 'Type directly to edit this indented code block.'
+          : 'Type directly in the code block to edit its contents. Use Markdown to edit the lines that mark where it starts and ends.';
       }
     } else if (block.kind === 'list' && !inlineMarkup) {
       reason = nestedList
@@ -468,7 +529,7 @@
           linkLabels.push({ index, start, end: start + match[1].length, text, link });
           continue;
         }
-        if (!parsed || parsed.task) continue;
+        if (!parsed) continue;
         const rawText = parsed.body.trimEnd();
         if (!/^(?:\\[\\\x60*_[\]<>!&#~+.)-]|[^\\\x60*_[\]<>!&#~])+$/.test(rawText)) continue;
         const plain = rawText.replace(/\\([\\\x60*_[\]<>!&#~+.)-])/g, '$1');
@@ -499,8 +560,9 @@
           item.dataset.visualRestriction = reason;
           item.dataset.sourceListItem = String(index);
         }
-        const checkbox = item.querySelector('input');
-        if (checkbox && !nestedList) {
+        const checkbox = item.querySelector(':scope > input[type="checkbox"]');
+        const parsed = lines[index] && window.markdownVisionReader.readListItem(lines[index].text);
+        if (checkbox && parsed?.task) {
           checkbox.disabled = false;
           checkbox.setAttribute('aria-label', item.textContent.trim() || 'Task');
           checkbox.dataset.visualEdit = 'task';
@@ -522,8 +584,8 @@
         const editableCells = [];
         for (const [row, line] of displayed.entries()) {
           const raw = rows[row ? row + 1 : 0];
-          if (raw.cells.length !== line.cells.length) continue;
           for (const [column, cell] of [...line.cells].entries()) {
+            if (!raw.cells[column]) continue;
             const { start, end } = raw.cells[column];
             const sourceOnly = needsMarkdown(raw.text.slice(start, end), referenceLabels, true);
             cell.tabIndex = 0;
@@ -575,6 +637,134 @@
     block.node.append(actions);
   }
 
+  function configureListSegments(block, rendered) {
+    const lines = blockLines(block.source);
+    const labels = block.editableLinkLabels || [];
+    let nextIndex = Math.max(-1, ...labels.map((label) => label.index)) + 1;
+    for (const [itemIndex, item] of [...rendered.querySelectorAll('li')].entries()) {
+      const line = lines[itemIndex];
+      const parsed = line && window.markdownVisionReader.readListItem(line.text);
+      if (!parsed || item.querySelector(':scope > [data-editable-list-link]')) continue;
+      const candidates = [];
+      for (const child of item.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE && child.data.trim()) {
+          const value = child.data.trim();
+          if (/[\\\x60*_[\]<>!&#~]/.test(value)) continue;
+          const at = line.text.indexOf(value, parsed.bodyStart);
+          if (at >= 0 && line.text.indexOf(value, at + 1) === -1)
+            candidates.push({ node: child, start: line.start + at, end: line.start + at + value.length, text: value, listPlain: true });
+        } else if (child.nodeType === Node.ELEMENT_NODE && child.matches('a,code') && child.childNodes.length === 1
+            && child.firstChild.nodeType === Node.TEXT_NODE) {
+          const value = child.textContent;
+          if (!value || value.includes('\n')) continue;
+          if (child.tagName === 'A' && !/[\\\x60*_[\]<>!&#~]/.test(value)) {
+            const needle = '[' + value + '](';
+            const at = line.text.indexOf(needle, parsed.bodyStart);
+            if (at >= 0 && line.text.indexOf(needle, at + 1) === -1)
+              candidates.push({ node: child.firstChild, start: line.start + at + 1, end: line.start + at + 1 + value.length, text: value });
+          } else if (child.tagName === 'CODE' && !value.includes('\x60')) {
+            const match = [...line.text.matchAll(/(\x60+)([^\x60\n]+)\1/g)].filter((entry) => entry[2] === value);
+            if (match.length === 1) candidates.push({ node: child.firstChild, start: line.start + match[0].index,
+              end: line.start + match[0].index + match[0][0].length, text: value, codeSpan: match[0][1] });
+          }
+        }
+      }
+      const nonoverlapping = candidates.filter((candidate, index) => !candidates.some((other, otherIndex) => otherIndex !== index
+        && other.start < candidate.end && candidate.start < other.end));
+      for (const { node, ...candidate } of nonoverlapping) {
+        const offset = node.data.indexOf(candidate.text);
+        const content = node.splitText(offset);
+        content.splitText(candidate.text.length);
+        const field = document.createElement('span');
+        field.textContent = candidate.text;
+        field.contentEditable = 'plaintext-only';
+        field.dataset.editableListLink = String(nextIndex);
+        field.setAttribute('aria-label', candidate.codeSpan ? 'Edit inline code' : 'Edit list item text');
+        field.setAttribute('role', 'textbox');
+        field.spellcheck = !candidate.codeSpan;
+        content.replaceWith(field);
+        labels.push({ ...candidate, index: nextIndex++ });
+      }
+      const remaining = [...item.childNodes].some((child) => child.nodeType === Node.TEXT_NODE ? child.data.trim()
+        : child.nodeType === Node.ELEMENT_NODE && !child.matches('ul,ol,button,input,[data-editable-list-link]')
+          && !child.querySelector('[data-editable-list-link]'));
+      if (!remaining && nonoverlapping.length) item.querySelector(':scope > button[data-visual-edit="list-text"]')?.remove();
+    }
+    if (labels.length) block.editableLinkLabels = labels.sort((left, right) => left.start - right.start);
+    const sourceAction = block.node.querySelector('.visual-block-actions [data-visual-edit="source"]');
+    if (sourceAction && labels.length) sourceAction.textContent = 'Edit list structure in Markdown';
+  }
+
+  function configureComplexListText(block, rendered) {
+    const candidates = blockLines(block.source).flatMap((line) => {
+      const item = window.markdownVisionReader.readListItem(line.text);
+      const offset = item ? item.bodyStart : (line.text.match(/^[ \t]*/)?.[0].length || 0);
+      const text = line.text.slice(offset).trimEnd();
+      if (text.length < 8 || !text.trim() || /[\\\x60*_[\]<>!&#~]/.test(text)
+          || /^(?:[-+][ \t]|\d+[.)][ \t]|#{1,6}[ \t]|={3,}|-{3,})/.test(text)) return [];
+      return [{ start: line.start + offset, end: line.start + offset + text.length, text, listPlain: true }];
+    });
+    const nodes = [];
+    const walker = document.createTreeWalker(rendered, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      if (!node.parentElement.closest('li') || node.parentElement.closest('a,code,pre,table,em,strong,del')) continue;
+      nodes.push(node);
+    }
+    const matches = [];
+    for (const candidate of candidates) {
+      if (candidates.filter((other) => other.text === candidate.text).length !== 1) continue;
+      const occurrences = [];
+      for (const node of nodes) {
+        let at = node.data.indexOf(candidate.text);
+        while (at !== -1) {
+          const before = node.data[at - 1] || '';
+          const after = node.data[at + candidate.text.length] || '';
+          if (!(/[\p{L}\p{N}]/u.test(before) && /[\p{L}\p{N}]/u.test(candidate.text[0]))
+              && !(/[\p{L}\p{N}]/u.test(after) && /[\p{L}\p{N}]/u.test(candidate.text.at(-1)))) {
+            occurrences.push({ node, at });
+          }
+          at = node.data.indexOf(candidate.text, at + 1);
+        }
+      }
+      if (occurrences.length === 1) matches.push({ ...candidate, ...occurrences[0] });
+    }
+    matches.sort((left, right) => left.start - right.start);
+    const safe = matches.filter((match, index) => !matches.some((other, otherIndex) => otherIndex !== index
+      && other.node === match.node && other.at < match.at + match.text.length && match.at < other.at + other.text.length));
+    if (!safe.length) return;
+    block.editableLinkLabels = safe.map(({ node, at, ...label }, index) => ({ ...label, index }));
+    for (const match of [...safe].sort((left, right) => right.at - left.at)) {
+      const index = safe.indexOf(match);
+      const content = match.node.splitText(match.at);
+      content.splitText(match.text.length);
+      const field = document.createElement('span');
+      field.textContent = match.text;
+      field.contentEditable = 'plaintext-only';
+      field.dataset.editableListLink = String(index);
+      field.setAttribute('aria-label', 'Edit list item text');
+      field.setAttribute('role', 'textbox');
+      field.spellcheck = true;
+      content.replaceWith(field);
+    }
+    const lines = blockLines(block.source);
+    for (const match of safe) {
+      const lineIndex = lines.findIndex((line) => line.start <= match.start && match.start <= line.start + line.text.length);
+      const line = lines[lineIndex];
+      const item = line && window.markdownVisionReader.readListItem(line.text);
+      if (!item?.task || line.start + item.bodyStart !== match.start) continue;
+      const field = block.node.querySelector('[data-editable-list-link="' + safe.indexOf(match) + '"]');
+      const listItem = field?.closest('li');
+      const checkbox = listItem?.querySelector(':scope > input[type="checkbox"], :scope > p > input[type="checkbox"]');
+      if (!checkbox) continue;
+      checkbox.disabled = false;
+      checkbox.setAttribute('aria-label', match.text);
+      checkbox.dataset.visualEdit = 'task';
+      checkbox.dataset.index = String(lineIndex);
+    }
+    block.node.dataset.visualRestriction = 'Edit the plain list text directly. Edit the list structure in Markdown.';
+  }
+
   function configureQuotedText(block, rendered) {
     const lines = blockLines(block.source);
     const candidates = lines.flatMap((line) => {
@@ -603,6 +793,42 @@
       block.editableLinkLabels = labels;
       block.node.dataset.visualRestriction = 'Edit the plain text directly. Edit the quote structure in Markdown.';
     }
+  }
+
+  function configureSetextHeading(block, rendered) {
+    const lines = blockLines(block.source);
+    if (lines.length !== 2 || !/^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[1].text)) return;
+    const raw = lines[0].text;
+    const text = rendered.textContent;
+    const labels = [];
+    if (text && /^(?:\\[\\\x60*_[\]<>!&#~]|[^\\\x60*_[\]<>!&#~])+$/.test(raw)
+        && raw.replace(/\\([\\\x60*_[\]<>!&#~])/g, '$1') === text) {
+      labels.push({ node: rendered.firstChild, start: 0, end: raw.length, text });
+    } else {
+      const walker = document.createTreeWalker(rendered, NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        const value = node.data;
+        if (!value.trim() || node.parentElement.closest('code')) continue;
+        const start = raw.indexOf(value);
+        if (start < 0 || raw.indexOf(value, start + 1) !== -1) continue;
+        labels.push({ node, start, end: start + value.length, text: value });
+      }
+    }
+    labels.sort((left, right) => left.start - right.start);
+    if (!labels.length || labels.some((label, index) => index && labels[index - 1].end > label.start)) return;
+    block.editableLinkLabels = labels.map(({ node, ...label }, index) => {
+      const field = document.createElement('span');
+      field.textContent = label.text;
+      field.contentEditable = 'plaintext-only';
+      field.dataset.editableListLink = String(index);
+      field.setAttribute('aria-label', 'Edit heading text');
+      field.setAttribute('role', 'textbox');
+      field.spellcheck = true;
+      node.replaceWith(field);
+      return { ...label, index };
+    });
+    block.node.dataset.visualRestriction = 'Edit the heading text directly. Edit the heading style in Markdown.';
   }
 
   function displayedBlock(target) {
@@ -796,6 +1022,22 @@
       const code = node.querySelector('.visual-code-editor');
       const rawCode = code && closedCodeBlock(span.text);
       if (rawCode) {
+        if (rawCode.indented) {
+          let visualOffset = 0;
+          for (const line of blockLines(span.text)) {
+            const prefix = codeIndentWidth(line.text);
+            for (const hit of hits) {
+              const start = span.start + line.start + prefix;
+              const end = span.start + line.end;
+              if (hit.source.start >= start && hit.source.end <= end) {
+                hit.visual = { field: code, start: visualOffset + hit.source.start - start,
+                  end: visualOffset + hit.source.end - start };
+              }
+            }
+            visualOffset += line.text.length - prefix + 1;
+          }
+          continue;
+        }
         const start = span.start + span.text.indexOf('\n') + 1;
         for (const hit of hits) {
           if (hit.source.start >= start && hit.source.end <= start + rawCode.body.length) {
@@ -921,6 +1163,123 @@
     if (rect) preview.scrollTop += (rect.top + rect.bottom) / 2 - preview.getBoundingClientRect().top - preview.clientHeight / 2;
   }
 
+  function clearCounterpart() {
+    CSS.highlights?.delete('editor-counterpart');
+    counterpartFieldMark = null;
+    counterpartOverlay.replaceChildren();
+  }
+
+  function paintCounterpartField() {
+    counterpartOverlay.replaceChildren();
+    if (!counterpartFieldMark || panes.dataset.view !== 'split') return;
+    const { field, start, end } = counterpartFieldMark;
+    if (!field.isConnected || start >= end || end > field.value.length) return;
+    withTextareaLayout(field, (text, origin) => {
+      const range = document.createRange();
+      range.setStart(text, start);
+      range.setEnd(text, end);
+      const bounds = field.getBoundingClientRect();
+      const clip = field === source ? bounds : preview.getBoundingClientRect();
+      for (const rect of range.getClientRects()) {
+        const left = Math.max(bounds.left, clip.left, bounds.left + rect.left - origin.left - field.scrollLeft);
+        const top = Math.max(bounds.top, clip.top, bounds.top + rect.top - origin.top - field.scrollTop);
+        const right = Math.min(bounds.right, clip.right, bounds.left + rect.right - origin.left - field.scrollLeft);
+        const bottom = Math.min(bounds.bottom, clip.bottom, bounds.top + rect.bottom - origin.top - field.scrollTop);
+        if (right <= left || bottom <= top) continue;
+        const mark = document.createElement('span');
+        Object.assign(mark.style, { left: left + 'px', top: top + 'px', width: right - left + 'px', height: bottom - top + 'px' });
+        counterpartOverlay.append(mark);
+      }
+    });
+  }
+
+  function wordAt(text, start, end) {
+    if (end > start) return end - start <= 80 && !/[\r\n]/.test(text.slice(start, end))
+      ? { start, end, text: text.slice(start, end) } : null;
+    const isWord = (character) => character && /[\p{L}\p{N}_]/u.test(character);
+    if (!isWord(text[start]) && !isWord(text[start - 1])) return null;
+    let left = start;
+    let right = start;
+    while (left > 0 && isWord(text[left - 1])) left -= 1;
+    while (right < text.length && isWord(text[right])) right += 1;
+    return right - left <= 80 ? { start: left, end: right, text: text.slice(left, right) } : null;
+  }
+
+  function synchronizeCounterpart() {
+    clearCounterpart();
+    if (!active || panes.dataset.view !== 'split' || source.value !== previewSource) return;
+    const focused = document.activeElement;
+    const fromSource = focused === source;
+    const field = focused?.matches('.visual-code-editor') ? focused : null;
+    let word;
+    let selectedRange;
+    if (fromSource || field) {
+      const current = fromSource ? source : field;
+      word = wordAt(current.value, current.selectionStart, current.selectionEnd);
+    } else if (preview.contains(focused) || focused === preview) {
+      const selection = window.getSelection();
+      if (!selection?.rangeCount) return;
+      selectedRange = selection.getRangeAt(0);
+      if (!preview.contains(selectedRange.startContainer) || !preview.contains(selectedRange.endContainer)) return;
+      if (!selectedRange.collapsed) {
+        const text = selectedRange.toString();
+        if (text && text.length <= 80 && !/[\r\n]/.test(text)) word = { text };
+      } else if (selectedRange.startContainer.nodeType === Node.TEXT_NODE) {
+        const node = selectedRange.startContainer;
+        word = wordAt(node.data, selectedRange.startOffset, selectedRange.startOffset);
+        if (word) {
+          selectedRange = document.createRange();
+          selectedRange.setStart(node, word.start);
+          selectedRange.setEnd(node, word.end);
+        }
+      }
+    }
+    if (!word?.text || !word.text.trim()) return;
+    const raw = occurrences(source.value, word.text).map((hit) => ({ source: hit, order: hit.start }));
+    if (raw.length > 2000) return;
+    const matches = addVisualSearchMatches(word.text, raw);
+    let match;
+    if (fromSource) match = matches.find((entry) => entry.source?.start === word.start && entry.source?.end === word.end && entry.visual);
+    else if (field) match = matches.find((entry) => entry.source && entry.visual?.field === field
+      && entry.visual.start === word.start && entry.visual.end === word.end);
+    else if (selectedRange) match = matches.find((entry) => {
+      const range = entry.visual?.range;
+      return entry.source && range && range.compareBoundaryPoints(Range.START_TO_START, selectedRange) === 0
+        && range.compareBoundaryPoints(Range.END_TO_END, selectedRange) === 0;
+    });
+    if (!match) return;
+    if (fromSource && match.visual.range) {
+      const range = match.visual.range;
+      if (CSS.highlights && typeof Highlight === 'function') CSS.highlights.set('editor-counterpart', new Highlight(range));
+      const rect = range.getBoundingClientRect();
+      const bounds = preview.getBoundingClientRect();
+      if (rect.top < bounds.top || rect.bottom > bounds.bottom) centerVisualMatch(range);
+    } else {
+      const mark = fromSource ? match.visual : { field: source, ...match.source };
+      if (!mark.field) return;
+      counterpartFieldMark = { field: mark.field, start: mark.start, end: mark.end };
+      withTextareaLayout(mark.field, (text, origin) => {
+        const range = document.createRange();
+        range.setStart(text, mark.start);
+        range.setEnd(text, mark.end);
+        const rect = range.getBoundingClientRect();
+        const bounds = mark.field.getBoundingClientRect();
+        const y = bounds.top + rect.top - origin.top - mark.field.scrollTop;
+        const clip = mark.field === source ? bounds : preview.getBoundingClientRect();
+        if (y < clip.top || y + rect.height > clip.bottom) centerFieldMatch(mark.field, { rects: [{
+          top: rect.top - origin.top, bottom: rect.bottom - origin.top,
+          left: rect.left - origin.left, right: rect.right - origin.left
+        }] });
+      });
+      paintCounterpartField();
+    }
+  }
+
+  function scheduleCounterpart(delay = 80) {
+    clearTimeout(counterpartTimer);
+    counterpartTimer = setTimeout(synchronizeCounterpart, delay);
+  }
+
   function showEditorSearch(index, center) {
     searchIndex = index;
     const activeMatch = searchMatches[index];
@@ -1020,6 +1379,20 @@
     const field = span.node.querySelector('.visual-code-editor');
     if (!field || !visitedCodeEditors.has(field)) {
       focusSource(span);
+      return;
+    }
+    const code = closedCodeBlock(span.text);
+    if (code?.indented) {
+      const sourcePosition = (position) => {
+        const preceding = field.value.slice(0, position).split('\n');
+        const line = preceding.length - 1;
+        const sourceLines = blockLines(span.text);
+        const target = sourceLines[line];
+        return span.start + target.start + codeIndentWidth(target.text) + preceding.at(-1).length;
+      };
+      const line = field.value.slice(0, field.selectionStart).split('\n').length - 1;
+      const lineOffset = line * parseFloat(getComputedStyle(field).lineHeight) - field.scrollTop;
+      focusSource({ start: sourcePosition(field.selectionStart), end: sourcePosition(field.selectionEnd) }, field, lineOffset);
       return;
     }
     const bodyStart = span.start + span.text.indexOf('\n') + 1;
@@ -1154,20 +1527,6 @@
     if (!item?.task) return;
     const marker = span.start + line.start + item.prefix.length + 1;
     applyVisualPatch(marker, marker + 1, item.task === '[ ]' ? 'x' : ' ');
-  }
-
-  function editVisualCodeLanguage(span) {
-    const code = closedCodeBlock(span.text);
-    if (!code) return;
-    const [, delimiter, info] = code.opener;
-    const [, spacing, language, rest] = info.match(/^([ \t]*)([^\s]*)(.*)$/);
-    showVisualEdit('Change code language', [['language', 'Language', language]], ({ language: value }) => {
-      const next = value.trim();
-      if (next && !/^[\w.+#-]+$/.test(next)) return 'Enter a single language name, such as javascript or c++.';
-      if (!next && rest.trim()) return 'Use Markdown to remove the language while keeping the extra options on the opening line.';
-      const from = span.start + delimiter.length + spacing.length;
-      return [from, from + language.length, next];
-    });
   }
 
   function readMultilineCell(markdown) {
@@ -1317,7 +1676,6 @@
     const index = Number(control.dataset.index);
     switch (control.dataset.visualEdit) {
       case 'source': focusBlockSource(span); break;
-      case 'code-language': editVisualCodeLanguage(span); break;
       case 'table-cell-source': showRestriction(control); break;
       case 'table-cell': editVisualTableCell(span, control, event); break;
       case 'table-options': {
@@ -1378,6 +1736,8 @@
     updateTools();
     if (editingSurface === source || preview.isContentEditable) editingSurface.focus({ preventScroll: true });
     window.markdownVisionReader.refreshEditorSearch({ preserve: true });
+    if (view === 'split') scheduleCounterpart();
+    else clearCounterpart();
   }
 
   function resizeSplit(percent) {
@@ -1388,6 +1748,7 @@
     divider.setAttribute('aria-valuetext', rounded + '% Markdown');
     positionRestriction();
     scheduleSearchPaint(true);
+    paintCounterpartField();
   }
 
   function setActive(value) {
@@ -1397,6 +1758,7 @@
       window.markdownVisionReader.showDocument('', 'Untitled.md');
     }
     active = value;
+    if (!value) clearCounterpart();
     toggle.setAttribute('aria-pressed', String(value));
     toggle.setAttribute('aria-label', value ? 'Return to reader' : 'Edit Markdown');
     toggle.title = value ? 'Return to reader' : 'Edit Markdown';
@@ -2104,8 +2466,11 @@
   preview.addEventListener('scroll', positionRestriction, { passive: true });
   preview.addEventListener('scroll', () => scheduleSearchPaint(), { capture: true, passive: true });
   source.addEventListener('scroll', () => scheduleSearchPaint(), { passive: true });
+  preview.addEventListener('scroll', paintCounterpartField, { capture: true, passive: true });
+  source.addEventListener('scroll', paintCounterpartField, { passive: true });
   window.addEventListener('resize', positionRestriction);
   window.addEventListener('resize', () => scheduleSearchPaint(true));
+  window.addEventListener('resize', paintCounterpartField);
   document.addEventListener('pointerdown', (event) => {
     if (restrictionAnchor && !restriction.contains(event.target) && !restrictionAnchor.contains(event.target)) hideRestriction();
   });
@@ -2180,6 +2545,7 @@
   });
   document.addEventListener('selectionchange', () => {
     if (active && editingSurface === preview) updateTools();
+    if (active) scheduleCounterpart();
   });
   tools.addEventListener('mousedown', (event) => {
     if (event.target.closest('button')) event.preventDefault();
@@ -2194,11 +2560,13 @@
     clearTimeout(previewTimer);
     if (panes.dataset.view === 'split') previewTimer = setTimeout(updatePreview, 180);
     updateCursor();
+    scheduleCounterpart(260);
   });
   source.addEventListener('focus', () => {
     hideRestriction();
     editingSurface = source;
     updateTools();
+    scheduleCounterpart();
   });
   preview.addEventListener('focusin', (event) => {
     updatePreview();
@@ -2214,6 +2582,7 @@
     }
     editingSurface = preview;
     updateTools();
+    scheduleCounterpart();
   });
   preview.addEventListener('beforeinput', (event) => {
     if (visualCommandActive) return;
@@ -2270,6 +2639,7 @@
     syncVisualDraft();
     rememberVisualChange(before, event.inputType);
     updateTools();
+    scheduleCounterpart();
   });
   preview.addEventListener('keydown', (event) => {
     if (event.target.matches('[data-direct-table-cell]')) {
