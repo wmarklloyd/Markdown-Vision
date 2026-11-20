@@ -4,7 +4,7 @@ Unicode True
 !include "nsDialogs.nsh"
 
 !define APP_NAME "Markdown Vision"
-!define APP_VERSION "2.8.4"
+!define APP_VERSION "2.8.5"
 !define APP_ID "8d1dd6d6-9e38-5fc2-8139-94aece1f4a40"
 !define SOURCE_DIR "..\dist\MarkdownVision-Native-Editor-${APP_VERSION}"
 !define APP_EXE "Markdown-Vision.exe"
