@@ -1,6 +1,8 @@
 (() => {
   const $ = (selector) => document.querySelector(selector);
   const toggle = $('#editorToggle');
+  const newFileButton = $('#newFileButton');
+  const newFileDialog = $('#newFileDialog');
   const tools = $('#editorTools');
   const workspace = $('#editorWorkspace');
   const reader = $('#readerShell');
@@ -1980,6 +1982,7 @@
     toggle.setAttribute('aria-label', value ? 'Return to reader' : 'Edit Markdown');
     toggle.title = value ? 'Return to reader' : 'Edit Markdown';
     tools.hidden = !value;
+    newFileButton.hidden = !value;
     workspace.hidden = !value;
     reader.hidden = value || !window.markdownVisionReader.getDocument();
     document.body.classList.toggle('is-editing', value);
@@ -2728,6 +2731,28 @@
   }
 
   toggle.addEventListener('click', () => setActive(!active));
+  newFileButton.addEventListener('click', () => {
+    if (saving || newFileDialog.open) return;
+    if (dirty) {
+      $('#newFileSave').hidden = !window.desktop?.saveMarkdownFile;
+      newFileDialog.returnValue = 'cancel';
+      newFileDialog.showModal();
+      return;
+    }
+    startNewFile();
+  });
+  newFileDialog.addEventListener('close', async () => {
+    if (newFileDialog.returnValue === 'save') {
+      await saveDraft();
+      if (dirty || saving) return;
+    } else if (newFileDialog.returnValue !== 'discard') return;
+    startNewFile();
+  });
+  function startNewFile() {
+    window.markdownVisionReader.showDocument('', 'Untitled.md');
+    reader.hidden = true;
+    selectView(panes.dataset.view);
+  }
   $('#editorSaveActions').hidden = !window.desktop?.saveMarkdownFile;
   window.markdownVisionReader.isSaving = () => saving;
   window.markdownVisionReader.getPrintDraft = () => active ? { content: source.value, name: fileName } : null;

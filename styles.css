@@ -93,7 +93,9 @@ body.is-editing .topbar { left: 0; max-width: none; padding-left: 0; }
 body.is-editing .toolbar { width: 100%; }
 .editor-tools { display: flex; flex: 1; align-items: center; justify-content: safe center; gap: 3px; min-width: 0; padding-inline: 4px; overflow-x: auto; }
 .editor-tools[hidden] { display: none; }
+#newFileButton[hidden] { display: none; }
 .editor-tools button { width: 34px; height: 36px; border: 0; border-radius: 6px; color: var(--text); background: transparent; cursor: pointer; }
+.editor-tools button svg { width: 19px; height: 19px; vertical-align: middle; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .editor-tools button:hover { background: var(--code-bg); }
 .editor-tools button[aria-pressed="true"] { color: var(--accent); background: var(--code-bg); box-shadow: inset 0 0 0 1px var(--accent); }
 .editor-tools button:disabled { opacity: .45; cursor: default; }
