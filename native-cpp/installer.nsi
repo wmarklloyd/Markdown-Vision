@@ -4,7 +4,7 @@ Unicode True
 !include "nsDialogs.nsh"
 
 !define APP_NAME "Markdown Vision"
-!define APP_VERSION "2.8.9"
+!define APP_VERSION "2.8.10"
 !define APP_ID "8d1dd6d6-9e38-5fc2-8139-94aece1f4a40"
 !define SOURCE_DIR "..\dist\MarkdownVision-Native-Editor-${APP_VERSION}"
 !define APP_EXE "Markdown-Vision.exe"
@@ -35,6 +35,23 @@ UninstPage instfiles
 
 Var DefaultMarkdownCheckbox
 Var SetAsDefaultMarkdown
+
+Function .onInit
+  SetRegView 64
+  ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_ID}" "InstallLocation"
+  ${If} $0 != ""
+    ; Preferences belong to the WebView profile for the installed app page.
+    ; Keep custom installation paths as the default for upgrades.
+    ${If} $INSTDIR == "$PROGRAMFILES64\MarkdownVision"
+      StrCpy $INSTDIR $0
+    ${EndIf}
+    ReadRegStr $1 HKLM "Software\Classes\.md" ""
+    StrCpy $SetAsDefaultMarkdown "0"
+    ${If} $1 == "${APP_PROGID}"
+      StrCpy $SetAsDefaultMarkdown "1"
+    ${EndIf}
+  ${EndIf}
+FunctionEnd
 
 Function CloseRunningApp
 check_running:
@@ -94,7 +111,11 @@ Function DefaultMarkdownPage
   Pop $0
   ${NSD_CreateCheckbox} 0 28u 100% 12u "Set Markdown Vision as the default application for markdown files"
   Pop $DefaultMarkdownCheckbox
-  ${NSD_SetState} $DefaultMarkdownCheckbox ${BST_CHECKED}
+  ${If} $SetAsDefaultMarkdown == ""
+    ${NSD_SetState} $DefaultMarkdownCheckbox ${BST_CHECKED}
+  ${Else}
+    ${NSD_SetState} $DefaultMarkdownCheckbox $SetAsDefaultMarkdown
+  ${EndIf}
   nsDialogs::Show
 FunctionEnd
 
@@ -112,6 +133,7 @@ Section "Markdown Vision" SEC_APP
   Call RemovePreviousInstall
   SetRegView 64
   SetShellVarContext all
+  ; The per-user WebView profile lives in LocalAppData, outside this cleanup.
   RMDir /r "$INSTDIR"
   CreateDirectory "$INSTDIR"
   SetOutPath "$INSTDIR"
@@ -174,8 +196,11 @@ native_executable_ready:
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\PreviewHandlers" "${PREVIEW_HANDLER_CLSID}" "Markdown Vision Preview Handler"
   ${If} $SetAsDefaultMarkdown == "1"
     WriteRegStr HKLM "Software\Classes\.md" "" "${APP_PROGID}"
-  ${Else}
-    DeleteRegValue HKLM "Software\Classes\.md" ""
+  ${ElseIf} $SetAsDefaultMarkdown == "0"
+    ReadRegStr $0 HKLM "Software\Classes\.md" ""
+    ${If} $0 == "${APP_PROGID}"
+      DeleteRegValue HKLM "Software\Classes\.md" ""
+    ${EndIf}
   ${EndIf}
   WriteRegStr HKLM "Software\Classes\.md\OpenWithProgids" "${APP_PROGID}" ""
   WriteRegStr HKLM "Software\Classes\.markdown" "" "${APP_PROGID}"
