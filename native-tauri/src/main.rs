@@ -83,17 +83,21 @@ fn main() {
 }
 
 #[tauri::command]
-fn show_open_error(message: &str) {
-    rfd::MessageDialog::new()
+fn show_open_error(window: tauri::WebviewWindow, message: &str) {
+    let dialog = rfd::MessageDialog::new()
         .set_title("Could not open document")
         .set_description(format!("The document could not be opened. Your current changes are still available.\n\n{message}"))
         .set_level(rfd::MessageLevel::Error)
-        .set_buttons(rfd::MessageButtons::Ok)
-        .show();
+        .set_buttons(rfd::MessageButtons::Ok);
+    #[cfg(target_os = "macos")]
+    let dialog = dialog.set_parent(&window);
+    #[cfg(not(target_os = "macos"))]
+    let _ = window;
+    dialog.show();
 }
 
 #[tauri::command]
-fn confirm_discard(action: &str) -> Result<bool, String> {
+fn confirm_discard(window: tauri::WebviewWindow, action: &str) -> Result<bool, String> {
     let message = match action {
         "open" => "Discard your unsaved changes and open another document?",
         "close" => "Discard your unsaved changes and close Markdown Vision?",
@@ -109,12 +113,16 @@ fn confirm_discard(action: &str) -> Result<bool, String> {
     let buttons = rfd::MessageButtons::YesNoCancelCustom(
         "Keep Editing".into(), "Discard".into(), "Cancel".into(),
     );
-    let result = rfd::MessageDialog::new()
+    let dialog = rfd::MessageDialog::new()
         .set_title("Unsaved changes")
         .set_description(message)
         .set_level(rfd::MessageLevel::Warning)
-        .set_buttons(buttons)
-        .show();
+        .set_buttons(buttons);
+    #[cfg(target_os = "macos")]
+    let dialog = dialog.set_parent(&window);
+    #[cfg(not(target_os = "macos"))]
+    let _ = window;
+    let result = dialog.show();
     Ok(result == rfd::MessageDialogResult::Custom("Discard".into()))
 }
 
