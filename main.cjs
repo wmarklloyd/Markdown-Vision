@@ -109,7 +109,7 @@ function createWindow(filePath = null) {
     height: 820,
     minWidth: 680,
     minHeight: 520,
-    backgroundColor: '#1c1c1b',
+    backgroundColor: '#202124',
     title: getDocumentTitle(initialDocument?.name),
     autoHideMenuBar: true,
     webPreferences: {
