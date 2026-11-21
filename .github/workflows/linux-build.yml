@@ -30,18 +30,18 @@ jobs:
           cargo test --locked --manifest-path native-tauri/Cargo.toml
       - name: Build Linux Debian package
         working-directory: native-tauri
-        run: '"$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" build --debug --bundles deb -- --locked'
+        run: '"$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" build --bundles deb -- --locked'
       - name: Inspect Debian package
         run: |
           set -eu
-          package=$(find native-tauri/target/debug/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)
+          package=$(find native-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)
           test -n "$package"
           dpkg-deb --info "$package"
           dpkg-deb --contents "$package"
       - name: Launch packaged application
         run: |
           set -eu
-          package=$(find native-tauri/target/debug/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)
+          package=$(find native-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)
           dpkg-deb --extract "$package" "$RUNNER_TEMP/markdown-vision-package"
           test -x "$RUNNER_TEMP/markdown-vision-package/usr/bin/markdown-vision"
           xvfb-run -a dbus-run-session -- sh -c '
@@ -58,6 +58,6 @@ jobs:
           ' sh "$RUNNER_TEMP/markdown-vision-package/usr/bin/markdown-vision" "$RUNNER_TEMP/markdown-vision-launch.log"
       - uses: actions/upload-artifact@v4
         with:
-          name: markdown-vision-linux-debug-deb
-          path: native-tauri/target/debug/bundle/deb/*.deb
+          name: markdown-vision-linux-development-deb
+          path: native-tauri/target/release/bundle/deb/*.deb
           if-no-files-found: error
