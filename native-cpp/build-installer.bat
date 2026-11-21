@@ -4,6 +4,13 @@ setlocal
 set "ROOT=%~dp0.."
 set "MAKENSIS=%LOCALAPPDATA%\electron-builder\Cache\nsis-3.0.4.1\nsis-3.0.4.1-1mx3n\makensis.exe"
 
+if "%~1"=="" (
+  call "%~f0" x64
+  if errorlevel 1 exit /b %errorlevel%
+  call "%~f0" arm64
+  exit /b %errorlevel%
+)
+
 set "ARCH=%~1"
 if "%ARCH%"=="" set "ARCH=x64"
 if /I not "%ARCH%"=="x64" if /I not "%ARCH%"=="arm64" exit /b 1

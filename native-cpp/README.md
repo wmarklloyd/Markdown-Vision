@@ -17,6 +17,8 @@ Build the replacement installer:
 .\native-cpp\build-installer.bat
 ```
 
+Running the installer build without an architecture argument builds both x64 and ARM64 packages. Pass `x64` or `arm64` to build only one architecture.
+
 To build the ARM64 application, preview handler, portable ZIP, and installer,
 install the Visual Studio ARM64 C++ tools and run:
 
