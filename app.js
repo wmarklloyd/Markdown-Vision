@@ -1065,6 +1065,8 @@ if (window.desktop?.onFullscreenChange) {
 applyPreferences();
 void loadPreferences();
 
+let availableUpdate = null;
+
 function versionParts(value) {
   const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(value);
   return match ? match.slice(1).map(Number) : null;
@@ -1078,6 +1080,7 @@ async function checkForUpdates() {
   latestLabel.textContent = 'Latest version: checking…';
   retryButton.hidden = true;
   updateLink.hidden = true;
+  availableUpdate = null;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {
@@ -1091,6 +1094,16 @@ async function checkForUpdates() {
     latestLabel.textContent = `Latest version: ${latest.join('.')}`;
     const difference = latest.findIndex((part, index) => part !== installed[index]);
     updateLink.hidden = difference < 0 || latest[difference] < installed[difference];
+    if (!updateLink.hidden && window.desktop?.installUpdate) {
+      const version = latest.join('.');
+      const architecture = await window.desktop.updateArchitecture();
+      if (!['x64', 'arm64'].includes(architecture)) throw new Error('Unsupported architecture');
+      const suffix = architecture === 'arm64' ? '-arm64' : '';
+      const asset = release.assets?.find((item) => item.name === `Markdown-Vision-Native-Setup-${version}${suffix}.exe`);
+      const digest = /^sha256:([0-9a-f]{64})$/.exec(asset?.digest || '');
+      if (!digest) throw new Error('Installer verification is unavailable');
+      availableUpdate = { version, digest: digest[1] };
+    }
   } catch {
     latestLabel.textContent = 'Unable to check for updates. Check your internet connection and try again.';
     updateLink.hidden = true;
@@ -1101,6 +1114,22 @@ async function checkForUpdates() {
 }
 
 document.getElementById('retryUpdateCheck').addEventListener('click', () => void checkForUpdates());
+document.getElementById('updateLink').addEventListener('click', async (event) => {
+  if (!window.desktop?.installUpdate) return;
+  event.preventDefault();
+  if (!availableUpdate || window.markdownVisionReader.isSaving?.()) return;
+  if (!window.confirm('Download and run the Markdown Vision installer? Save any open documents first. Setup may ask to close Markdown Vision.')) return;
+  const link = event.currentTarget;
+  const status = document.getElementById('latestVersion');
+  link.hidden = true;
+  status.textContent = 'Downloading and verifying update…';
+  const started = await window.desktop.installUpdate(availableUpdate.version, availableUpdate.digest);
+  if (started) status.textContent = 'Installer started.';
+  else {
+    status.textContent = 'Could not download, verify, or start the installer. Please try again.';
+    link.hidden = false;
+  }
+});
 
 window.addEventListener('load', async () => {
   const initialDocument = await window.desktop?.getInitialDocument?.();

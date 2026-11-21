@@ -4,9 +4,15 @@ Unicode True
 !include "nsDialogs.nsh"
 
 !define APP_NAME "Markdown Vision"
-!define APP_VERSION "2.8.10"
+!define APP_VERSION "2.8.11"
 !define APP_ID "8d1dd6d6-9e38-5fc2-8139-94aece1f4a40"
+!ifdef ARM64
+!define SOURCE_DIR "..\dist\MarkdownVision-Native-Editor-${APP_VERSION}-arm64"
+!define SETUP_SUFFIX "-arm64"
+!else
 !define SOURCE_DIR "..\dist\MarkdownVision-Native-Editor-${APP_VERSION}"
+!define SETUP_SUFFIX ""
+!endif
 !define APP_EXE "Markdown-Vision.exe"
 !define APP_PROGID "MarkdownVision.Document"
 !define PREVIEW_HANDLER_CLSID "{1f0cc1d8-7d91-4f93-8a20-a09f3f714dc8}"
@@ -14,7 +20,7 @@ Unicode True
 !define APP_CAPABILITIES "Software\Classes\Applications\${APP_EXE}\Capabilities"
 
 Name "${APP_NAME} ${APP_VERSION} (Native)"
-OutFile "..\dist\Markdown-Vision-Native-Setup-${APP_VERSION}.exe"
+OutFile "..\dist\Markdown-Vision-Native-Setup-${APP_VERSION}${SETUP_SUFFIX}.exe"
 VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey "FileDescription" "Markdown Vision Native Setup"
 VIAddVersionKey "FileVersion" "${APP_VERSION}"
@@ -37,6 +43,16 @@ Var DefaultMarkdownCheckbox
 Var SetAsDefaultMarkdown
 
 Function .onInit
+!ifdef ARM64
+  System::Call 'kernel32::IsWow64Process2(p -1, *i .r0, *i .r1) i.r2'
+  IntOp $1 $1 & 0xffff
+  ${If} $2 == 0
+  ${OrIf} $1 != 43620
+    MessageBox MB_ICONSTOP "This installer requires Windows on ARM64."
+    SetErrorLevel 1
+    Abort
+  ${EndIf}
+!endif
   SetRegView 64
   ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_ID}" "InstallLocation"
   ${If} $0 != ""

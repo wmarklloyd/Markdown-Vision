@@ -1,8 +1,34 @@
 # Total Markdown Torture Test
 
-This document combines five test files. The embedded-content section is last because it ends with an intentionally unclosed code fence.
+This combined test is organized by Markdown feature and editing behavior. The final section ends with an intentionally unclosed code fence, so it must remain last.
+
+## Contents
+
+- [Block structure and nesting](#block-structure-and-nesting)
+  - [Headings and block boundaries](#headings-and-block-boundaries)
+  - [Lists, interruption, and indentation](#lists-interruption-and-indentation)
+  - [Quotations and headings](#quotations-and-headings)
+- [Inline syntax, links, and Unicode](#inline-syntax-links-and-unicode)
+  - [Emphasis and punctuation](#emphasis-and-punctuation)
+  - [Reference links and autolinks](#reference-links)
+  - [Escapes, code spans, and entities](#inline-code-and-entities)
+  - [Unicode and direction](#unicode-and-direction)
+- [Tables and cell editing](#tables-and-cell-editing)
+  - [Alignment and basic structure](#alignment-and-basic-structure)
+  - [Empty and irregular rows](#empty-and-irregular-rows)
+  - [Inline formatting and escaped pipes](#inline-formatting-and-escaped-pipes)
+  - [Tables in containers](#block-boundaries-and-containers)
+  - [Editing round trips and print pagination](#search-and-editing-round-trips)
+- [HTML, footnotes, tasks, and code](#html-footnotes-tasks-and-code)
+  - [Disclosure sections and raw HTML](#disclosure-sections)
+  - [Footnotes and reference reuse](#footnotes-and-reference-reuse)
+  - [Fenced code](#fenced-code)
+- [Reader and editor behavior](#search-and-editing-round-trips)
+  - [Search, editing, undo, and print](#search-and-editing-round-trips)
 
 <!-- Source: markdown-table-torture-test.md -->
+
+## Tables and cell editing
 
 # Markdown Table Torture Test
 
@@ -194,6 +220,8 @@ Print or use print preview with enough scaling to span pages if needed. Rows sho
 
 <!-- Source: markdown-torture-3-structure.md -->
 
+## Block structure and nesting
+
 # Torture Test 3: Containers and Block Boundaries
 
 This document stresses block nesting, interruption, indentation, and source-preserving edits. Edit the marked sentences and check that the surrounding markers remain unchanged.
@@ -260,6 +288,8 @@ The next shorter marker is code.
 The paragraph after the code block remains outside it.
 
 <!-- Source: markdown-torture-4-inline.md -->
+
+## Inline syntax, links, and Unicode
 
 # Torture Test 4: Inline Syntax, References, and Unicode
 
@@ -434,6 +464,8 @@ An inline footnote is here.^[Inline footnote with **emphasis**.] A separate late
 [^additional-note]: A later-defined note with `code` and a [reference link][mixed ref].
 
 <!-- Source: markdown-torture-6-embedded.md -->
+
+## HTML, footnotes, tasks, and code
 
 # Torture Test 6: Embedded HTML, Footnotes, and Fences
 

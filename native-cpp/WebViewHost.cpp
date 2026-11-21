@@ -4,6 +4,8 @@
 #include <shellapi.h>
 #include <shlwapi.h>
 #include <shlobj.h>
+#include <urlmon.h>
+#include <bcrypt.h>
 #include <wrl.h>
 #include <WebView2.h>
 
@@ -11,8 +13,10 @@
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <string>
+#include <thread>
 #include <vector>
 
 using Microsoft::WRL::Callback;
@@ -23,6 +27,7 @@ constexpr wchar_t kClassName[] = L"MarkdownVisionNativeWebView";
 constexpr wchar_t kAppName[] = L"Markdown Vision";
 constexpr wchar_t kDetachedFlag[] = L"--markdown-vision-detached";
 constexpr UINT kPrintShortcut = WM_APP + 1;
+constexpr UINT kUpdateDownloaded = WM_APP + 2;
 
 HWND g_window = nullptr;
 ComPtr<ICoreWebView2Controller> g_controller;
@@ -402,6 +407,74 @@ void Resolve(const std::wstring& id, const std::wstring& result) {
     g_webView->ExecuteScript(script.c_str(), nullptr);
 }
 
+struct UpdateResult {
+    std::wstring id;
+    std::wstring path;
+    bool verified = false;
+};
+
+bool VerifyUpdate(const std::wstring& path, const std::wstring& expected) {
+    std::ifstream file(std::filesystem::path(path), std::ios::binary);
+    if (!file) return false;
+    BCRYPT_ALG_HANDLE algorithm = nullptr;
+    BCRYPT_HASH_HANDLE hash = nullptr;
+    bool ok = BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) == 0
+        && BCryptCreateHash(algorithm, &hash, nullptr, 0, nullptr, 0, 0) == 0;
+    char buffer[65536];
+    while (ok && (file.read(buffer, sizeof(buffer)) || file.gcount())) {
+        ok = BCryptHashData(hash, reinterpret_cast<PUCHAR>(buffer), static_cast<ULONG>(file.gcount()), 0) == 0;
+    }
+    unsigned char digest[32]{};
+    ok = ok && !file.bad() && BCryptFinishHash(hash, digest, sizeof(digest), 0) == 0;
+    if (hash) BCryptDestroyHash(hash);
+    if (algorithm) BCryptCloseAlgorithmProvider(algorithm, 0);
+    const wchar_t hex[] = L"0123456789abcdef";
+    std::wstring actual;
+    for (const auto byte : digest) { actual += hex[byte >> 4]; actual += hex[byte & 15]; }
+    return ok && actual == expected;
+}
+
+std::wstring UpdateArchitecture() {
+    using IsWow64Process2Fn = BOOL (WINAPI*)(HANDLE, USHORT*, USHORT*);
+    const auto query = reinterpret_cast<IsWow64Process2Fn>(
+        GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "IsWow64Process2"));
+    USHORT processMachine = 0;
+    USHORT nativeMachine = 0;
+    if (query && query(GetCurrentProcess(), &processMachine, &nativeMachine)) {
+        if (nativeMachine == IMAGE_FILE_MACHINE_ARM64) return L"arm64";
+        if (nativeMachine == IMAGE_FILE_MACHINE_AMD64) return L"x64";
+        return L"unsupported";
+    }
+#if defined(_M_ARM64)
+    return L"arm64";
+#else
+    SYSTEM_INFO info{};
+    GetNativeSystemInfo(&info);
+    if (info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) return L"x64";
+    return L"unsupported";
+#endif
+}
+
+void DownloadUpdate(std::wstring id, std::wstring version, std::wstring digest, std::wstring architecture, HWND window) {
+    const HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    auto result = std::make_unique<UpdateResult>();
+    result->id = std::move(id);
+    wchar_t directory[MAX_PATH]{};
+    wchar_t temporary[MAX_PATH]{};
+    if (GetTempPathW(MAX_PATH, directory) && GetTempFileNameW(directory, L"mdv", 0, temporary)) {
+        result->path = std::wstring(temporary) + L".exe";
+        DeleteFileW(temporary);
+        const std::wstring suffix = architecture == L"arm64" ? L"-arm64" : L"";
+        const std::wstring url = L"https://github.com/wmarklloyd/Markdown-Vision/releases/download/v"
+            + version + L"/Markdown-Vision-Native-Setup-" + version + suffix + L".exe";
+        result->verified = SUCCEEDED(URLDownloadToFileW(nullptr, url.c_str(), result->path.c_str(), 0, nullptr))
+            && VerifyUpdate(result->path, digest);
+    }
+    if (!result->verified && !result->path.empty()) DeleteFileW(result->path.c_str());
+    if (SUCCEEDED(com)) CoUninitialize();
+    if (PostMessageW(window, kUpdateDownloaded, 0, reinterpret_cast<LPARAM>(result.get()))) result.release();
+}
+
 void HandleMessage(ICoreWebView2WebMessageReceivedEventArgs* args) {
     LPWSTR raw = nullptr;
     if (FAILED(args->TryGetWebMessageAsString(&raw)) || !raw) return;
@@ -427,6 +500,19 @@ void HandleMessage(ICoreWebView2WebMessageReceivedEventArgs* args) {
             DecodeSavePayload(message.substr(body + 1)), method == L"document.saveAs");
         g_saving = false;
         Resolve(id, result);
+    } else if (method == L"update.architecture") {
+        Resolve(id, IsLocalAppMessage(args) ? JsonString(UpdateArchitecture()) : L"null");
+    } else if (method == L"update.install") {
+        const size_t split = argument == std::wstring::npos ? argument : message.find(L'|', argument + 1);
+        const auto version = split == std::wstring::npos ? L"" : message.substr(argument + 1, split - argument - 1);
+        const auto digest = split == std::wstring::npos ? L"" : message.substr(split + 1);
+        const bool validVersion = !version.empty() && version.size() <= 32
+            && std::count(version.begin(), version.end(), L'.') == 2
+            && version.find_first_not_of(L"0123456789.") == std::wstring::npos;
+        const bool validDigest = digest.size() == 64 && digest.find_first_not_of(L"0123456789abcdef") == std::wstring::npos;
+        const auto architecture = UpdateArchitecture();
+        if (!IsLocalAppMessage(args) || !validVersion || !validDigest || architecture == L"unsupported") { Resolve(id, L"false"); return; }
+        std::thread(DownloadUpdate, id, version, digest, architecture, g_window).detach();
     } else if (method == L"document.print") {
         ComPtr<ICoreWebView2_16> printView;
         const bool opened = !g_saving && IsLocalAppMessage(args)
@@ -541,6 +627,8 @@ void InitializeWebView() {
     openMarkdownFile: () => request('document.open'),
     saveMarkdownFile: (documentId, content, saveAs) => request(saveAs ? 'document.saveAs' : 'document.save',
       '|' + (documentId || '') + '|' + content.replaceAll('%', '%25').replaceAll('\0', '%00')),
+    installUpdate: (version, digest) => request('update.install', '|' + version + '|' + digest),
+    updateArchitecture: () => request('update.architecture'),
     printMarkdown: () => request('document.print'),
     listSystemFonts: () => request('fonts.list'),
     onOpenDocument: () => {},
@@ -622,6 +710,16 @@ LRESULT CALLBACK WindowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
     case kPrintShortcut:
         if (g_webView) g_webView->ExecuteScript(L"window.markdownVisionReader?.printDocument()", nullptr);
         return 0;
+    case kUpdateDownloaded: {
+        std::unique_ptr<UpdateResult> result(reinterpret_cast<UpdateResult*>(lParam));
+        bool started = false;
+        if (result->verified) {
+            started = reinterpret_cast<INT_PTR>(ShellExecuteW(window, L"open", result->path.c_str(), nullptr, nullptr, SW_SHOWNORMAL)) > 32;
+            if (!started) DeleteFileW(result->path.c_str());
+        }
+        Resolve(result->id, started ? L"true" : L"false");
+        return 0;
+    }
     case WM_GETMINMAXINFO:
         reinterpret_cast<MINMAXINFO*>(lParam)->ptMinTrackSize = {680, 520};
         return 0;

@@ -448,6 +448,10 @@
       if (protectedBlock && ((!block.kind && rendered?.tagName === 'P') || editableHtml || markdownDiv || tableCandidates.length)) {
         const candidates = tableCandidates.length ? tableCandidates : mappedInlineCandidates(record, rendered);
         if (candidates.length) mappedBlocks.push({ block: record, rendered, candidates });
+        if (block.kind === 'html' && candidates.length
+            && (rendered?.tagName === 'PRE' || markdownDiv)) {
+          node.querySelector('.visual-block-actions [data-visual-edit="source"]')?.remove();
+        }
       }
       if ((['code', 'indented-code'].includes(block.kind) && rendered?.querySelector('.visual-code-editor'))
           || (block.kind === 'complex' && /^H[12]$/.test(rendered?.tagName || '')
