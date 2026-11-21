@@ -78,7 +78,7 @@ pub fn initial_document(state: State<'_, Mutex<Documents>>) -> Result<Option<Val
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 pub fn queue_open(documents: &mut Documents, path: PathBuf) {
     documents.pending.push_back(path);
 }

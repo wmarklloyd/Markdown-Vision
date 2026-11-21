@@ -21,7 +21,7 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev pkg-config xvfb xauth dbus-x11
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev pkg-config xvfb xauth dbus-x11 xdotool zenity imagemagick
       - name: Install Tauri CLI
         run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.6
       - name: Test native services
@@ -56,6 +56,16 @@ jobs:
             kill "$pid"
             wait "$pid" || true
           ' sh "$RUNNER_TEMP/markdown-vision-package/usr/bin/markdown-vision" "$RUNNER_TEMP/markdown-vision-launch.log"
+      - name: Check Linux file-open lifecycle
+        run: |
+          set -eu
+          xvfb-run -a dbus-run-session -- sh tools/check-linux-lifecycle.sh "$RUNNER_TEMP/markdown-vision-package/usr/bin/markdown-vision" "$GITHUB_WORKSPACE/Markdown-total-torture-test.md" "$RUNNER_TEMP/lifecycle-evidence"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-lifecycle-evidence
+          path: ${{ runner.temp }}/lifecycle-evidence/
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         with:
           name: markdown-vision-linux-development-deb

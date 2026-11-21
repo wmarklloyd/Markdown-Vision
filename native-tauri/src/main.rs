@@ -3,7 +3,25 @@
 use tauri::Manager;
 
 fn main() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "linux")]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+        let base = std::path::Path::new(&cwd);
+        let state = app.state::<std::sync::Mutex<document::Documents>>();
+        if let Ok(mut documents) = state.lock() {
+            for argument in args.into_iter().skip(1).filter(|arg| !arg.starts_with('-')) {
+                let path = std::path::PathBuf::from(argument);
+                let path = if path.is_absolute() { path } else { base.join(path) };
+                document::queue_open(&mut documents, path);
+            }
+        }
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
+            let _ = window.eval("window.__markdownVisionProcessOpenQueue?.()");
+        }
+    }));
+    builder
         .setup(|app| {
             let config = &app.config().app.windows[0];
             let window = tauri::WebviewWindowBuilder::from_config(app, config)?

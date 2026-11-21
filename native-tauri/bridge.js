@@ -3,8 +3,17 @@
   let closing = false;
   let openCallback = null;
   let processing = false;
+  let retryOpenQueue = false;
   window.__markdownVisionProcessOpenQueue = async () => {
-    if (!openCallback || processing || window.markdownVisionReader?.isSaving?.()) return;
+    if (!openCallback) return;
+    if (processing) {
+      retryOpenQueue = true;
+      return;
+    }
+    if (window.markdownVisionReader?.isSaving?.()) {
+      setTimeout(window.__markdownVisionProcessOpenQueue, 250);
+      return;
+    }
     processing = true;
     try {
       while (await invoke('has_pending_document')) {
@@ -19,6 +28,10 @@
       console.error('Unable to open the requested document:', error);
     } finally {
       processing = false;
+      if (retryOpenQueue) {
+        retryOpenQueue = false;
+        setTimeout(window.__markdownVisionProcessOpenQueue, 0);
+      }
     }
   };
   window.__markdownVisionRequestClose = async () => {
