@@ -23,8 +23,8 @@ sleep 1
 import -window root "$evidence/linux-print-to-file.png"
 xdotool mousemove --window "$print_dialog" 580 486 click 1
 sleep 5
-pdf=$(find "$HOME" -maxdepth 3 -type f -name '*.pdf' -print -quit)
-test -n "$pdf"
+pdf="$PWD/output.pdf"
+test -f "$pdf"
 file "$pdf" | grep -q 'PDF document'
 cp "$pdf" "$evidence/linux-print.pdf"
 xdotool windowfocus --sync "$window" key ctrl+n
