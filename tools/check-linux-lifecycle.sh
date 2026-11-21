@@ -6,13 +6,20 @@ app=$1
 fixture=$2
 evidence=$3
 mkdir -p "$evidence"
-"$app" >"$evidence/app.log" 2>&1 &
+"$app" "$fixture" >"$evidence/app.log" 2>&1 &
 pid=$!
 trap 'kill "$pid" 2>/dev/null || true' EXIT
 sleep 8
 kill -0 "$pid"
-window=$(xdotool search --onlyvisible --name 'Markdown Vision' | head -n 1)
+window=$(xdotool search --onlyvisible --name 'Markdown-total-torture-test.md' | head -n 1)
 test -n "$window"
+xdotool windowfocus --sync "$window" key ctrl+p
+sleep 5
+import -window root "$evidence/linux-print.png"
+print_dialog=$(xdotool search --onlyvisible --name 'Print' | head -n 1)
+test -n "$print_dialog"
+xdotool windowfocus --sync "$print_dialog" key Escape
+sleep 2
 xdotool windowfocus --sync "$window" key ctrl+n
 sleep 2
 xdotool type --clearmodifiers 'Unsaved Linux test'
