@@ -88,7 +88,7 @@ function writePreferences(preferences) {
 }
 
 function getDocumentTitle(documentName) {
-  return documentName ? `${appTitle} - ${documentName}` : appTitle;
+  return documentName || appTitle;
 }
 
 function deliverDocument(targetWindow, filePath) {

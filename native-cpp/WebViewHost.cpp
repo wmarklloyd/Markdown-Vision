@@ -191,7 +191,7 @@ std::wstring DocumentJson(const std::wstring& path) {
 void SetDocumentTitle(const std::wstring& path) {
     const std::wstring title = path.empty()
         ? kAppName
-        : std::wstring(kAppName) + L" - " + std::filesystem::path(path).filename().wstring();
+        : std::filesystem::path(path).filename().wstring();
     SetWindowTextW(g_window, title.c_str());
 }
 

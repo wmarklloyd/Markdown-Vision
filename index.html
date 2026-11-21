@@ -30,7 +30,7 @@
         <button class="icon-button editor-toggle" id="editorToggle" type="button" title="Edit Markdown" aria-label="Edit Markdown" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-.9L19.5 7.8a2.1 2.1 0 0 0-3-3L5.2 16.1 4 20Z"/><path d="m14.9 6.4 2.8 2.8"/></svg>
         </button>
-        <button class="icon-button" id="newFileButton" type="button" title="New Markdown file" aria-label="New Markdown file" hidden>
+        <button class="icon-button" id="newFileButton" type="button" title="New Markdown file (Ctrl+N)" aria-label="New Markdown file" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h9l5 5v13H5z"/><path d="M14 3v5h5M12 11v7M8.5 14.5h7"/></svg>
         </button>
         <button class="icon-button" id="openButton" type="button" title="Open Markdown file" aria-label="Open Markdown file">
@@ -58,7 +58,7 @@
           <summary class="icon-button" aria-label="About Markdown Vision" title="About Markdown Vision">?</summary>
           <div class="about-panel">
             <strong>Markdown Vision</strong>
-            <span>Version 2.8.7</span>
+            <span>Version 2.8.8</span>
             <span>© 2026 Mark Lloyd</span>
             <a href="https://github.com/wmarklloyd/Markdown-Vision/releases/latest" target="_blank" rel="noopener noreferrer">Check for updates</a>
           </div>
@@ -127,11 +127,11 @@
     <main>
       <section class="editor-workspace" id="editorWorkspace" hidden aria-label="Markdown editor">
         <div class="editor-header">
-          <strong id="editorFileName">Untitled.md</strong>
           <span class="editor-dirty" id="editorDirty" aria-live="polite"></span>
           <div class="editor-views" role="group" aria-label="Editor view">
             <button type="button" data-view="source" aria-pressed="false">Markdown</button>
-            <button type="button" data-view="split" aria-pressed="false">Split</button>
+            <button type="button" data-view="split" aria-pressed="false" title="Markdown left, Visual right">Split ↔</button>
+            <button type="button" data-view="split-vertical" aria-pressed="false" title="Visual above Markdown">Split ↕</button>
             <button type="button" data-view="visual" aria-pressed="true">Visual</button>
           </div>
           <div class="editor-save-actions" id="editorSaveActions" hidden>
@@ -163,7 +163,7 @@
         <footer class="editor-status"><span id="editorStats">0 words</span><span id="editorCursor">Ln 1, Col 1</span></footer>
       </section>
       <section class="reader-shell" id="readerShell" hidden>
-        <div class="document-meta">
+        <div class="document-meta" hidden>
           <span id="fileName">Untitled.md</span>
         </div>
         <article class="markdown-body" id="markdownOutput"></article>

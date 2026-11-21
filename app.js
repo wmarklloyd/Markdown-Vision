@@ -781,7 +781,7 @@ function showDocument(markdown, name = 'Untitled.md', documentId = null, imageBa
   elements.markdownOutput.innerHTML = parseMarkdown(markdown);
   syncPictureSourcesToTheme();
   elements.fileName.textContent = name;
-  document.title = `Markdown Vision - ${name}`;
+  document.title = name;
   elements.readerShell.hidden = false;
   document.dispatchEvent(new CustomEvent('markdownvision:documentchanged', { detail: { ...currentDocument } }));
   updatePrintButton();

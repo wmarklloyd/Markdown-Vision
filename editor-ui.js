@@ -4,6 +4,10 @@
   const newFileButton = $('#newFileButton');
   const newFileDialog = $('#newFileDialog');
   const tools = $('#editorTools');
+  const views = $('.editor-views');
+  $('.toolbar').prepend(views);
+  $('.editor-header').prepend(tools);
+  views.hidden = true;
   const workspace = $('#editorWorkspace');
   const reader = $('#readerShell');
   const source = $('#markdownSource');
@@ -49,6 +53,7 @@
   let lastTyping = null;
   const visitedCodeEditors = new WeakSet();
   let dividerGrabOffset = 0;
+  const isSplit = (view) => view === 'split' || view === 'split-vertical';
   const minSourceShare = Number(divider.getAttribute('aria-valuemin'));
   const maxSourceShare = Number(divider.getAttribute('aria-valuemax'));
   const listItemHint = 'Double-click or press Alt+Enter to edit this item';
@@ -299,7 +304,7 @@
   function updateDirty() {
     dirty = source.value !== original;
     dirtyLabel.textContent = saving ? 'Saving…' : dirty ? 'Unsaved' : saved ? 'Saved' : '';
-    saveButton.disabled = saving || !dirty;
+    saveButton.disabled = saving || (!dirty && !!documentId);
     saveAsButton.disabled = saving;
     const text = source.value.trim();
     $('#editorStats').textContent = (text ? text.split(/\s+/).length : 0) + ' words';
@@ -320,7 +325,7 @@
   }
 
   async function saveDraft(saveAs = false) {
-    if (!active || saving || (!saveAs && !dirty) || !window.desktop?.saveMarkdownFile) return;
+    if (!active || saving || (!saveAs && !dirty && documentId) || !window.desktop?.saveMarkdownFile) return;
     const snapshot = source.value;
     const generation = documentGeneration;
     saveError.hidden = true;
@@ -340,8 +345,7 @@
       imageBase = result.imageBase || '';
       fileName = result.name;
       saved = true;
-      $('#editorFileName').textContent = fileName;
-      document.title = 'Markdown Vision - ' + fileName;
+      document.title = fileName;
       if (!active || imageBase !== previousImageBase) showDraftInReader();
       if (active && imageBase !== previousImageBase) {
         reader.hidden = true;
@@ -1379,7 +1383,7 @@
 
   function paintCounterpartField() {
     counterpartOverlay.replaceChildren();
-    if (!counterpartFieldMark || panes.dataset.view !== 'split') return;
+    if (!counterpartFieldMark || !isSplit(panes.dataset.view)) return;
     const { field, start, end } = counterpartFieldMark;
     if (!field.isConnected || start >= end || end > field.value.length) return;
     withTextareaLayout(field, (text, origin) => {
@@ -1415,7 +1419,7 @@
 
   function synchronizeCounterpart() {
     clearCounterpart();
-    if (!active || panes.dataset.view !== 'split' || source.value !== previewSource) return;
+    if (!active || !isSplit(panes.dataset.view) || source.value !== previewSource) return;
     const focused = document.activeElement;
     const fromSource = focused === source;
     const field = focused?.matches('.visual-code-editor') ? focused : null;
@@ -1548,7 +1552,7 @@
     isStale: () => searchDraft !== source.value || searchView !== panes.dataset.view,
     scope(index) {
       const match = searchMatches[index];
-      if (!match || searchView !== 'split') return '';
+      if (!match || !isSplit(searchView)) return '';
       if (!match.visual) return 'Markdown only';
       return match.source ? '' : 'Visual only';
     },
@@ -1567,7 +1571,7 @@
   function focusSource(span, target = span.node, targetOffset = 0) {
     const targetTop = () => target.getBoundingClientRect().top + targetOffset;
     const previousTop = targetTop() - preview.getBoundingClientRect().top;
-    selectView('split', source);
+    selectView(isSplit(panes.dataset.view) ? panes.dataset.view : 'split', source);
     source.setSelectionRange(span.start, span.end, 'backward');
 
     const visualBounds = preview.getBoundingClientRect();
@@ -1947,6 +1951,11 @@
   function selectView(view, surface = view === 'source' ? source : preview) {
     hideRestriction();
     panes.dataset.view = view;
+    const vertical = view === 'split-vertical';
+    divider.setAttribute('aria-orientation', vertical ? 'horizontal' : 'vertical');
+    divider.setAttribute('aria-label', vertical ? 'Visual pane height' : 'Markdown pane width');
+    divider.setAttribute('aria-controls', vertical ? 'editorPreview' : 'editorSourcePane');
+    resizeSplit(Number(divider.getAttribute('aria-valuenow')));
     document.querySelectorAll('[data-view]').forEach((button) => {
       if (button.tagName === 'BUTTON') button.setAttribute('aria-pressed', String(button.dataset.view === view));
     });
@@ -1955,7 +1964,7 @@
     updateTools();
     if (editingSurface === source || preview.isContentEditable) editingSurface.focus({ preventScroll: true });
     window.markdownVisionReader.refreshEditorSearch({ preserve: true });
-    if (view === 'split') scheduleCounterpart();
+    if (isSplit(view)) scheduleCounterpart();
     else clearCounterpart();
   }
 
@@ -1964,7 +1973,7 @@
     panes.style.setProperty('--source-pane-share', String(width / 100));
     const rounded = Math.round(width);
     divider.setAttribute('aria-valuenow', String(rounded));
-    divider.setAttribute('aria-valuetext', rounded + '% Markdown');
+    divider.setAttribute('aria-valuetext', rounded + (panes.dataset.view === 'split-vertical' ? '% Visual' : '% Markdown'));
     positionRestriction();
     scheduleSearchPaint(true);
     paintCounterpartField();
@@ -1982,6 +1991,7 @@
     toggle.setAttribute('aria-label', value ? 'Return to reader' : 'Edit Markdown');
     toggle.title = value ? 'Return to reader' : 'Edit Markdown';
     tools.hidden = !value;
+    views.hidden = !value;
     newFileButton.hidden = !value;
     workspace.hidden = !value;
     reader.hidden = value || !window.markdownVisionReader.getDocument();
@@ -2759,27 +2769,43 @@
   saveButton.addEventListener('click', () => saveDraft());
   saveAsButton.addEventListener('click', () => saveDraft(true));
   document.addEventListener('keydown', (event) => {
-    if (!active || editDialog.open || event.isComposing || !(event.ctrlKey || event.metaKey)
-        || event.altKey || event.key.toLowerCase() !== 's' || !window.desktop?.saveMarkdownFile) return;
+    if (editDialog.open || newFileDialog.open || event.isComposing || !(event.ctrlKey || event.metaKey) || event.altKey) return;
+    const key = event.key.toLowerCase();
+    if (key === 'n' && !event.shiftKey) {
+      event.preventDefault();
+      if (event.repeat) return;
+      if (!active) setActive(true);
+      newFileButton.click();
+      return;
+    }
+    if (key !== 's' || !window.desktop?.saveMarkdownFile) return;
     event.preventDefault();
+    if (event.repeat) return;
+    if (!active) setActive(true);
     void saveDraft(event.shiftKey);
   });
   divider.addEventListener('pointerdown', (event) => {
     if (!event.isPrimary || event.button !== 0) return;
     event.preventDefault();
-    dividerGrabOffset = event.clientX - divider.getBoundingClientRect().left;
+    const vertical = panes.dataset.view === 'split-vertical';
+    const rect = divider.getBoundingClientRect();
+    dividerGrabOffset = vertical ? event.clientY - rect.top : event.clientX - rect.left;
     divider.setPointerCapture(event.pointerId);
   });
   divider.addEventListener('pointermove', (event) => {
     if (!divider.hasPointerCapture(event.pointerId)) return;
     const bounds = panes.getBoundingClientRect();
-    const usableWidth = bounds.width - divider.offsetWidth;
-    if (usableWidth > 0) resizeSplit(100 * (event.clientX - bounds.left - dividerGrabOffset) / usableWidth);
+    const vertical = panes.dataset.view === 'split-vertical';
+    const usable = vertical ? bounds.height - divider.offsetHeight : bounds.width - divider.offsetWidth;
+    const position = vertical ? event.clientY - bounds.top : event.clientX - bounds.left;
+    if (usable > 0) resizeSplit(100 * (position - dividerGrabOffset) / usable);
   });
   divider.addEventListener('dblclick', () => resizeSplit(50));
   divider.addEventListener('keydown', (event) => {
     const current = Number(divider.getAttribute('aria-valuenow'));
-    const widths = { ArrowLeft: current - 5, ArrowRight: current + 5, Home: minSourceShare, End: maxSourceShare };
+    const widths = panes.dataset.view === 'split-vertical'
+      ? { ArrowUp: current - 5, ArrowDown: current + 5, Home: minSourceShare, End: maxSourceShare }
+      : { ArrowLeft: current - 5, ArrowRight: current + 5, Home: minSourceShare, End: maxSourceShare };
     if (!Object.hasOwn(widths, event.key)) return;
     event.preventDefault();
     resizeSplit(widths[event.key]);
@@ -2799,7 +2825,7 @@
   source.addEventListener('input', () => {
     updateDirty();
     clearTimeout(previewTimer);
-    if (panes.dataset.view === 'split') previewTimer = setTimeout(updatePreview, 180);
+    if (isSplit(panes.dataset.view)) previewTimer = setTimeout(updatePreview, 180);
     updateCursor();
     scheduleCounterpart(260);
   });
@@ -3002,7 +3028,6 @@
   });
   document.addEventListener('markdownvision:documentchanged', (event) => {
     fileName = event.detail.name;
-    $('#editorFileName').textContent = fileName;
     if (showingDraft) return;
     documentId = event.detail.documentId || null;
     imageBase = event.detail.imageBase || '';
@@ -3018,6 +3043,5 @@
 
   source.value = original;
   original = source.value;
-  $('#editorFileName').textContent = fileName;
   updateDirty();
 })();
