@@ -54,6 +54,9 @@ sleep 1
 xdotool mousemove 70 165 click --repeat 2 --delay 100 1
 sleep 2
 import -window root "$evidence/linux-split-counterpart.png"
+xdotool mousemove 418 35 click 1
+sleep 2
+import -window root "$evidence/linux-split-vertical.png"
 "$app" "$fixture" >"$evidence/second-instance.log" 2>&1 &
 second=$!
 sleep 5
