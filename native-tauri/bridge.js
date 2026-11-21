@@ -33,6 +33,8 @@
     }
   };
   window.desktop = {
+    getPreferences: () => invoke('get_preferences'),
+    savePreferences: (preferences) => invoke('save_preferences', { preferences }),
     getInitialDocument: () => invoke('initial_document'),
     openMarkdownFile: () => invoke('open_document'),
     saveMarkdownFile: (documentId, content, saveAs) =>

@@ -44,7 +44,7 @@ fn main() {
                 None => tauri::http::Response::builder().status(404).body(Vec::new()).unwrap(),
             }
         })
-        .invoke_handler(tauri::generate_handler![document::initial_document, document::open_document, document::save_document, document::has_pending_document, document::pending_document, close_window])
+        .invoke_handler(tauri::generate_handler![document::initial_document, document::open_document, document::save_document, document::has_pending_document, document::pending_document, preferences::get_preferences, preferences::save_preferences, close_window])
         .build(tauri::generate_context!())
         .expect("failed to build Markdown Vision")
         .run(|_app, _event| {
@@ -71,3 +71,4 @@ fn close_window(window: tauri::WebviewWindow) -> Result<(), String> {
 }
 
 mod document;
+mod preferences;

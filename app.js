@@ -46,8 +46,13 @@ const preferenceStorageKey = 'markdown-vision-preferences';
 const fontCacheStorageKey = 'markdown-vision-font-cache';
 const fontCacheTtlMs = 7 * 24 * 60 * 60 * 1000;
 const storedPreferences = readLocalPreferences();
-const preferences = { ...defaults, ...JSON.parse(storedPreferences) };
+const preferences = { ...defaults, ...storedPreferences };
 preferences.font = legacyFonts[preferences.font] || preferences.font;
+let preferenceLoadPending = Boolean(window.desktop?.getPreferences);
+let preferenceNativeAvailable = true;
+let preferenceSnapshot = { ...preferences };
+const preferenceEdits = new Set();
+let preferenceWrite = Promise.resolve();
 let fontLoadPromise = null;
 let installedFonts = [];
 const fontPickers = [
@@ -65,9 +70,10 @@ let printStatusTimer = null;
 
 function readLocalPreferences() {
   try {
-    return localStorage.getItem(preferenceStorageKey) || '{}';
+    const value = JSON.parse(localStorage.getItem(preferenceStorageKey) || '{}');
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   } catch {
-    return '{}';
+    return {};
   }
 }
 
@@ -75,21 +81,42 @@ async function loadPreferences() {
   if (!window.desktop?.getPreferences) return;
   try {
     const stored = await window.desktop.getPreferences();
-    if (!stored || typeof stored !== 'object') {
-      savePreferences();
-      return;
+    if (stored && typeof stored === 'object') {
+      const merged = { ...defaults, ...stored };
+      for (const key of preferenceEdits) merged[key] = preferences[key];
+      Object.assign(preferences, merged);
+      preferences.font = legacyFonts[preferences.font] || preferences.font;
+      applyPreferences();
+      try { localStorage.setItem(preferenceStorageKey, JSON.stringify(preferences)); } catch {}
     }
-    Object.assign(preferences, defaults, stored);
-    preferences.font = legacyFonts[preferences.font] || preferences.font;
-    applyPreferences();
-  } catch {}
+    preferenceLoadPending = false;
+    preferenceSnapshot = { ...preferences };
+    if (!stored || preferenceEdits.size) persistNativePreferences();
+  } catch {
+    preferenceLoadPending = false;
+    preferenceNativeAvailable = false;
+    preferenceSnapshot = { ...preferences };
+  }
+}
+
+function persistNativePreferences() {
+  if (!preferenceNativeAvailable || !window.desktop?.savePreferences) return;
+  const snapshot = { ...preferences };
+  preferenceWrite = preferenceWrite.catch(() => {}).then(() => window.desktop.savePreferences(snapshot));
+  void preferenceWrite.catch(() => {});
 }
 
 function savePreferences() {
+  if (preferenceLoadPending) {
+    for (const key of Object.keys(defaults)) {
+      if (preferenceSnapshot[key] !== preferences[key]) preferenceEdits.add(key);
+    }
+  }
+  preferenceSnapshot = { ...preferences };
   try {
     localStorage.setItem(preferenceStorageKey, JSON.stringify(preferences));
   } catch {}
-  if (window.desktop?.savePreferences) void window.desktop.savePreferences(preferences);
+  if (!preferenceLoadPending) persistNativePreferences();
 }
 
 function applyFontStyle(preference, fontValue = preferences[preference]) {
