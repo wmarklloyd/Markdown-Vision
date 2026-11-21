@@ -411,7 +411,7 @@
         if (previousLocked) appendTypingLine();
         node.contentEditable = 'false';
         node.className = 'visual-protected-block';
-        if (block.kind === 'definitions') node.hidden = true;
+        if (block.kind === 'definitions' || (block.kind === 'html' && /^\s*<!--[\s\S]*?-->\s*$/.test(block.source))) node.hidden = true;
         if (template.content.childNodes.length) node.append(template.content);
         else node.textContent = 'Embedded content';
       }
@@ -463,10 +463,12 @@
     if (previousLocked && visualBlocks.size) appendTypingLine();
     configureMappedInlineBlocks(mappedBlocks, previewSource);
     for (const block of visualBlocks.values()) {
+      configureNestedTableOptions(block);
       if (block.kind !== 'table') continue;
       const sourceAction = block.node.querySelector('.visual-block-actions [data-visual-edit="source"]');
       if (!sourceAction || !block.node.querySelector('[data-visual-edit="table-cell"]')) continue;
       if (block.node.querySelector('[data-visual-edit="table-options"]')
+          && !block.node.querySelector('[data-table-structure="alignment"]')
           && !block.node.querySelector('[data-visual-edit="table-cell-source"]')) sourceAction.remove();
       else sourceAction.textContent = 'Edit table source';
     }
@@ -510,14 +512,45 @@
     });
   }
 
-  function editableTable(markdown) {
-    const rows = blockLines(markdown).map((line) => ({
-      ...line, cells: window.markdownVisionReader.tableCellRanges(line.text)
-    }));
+  function editableTable(markdown, prefix = '') {
+    const lines = blockLines(markdown);
+    if (lines.some((line) => !line.text.startsWith(prefix))) return null;
+    const rows = lines.map((line) => {
+      const text = line.text.slice(prefix.length);
+      return { ...line, text, start: line.start + prefix.length, cells: window.markdownVisionReader.tableCellRanges(text) };
+    });
     const columns = rows[0].cells.length;
     if (columns < 1 || rows.length < 2 || rows[1].cells.length !== columns
         || !rows[1].cells.every(({ start, end }) => /^:?-+:?$/.test(rows[1].text.slice(start, end)))) return null;
     return rows;
+  }
+
+  function configureNestedTableOptions(block) {
+    if (!block.tableRanges?.length) return;
+    const tables = [...block.node.querySelectorAll('table')];
+    if (tables.length !== block.tableRanges.length) return;
+    for (const [index, table] of tables.entries()) {
+      const { start, end } = block.tableRanges[index];
+      const markdown = block.source.slice(start, end);
+      const prefix = markdown.match(/^([ >]+)(?=\|)/)?.[1];
+      if (!prefix || !blockLines(markdown).every(({ text }) => text.startsWith(prefix + '|'))) continue;
+      const rows = editableTable(markdown, prefix);
+      if (!rows || rows.length !== table.rows.length + 1
+          || rows.some((row) => row.cells.length !== rows[0].cells.length)
+          || [...table.rows].some((row) => row.cells.length !== rows[0].cells.length)
+          || /<\/?(?:table|tbody|thead|tfoot|tr|th|td|caption|col|colgroup)\b/i.test(markdown)) continue;
+      for (const [row, line] of [...table.rows].entries()) {
+        for (const [column, cell] of [...line.cells].entries()) {
+          cell.dataset.visualEdit = 'table-cell-nested';
+          cell.dataset.row = String(row);
+          cell.dataset.index = String(column);
+          cell.dataset.nestedTable = String(index);
+          cell.dataset.tableStructure = 'true';
+          cell.tabIndex = 0;
+          cell.title = 'Select a cell to edit it or change the table. Press Alt+Enter while typing.';
+        }
+      }
+    }
   }
 
   function configureVisualBlock(block, rendered, { inlineMarkup, nestedList, referenceLabels }) {
@@ -609,6 +642,13 @@
           item.insertBefore(visualAction('Edit item', nestedList ? 'list-text' : 'list-item', index),
             item.querySelector(':scope > ul, :scope > ol'));
         }
+        if (lines.length === items.length && lines.every((line) => {
+          const item = window.markdownVisionReader.readListItem(line.text);
+          return item && !item.indent.includes('\t');
+        })) {
+          item.insertBefore(visualAction('List options', 'list-structure', index),
+            item.querySelector(':scope > ul, :scope > ol'));
+        }
       }
     } else if (block.kind === 'table') {
       reason = 'This table needs to be edited in Markdown.';
@@ -617,7 +657,8 @@
       const markup = window.markdownVisionReader.withoutInlineCode(block.source);
       if (rows && displayed.length === rows.length - 1 && displayed.every((row) => row.cells.length === rows[0].cells.length)
           && !/<\/?(?:table|tbody|thead|tfoot|tr|th|td|caption|col|colgroup)\b/i.test(markup)) {
-        const allowStructure = !inlineMarkup && rows.every((row) => row.cells.length === rows[0].cells.length);
+        const rectangular = rows.every((row) => row.cells.length === rows[0].cells.length);
+        const tableStructure = rectangular && !inlineMarkup ? 'true' : 'alignment';
         const editableCells = [];
         for (const [row, line] of displayed.entries()) {
           const raw = rows[row ? row + 1 : 0];
@@ -641,7 +682,7 @@
                 ? 'This cell contains HTML. Edit this cell in Markdown.'
                 : 'This cell uses Markdown references. Edit this cell in Markdown.';
             }
-            if (allowStructure) cell.dataset.tableStructure = 'true';
+            cell.dataset.tableStructure = tableStructure;
             if (!sourceOnly && [...cell.childNodes].every((child) =>
               child.nodeType === Node.TEXT_NODE || child.nodeName === 'BR')) {
               const markdown = raw.text.slice(start, end);
@@ -674,8 +715,14 @@
           }
         }
         if (editableCells.length) block.editableCells = editableCells;
-        if (allowStructure) actions.append(visualAction('Table options', 'table-options'));
+        actions.append(visualAction('Table options', 'table-options'));
       }
+    } else if (block.kind === 'footnotes') {
+      const notes = block.node.querySelectorAll('.footnotes-list > li');
+      for (const edit of block.footnoteEdits || []) {
+        notes[edit.index]?.append(visualAction('Edit note', 'footnote-text', edit.index));
+      }
+      if (block.footnoteEdits?.length) reason = 'Use Edit note to change supported footnote text.';
     } else if (block.kind === 'html') {
       reason = 'This layout uses HTML. Edit it in Markdown.';
     }
@@ -1041,6 +1088,8 @@
       return { ...label, index };
     });
     block.node.dataset.visualRestriction = 'Edit the heading text directly. Edit the heading style in Markdown.';
+    const actions = block.node.querySelector('.visual-block-actions');
+    if (actions) actions.prepend(visualAction('Heading style', 'heading-style'));
   }
 
   function displayedBlock(target) {
@@ -1689,8 +1738,10 @@
     editDialog.showModal();
     inputs.querySelectorAll('textarea').forEach(resizeDialogTextarea);
     const first = inputs.querySelector('input,textarea');
-    first.focus();
-    if (first.tagName !== 'TEXTAREA') first.select();
+    if (first) {
+      first.focus();
+      if (first.tagName !== 'TEXTAREA') first.select();
+    } else inputs.querySelector('select')?.focus();
   }
 
   function resizeDialogTextarea(input) {
@@ -1722,6 +1773,82 @@
       if (!text.trim()) return allowStructure ? 'Enter item text or choose Remove item.' : 'Enter item text.';
       return [span.start + line.start + item.bodyStart, span.start + line.end - trailing.length, text.trim()];
     }, allowStructure ? [['add', 'Add item below'], ['remove', 'Remove item']] : []);
+  }
+
+  function editVisualListStructure(span, index) {
+    const lines = blockLines(span.text);
+    const items = lines.map((line) => window.markdownVisionReader.readListItem(line.text));
+    const item = items[index];
+    if (!item || items.some((entry) => !entry || entry.indent.includes('\t'))) return;
+    const depth = item.indent.length;
+    const hasChildren = items[index + 1] && items[index + 1].indent.length > depth;
+    let subtreeEnd = index + 1;
+    while (subtreeEnd < items.length && items[subtreeEnd].indent.length > depth) subtreeEnd += 1;
+    const actions = [['add', 'Add item below']];
+    if (!hasChildren) {
+      actions.push(['remove', 'Remove item']);
+      if (index > 0 && items[index - 1].indent.length === depth) actions.push(['indent', 'Indent under previous item']);
+      if (depth > 0 && (subtreeEnd === items.length || items[subtreeEnd].indent.length < depth)) {
+        actions.push(['outdent', 'Outdent item']);
+      }
+    }
+    showVisualEdit('List options', [], (_data, action) => {
+      if (action === 'save') return null;
+      if (action === 'add') {
+        const marker = item.marker.replace(/^\d+/, (number) => String(Number(number) + 1));
+        const prefix = item.indent + marker + item.prefix.slice(item.indent.length + item.marker.length);
+        const task = item.task ? '[ ]' + item.taskSpacing : '';
+        const at = lines[subtreeEnd - 1].end;
+        return [span.start + at, span.start + at, '\n' + prefix + task + 'New item'];
+      }
+      if (action === 'remove') {
+        const start = index === lines.length - 1 && index > 0 ? lines[index].start - 1 : lines[index].start;
+        const end = index < lines.length - 1 ? lines[index].end + 1 : lines[index].end;
+        return [span.start + start, span.start + end, ''];
+      }
+      if (action === 'indent') {
+        const previous = items[index - 1];
+        const width = Math.max(2, previous.marker.length + previous.prefix.slice(previous.indent.length + previous.marker.length).length);
+        return [span.start + lines[index].start, span.start + lines[index].start, ' '.repeat(width)];
+      }
+      if (action === 'outdent') {
+        const parent = items.slice(0, index).reverse().find((entry) => entry.indent.length < depth);
+        if (!parent) return 'This item has no parent to outdent from.';
+        return [span.start + lines[index].start, span.start + lines[index].start + depth - parent.indent.length, ''];
+      }
+      return null;
+    }, actions);
+  }
+
+  function editSetextHeadingStyle(span) {
+    const lines = blockLines(span.text);
+    if (lines.length !== 2 || !/^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[1].text)) return;
+    const choices = Array.from({ length: 6 }, (_, index) => ['h' + (index + 1), 'Heading ' + (index + 1)]);
+    showVisualEdit('Heading style', [], (_data, action) => {
+      if (action === 'save') return null;
+      const level = Number(action.slice(1));
+      if (level < 1 || level > 6) return null;
+      return [span.start, span.end, '#'.repeat(level) + ' ' + lines[0].text.replace(/^ {0,3}/, '')];
+    }, choices);
+  }
+
+  function editVisualFootnote(span, index) {
+    const block = visualBlocks.get(span.node.dataset.visualBlock);
+    const note = block?.footnoteEdits?.find((entry) => entry.index === index);
+    if (!note) return;
+    const matches = blockLines(source.value).flatMap((line) => {
+      const prefix = line.text.match(/^ {0,3}\[\^([^\]]+)\]:[ \t]+/);
+      if (!prefix || prefix[1] !== note.label || line.text.slice(prefix[0].length).trimEnd() !== note.text) return [];
+      return [line.start + prefix[0].length];
+    });
+    if (matches.length !== 1) return;
+    const start = matches[0];
+    showVisualEdit('Edit footnote', [['text', 'Note text', note.text]], ({ text }) => {
+      if (text === note.text) return null;
+      if (!text.trim() || /[\r\n]/.test(text)) return 'Enter the note text on one line.';
+      const value = text.replace(/([\\\x60*_[\]<>!&#~|])/g, '\\$1');
+      return [start, start + note.text.length, value];
+    });
   }
 
   function editDirectListItem(target) {
@@ -1792,8 +1919,8 @@
     return parts[renderedCellText(prefix.cloneContents()).length]?.index ?? value.length;
   }
 
-  function editVisualTableCell(span, control, event) {
-    const rows = editableTable(span.text);
+  function editVisualTableCell(span, control, event, prefix = '') {
+    const rows = editableTable(span.text, prefix);
     const rowIndex = Number(control.dataset.row);
     const column = Number(control.dataset.index);
     const index = rowIndex ? rowIndex + 1 : 0;
@@ -1817,10 +1944,16 @@
       focusSource({ start, end }, control);
       return;
     }
-    const operations = [['add-row', 'Add row below'], ['add-column', 'Add column after'],
-      ['align-left', 'Align column left'], ['align-center', 'Center column'], ['align-right', 'Align column right']];
-    if (index) operations.push(['remove-row', 'Remove row']);
-    if (row.cells.length > 2) operations.push(['remove-column', 'Remove column']);
+    const operations = [];
+    if (control.dataset.tableStructure === 'true') {
+      operations.push(['add-row', 'Add row below'], ['add-column', 'Add column after']);
+      if (index) operations.push(['remove-row', 'Remove row']);
+      if (row.cells.length > 2) operations.push(['remove-column', 'Remove column']);
+    }
+    if (control.dataset.tableStructure) {
+      operations.push(['align-left', 'Align column left'], ['align-center', 'Center column'],
+        ['align-right', 'Align column right']);
+    }
     const { value, breaks } = readMultilineCell(row.text.slice(cell.start, cell.end));
     const caret = tableEditCaret(control, value, event);
     showVisualEdit('Edit table cell', [['cell', 'Cell text (Markdown)', value, true, caret]], (data, action) => {
@@ -1838,10 +1971,17 @@
       }
       if (action === 'add-row') {
         const after = rows[Math.max(index, 1)].end;
-        const added = '\n|' + '   |'.repeat(row.cells.length);
+        const added = '\n' + prefix + '|' + '   |'.repeat(row.cells.length);
         return [span.start + after, span.start + after, added];
       }
-      if (action === 'remove-row') return [span.start + row.start - 1, span.start + row.end, ''];
+      if (action === 'remove-row') return [span.start + row.start - prefix.length - 1, span.start + row.end, ''];
+      if (action.startsWith('align-')) {
+        const divider = rows[1];
+        const part = divider.cells[column];
+        const dashes = divider.text.slice(part.start, part.end).replaceAll(':', '');
+        const mark = (action === 'align-right' ? '' : ':') + dashes + (action === 'align-left' ? '' : ':');
+        return [span.start + divider.start + part.start, span.start + divider.start + part.end, mark];
+      }
       const replacement = rows.map((line, i) => {
         const part = line.cells[column];
         if (action === 'add-column') {
@@ -1852,13 +1992,10 @@
           const last = column === line.cells.length - 1;
           return line.text.slice(0, part.fieldStart - Number(last)) + line.text.slice(part.fieldEnd + Number(!last));
         }
-        if (i !== 1) return line.text;
-        const dashes = line.text.slice(part.start, part.end).replaceAll(':', '');
-        const mark = action === 'align-left' ? ':' + dashes : action === 'align-center' ? ':' + dashes + ':' : dashes + ':';
-        return line.text.slice(0, part.start) + mark + line.text.slice(part.end);
-      }).join('\n');
+        return line.text;
+      }).map((line) => prefix + line).join('\n');
       return [span.start, span.end, replacement];
-    }, control.dataset.tableStructure === 'true' ? operations : []);
+    }, operations);
   }
 
   function editVisualAsset(span, target) {
@@ -1901,14 +2038,28 @@
       case 'source': focusBlockSource(span); break;
       case 'table-cell-source': showRestriction(control); break;
       case 'table-cell': editVisualTableCell(span, control, event); break;
+      case 'table-cell-nested': {
+        // Earlier direct edits may have shifted this table inside its container.
+        const current = window.markdownVisionReader.renderBlocks(source.value)
+          .find((entry) => entry.start === span.start)?.tableRanges?.[Number(control.dataset.nestedTable)];
+        if (!current) break;
+        const text = span.text.slice(current.start, current.end);
+        const prefix = text.match(/^([ >]+)(?=\|)/)?.[1];
+        if (!prefix) break;
+        editVisualTableCell({ start: span.start + current.start, end: span.start + current.end, text }, control, event, prefix);
+        break;
+      }
       case 'table-options': {
-        const cell = span.node.querySelector('[data-table-selected="true"]')
-          || span.node.querySelector('[data-visual-edit="table-cell"]');
+        const cell = span.node.querySelector('[data-table-selected="true"][data-table-structure]')
+          || span.node.querySelector('[data-visual-edit="table-cell"][data-table-structure]');
         if (cell) editVisualTableCell(span, cell);
         break;
       }
       case 'list-item': editVisualListItem(span, index); break;
       case 'list-text': editVisualListItem(span, index, false); break;
+      case 'list-structure': editVisualListStructure(span, index); break;
+      case 'heading-style': editSetextHeadingStyle(span); break;
+      case 'footnote-text': editVisualFootnote(span, index); break;
       case 'task': toggleVisualTask(span, index); break;
       default:
         if (!control.closest('table')) editVisualAsset(span, control);
@@ -2910,11 +3061,10 @@
   });
   preview.addEventListener('keydown', (event) => {
     if (event.altKey && event.key === 'Enter' && event.target.matches('[data-editable-list-link]')) {
-      const cell = event.target.closest('td[data-visual-edit="table-cell"],th[data-visual-edit="table-cell"]');
-      const span = cell && displayedBlock(cell);
-      if (span) {
+      const cell = event.target.closest('[data-visual-edit="table-cell"],[data-visual-edit="table-cell-nested"]');
+      if (cell) {
         event.preventDefault();
-        editVisualTableCell(span, cell);
+        runVisualEdit(cell);
         return;
       }
     }

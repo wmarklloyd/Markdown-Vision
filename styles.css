@@ -90,6 +90,10 @@ body.is-editing .topbar { left: 0; max-width: none; padding-left: 0; }
 .about-menu summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .about-panel { position: absolute; top: 48px; right: 0; display: grid; gap: 8px; min-width: 210px; padding: 16px; border: 1px solid var(--faint); border-radius: 12px; background: var(--surface); color: var(--text); box-shadow: var(--shadow); font-size: 14px; }
 .about-panel a { color: var(--accent); margin-top: 4px; }
+.about-panel .update-link { display: block; padding: 8px 12px; border-radius: 5px; background: var(--accent); color: #fff; text-align: center; text-decoration: none; }
+.about-panel button.update-link { width: 100%; border: 0; cursor: pointer; font: inherit; }
+.about-panel .update-link:hover { background: var(--accent-hover); }
+.about-panel .update-link[hidden] { display: none; }
 body.is-editing .toolbar { width: 100%; }
 .editor-tools { display: flex; flex: 1; align-items: center; justify-content: safe center; gap: 3px; min-width: 0; padding-inline: 4px; overflow-x: auto; }
 .editor-tools[hidden] { display: none; }

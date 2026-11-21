@@ -554,6 +554,25 @@ function parseMarkdown(markdown, describeBlocks = false) {
     }
     if (token.type === 'footnote_block_open') {
       add(nextLine, lines.length, 'footnotes', render(tokens.slice(first, last)));
+      const edits = [];
+      let footnoteIndex = -1;
+      let label = null;
+      for (const entry of tokens.slice(first + 1, last)) {
+        if (entry.type === 'footnote_open') {
+          footnoteIndex += 1;
+          label = entry.meta?.label ?? null;
+        } else if (entry.type === 'inline' && label && entry.map && !edits.some((edit) => edit.index === footnoteIndex)) {
+          const lineIndex = entry.map[0];
+          const line = lines[lineIndex];
+          const prefix = line?.match(/^ {0,3}\[\^([^\]]+)\]:[ \t]+/);
+          const text = entry.content;
+          if (!prefix || prefix[1] !== label || !text || /[\n\\`*_[\]<>!&#~|]/.test(text)
+              || line.slice(prefix[0].length).trimEnd() !== text) continue;
+          const start = offsets[lineIndex] + prefix[0].length;
+          edits.push({ index: footnoteIndex, label, start, end: start + text.length, text });
+        }
+      }
+      blocks.at(-1).footnoteEdits = edits;
       return blocks;
     }
     if (token.map) {
@@ -594,6 +613,14 @@ function parseMarkdown(markdown, describeBlocks = false) {
           || (token.type === 'blockquote_open' && tokens.slice(first + 1, last - 1).some((entry) => entry.block &&
             !['paragraph_open', 'paragraph_close', 'inline'].includes(entry.type)))) kind = 'complex';
       add(start, end, kind, render(tokens.slice(first, last)));
+      if (kind === 'complex') {
+        blocks.at(-1).tableRanges = tokens.slice(first, last)
+          .filter((entry) => entry.type === 'table_open' && entry.map)
+          .map(({ map }) => ({
+            start: offsets[map[0]] - offsets[start],
+            end: (offsets[map[1]] ?? offset) - 1 - offsets[start]
+          }));
+      }
       nextLine = end;
     }
     first = last;
@@ -1038,8 +1065,46 @@ if (window.desktop?.onFullscreenChange) {
 applyPreferences();
 void loadPreferences();
 
+function versionParts(value) {
+  const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(value);
+  return match ? match.slice(1).map(Number) : null;
+}
+
+async function checkForUpdates() {
+  const latestLabel = document.getElementById('latestVersion');
+  const updateLink = document.getElementById('updateLink');
+  const retryButton = document.getElementById('retryUpdateCheck');
+  const installed = versionParts(document.getElementById('installedVersion').dataset.version);
+  latestLabel.textContent = 'Latest version: checking…';
+  retryButton.hidden = true;
+  updateLink.hidden = true;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch('https://api.github.com/repos/wmarklloyd/Markdown-Vision/releases/latest', {
+      signal: controller.signal, cache: 'no-store', headers: { Accept: 'application/vnd.github+json' }
+    });
+    if (!response.ok) throw new Error('Release check failed');
+    const release = await response.json();
+    const latest = versionParts(release.tag_name || '');
+    if (!installed || !latest) throw new Error('Unrecognized version');
+    latestLabel.textContent = `Latest version: ${latest.join('.')}`;
+    const difference = latest.findIndex((part, index) => part !== installed[index]);
+    updateLink.hidden = difference < 0 || latest[difference] < installed[difference];
+  } catch {
+    latestLabel.textContent = 'Unable to check for updates. Check your internet connection and try again.';
+    updateLink.hidden = true;
+    retryButton.hidden = false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+document.getElementById('retryUpdateCheck').addEventListener('click', () => void checkForUpdates());
+
 window.addEventListener('load', async () => {
   const initialDocument = await window.desktop?.getInitialDocument?.();
   if (currentDocument) return;
   if (initialDocument) showDocument(initialDocument.content, initialDocument.name, initialDocument.documentId, initialDocument.imageBase);
 });
+window.addEventListener('load', () => setTimeout(() => void checkForUpdates(), 0));

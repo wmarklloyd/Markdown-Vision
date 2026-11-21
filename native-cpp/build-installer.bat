@@ -18,4 +18,4 @@ set "RESULT=%ERRORLEVEL%"
 popd
 if not "%RESULT%"=="0" exit /b %RESULT%
 
-echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.8.exe
+echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.9.exe
