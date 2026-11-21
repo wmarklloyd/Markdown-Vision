@@ -899,7 +899,7 @@ async function printCurrentDocument() {
     }
   } catch {
     printSnapshot = null;
-    elements.printStatus.textContent = 'Windows could not open the print dialog.';
+    elements.printStatus.textContent = 'Could not open the print dialog.';
     elements.printStatus.hidden = false;
     printStatusTimer = setTimeout(() => { elements.printStatus.hidden = true; }, 6000);
   } finally {
@@ -935,8 +935,16 @@ window.markdownVisionReader = {
 
 async function openPicker() {
   if (window.markdownVisionReader.isSaving?.()) return;
-  if (window.markdownVisionReader.hasUnsavedChanges?.()
-      && !window.confirm('Discard your unsaved changes and open another document?')) return;
+  if (window.markdownVisionReader.hasUnsavedChanges?.()) {
+    try {
+      const discard = window.desktop?.confirmDiscard
+        ? await window.desktop.confirmDiscard('open')
+        : window.confirm('Discard your unsaved changes and open another document?');
+      if (!discard) return;
+    } catch {
+      return;
+    }
+  }
   if (window.desktop?.openMarkdownFile) {
     const document = await window.desktop.openMarkdownFile();
     if (document) showDocument(document.content, document.name, document.documentId, document.imageBase);

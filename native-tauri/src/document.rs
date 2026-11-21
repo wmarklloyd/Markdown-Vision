@@ -155,6 +155,8 @@ fn replace_document(path: &std::path::Path, bytes: &[u8], previous: Option<&[u8]
     let parent = path.parent().ok_or("Invalid destination")?;
     let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
     if previous.is_some() {
+        // A writable parent directory must not bypass a file's own write permissions.
+        fs::OpenOptions::new().write(true).open(path).map_err(|e| e.to_string())?;
         let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
         temp.as_file().set_permissions(metadata.permissions()).map_err(|e| e.to_string())?;
     }
@@ -241,6 +243,21 @@ mod tests {
         symlink(&target, &link).unwrap();
         assert!(replace_document(&link, b"draft", Some(b"original")).is_err());
         assert_eq!(fs::read(&target).unwrap(), b"original");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read_only_documents_are_not_replaced() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("document.md");
+        fs::write(&path, b"original").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o444)).unwrap();
+        // Privileged users can write read-only files, so test only where the OS denies it.
+        if fs::OpenOptions::new().write(true).open(&path).is_err() {
+            assert!(replace_document(&path, b"draft", Some(b"original")).is_err());
+            assert_eq!(fs::read(&path).unwrap(), b"original");
+        }
     }
 
     #[cfg(unix)]

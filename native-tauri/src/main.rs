@@ -21,6 +21,9 @@ fn main() {
                     }
                     tauri::webview::NewWindowResponse::Deny
                 })
+                .on_document_title_changed(|window, title| {
+                    let _ = window.set_title(&title);
+                })
                 .build()?;
             let close_window = window.clone();
             window.on_window_event(move |event| {
@@ -44,7 +47,7 @@ fn main() {
                 None => tauri::http::Response::builder().status(404).body(Vec::new()).unwrap(),
             }
         })
-        .invoke_handler(tauri::generate_handler![document::initial_document, document::open_document, document::save_document, document::has_pending_document, document::pending_document, preferences::get_preferences, preferences::save_preferences, close_window])
+        .invoke_handler(tauri::generate_handler![document::initial_document, document::open_document, document::save_document, document::has_pending_document, document::pending_document, preferences::get_preferences, preferences::save_preferences, confirm_discard, print_document, close_window])
         .build(tauri::generate_context!())
         .expect("failed to build Markdown Vision")
         .run(|_app, _event| {
@@ -63,6 +66,31 @@ fn main() {
                 }
             }
         });
+}
+
+#[tauri::command]
+fn confirm_discard(action: &str) -> Result<bool, String> {
+    let message = match action {
+        "open" => "Discard your unsaved changes and open another document?",
+        "close" => "Discard your unsaved changes and close Markdown Vision?",
+        _ => return Err("Unknown confirmation request".into()),
+    };
+    let result = rfd::MessageDialog::new()
+        .set_title("Unsaved changes")
+        .set_description(message)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::YesNo)
+        .show();
+    Ok(result == rfd::MessageDialogResult::Yes)
+}
+
+#[tauri::command]
+fn print_document(window: tauri::WebviewWindow) -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    let result = window.print();
+    #[cfg(not(target_os = "macos"))]
+    let result = window.eval("window.print()");
+    result.map(|_| true).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
