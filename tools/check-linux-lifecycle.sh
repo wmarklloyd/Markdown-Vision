@@ -29,6 +29,13 @@ file "$pdf" | grep -q 'PDF document'
 cp "$pdf" "$evidence/linux-print.pdf"
 xdotool windowfocus --sync "$window" key ctrl+n
 sleep 2
+xdotool key Multi_key apostrophe e
+sleep 1
+xdotool key ctrl+a ctrl+c
+sleep 1
+timeout 5 xclip -selection clipboard -o > "$evidence/composition.txt"
+grep -q 'é' "$evidence/composition.txt"
+xdotool key BackSpace
 xdotool type --clearmodifiers 'Unsaved Linux test'
 sleep 2
 xdotool key ctrl+a ctrl+c
