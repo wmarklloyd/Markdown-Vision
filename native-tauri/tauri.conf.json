@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Markdown Vision",
+  "version": "2.8.12",
+  "identifier": "com.markdownvision.desktop",
+  "build": {
+    "beforeBuildCommand": "node tools/stage-tauri.cjs",
+    "beforeDevCommand": "node tools/stage-tauri.cjs",
+    "frontendDist": "../.tmp/tauri-frontend"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      { "title": "Markdown Vision", "width": 1100, "height": 800, "create": false }
+    ],
+    "security": { "csp": "default-src 'self'; img-src 'self' data: https: mvimage: http://mvimage.localhost; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://api.github.com" }
+  },
+  "bundle": {
+    "active": true,
+    "icon": ["icons/icon.png", "icons/icon.icns", "../native-cpp/MarkdownVision.ico"],
+    "fileAssociations": [
+      { "ext": ["md", "markdown", "mdown", "mkd"], "name": "Markdown document", "mimeType": "text/markdown", "role": "Editor", "rank": "Alternate" }
+    ]
+  }
+}

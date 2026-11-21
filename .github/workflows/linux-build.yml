@@ -1,0 +1,45 @@
+name: Linux development build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/linux-build-check
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev pkg-config
+      - name: Install Tauri CLI
+        run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.6
+      - name: Test native services
+        run: |
+          node tools/stage-tauri.cjs
+          cargo test --locked --manifest-path native-tauri/Cargo.toml
+      - name: Build Linux Debian package
+        working-directory: native-tauri
+        run: '"$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" build --debug --bundles deb -- --locked'
+      - name: Inspect Debian package
+        run: |
+          set -eu
+          package=$(find native-tauri/target/debug/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)
+          test -n "$package"
+          dpkg-deb --info "$package"
+          dpkg-deb --contents "$package"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: markdown-vision-linux-debug-deb
+          path: native-tauri/target/debug/bundle/deb/*.deb
+          if-no-files-found: error

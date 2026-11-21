@@ -335,7 +335,7 @@
       const result = await window.desktop.saveMarkdownFile(documentId, snapshot, saveAs);
       if (generation !== documentGeneration || result?.status === 'canceled') return;
       if (result?.status !== 'saved') {
-        saveError.textContent = result?.message || 'Windows could not save the draft. Your edits are still open.';
+        saveError.textContent = result?.message || 'Could not save the draft. Your edits are still open.';
         saveError.hidden = false;
         return;
       }
@@ -354,12 +354,13 @@
       }
     } catch {
       if (generation === documentGeneration) {
-        saveError.textContent = 'Windows could not save the draft. Your edits are still open.';
+        saveError.textContent = 'Could not save the draft. Your edits are still open.';
         saveError.hidden = false;
       }
     } finally {
       saving = false;
       updateDirty();
+      window.__markdownVisionProcessOpenQueue?.();
     }
   }
 
@@ -477,6 +478,7 @@
       else sourceAction.textContent = 'Edit table source';
     }
     window.markdownVisionReader.syncPictureSourcesToTheme(preview);
+    window.markdownVisionReader.containWideTables(preview);
     for (const block of visualBlocks.values()) block.html = block.node.outerHTML;
     preview.contentEditable = 'true';
     preview.tabIndex = 0;
@@ -2920,6 +2922,7 @@
   }
   $('#editorSaveActions').hidden = !window.desktop?.saveMarkdownFile;
   window.markdownVisionReader.isSaving = () => saving;
+  window.markdownVisionReader.hasUnsavedChanges = () => dirty;
   window.markdownVisionReader.getPrintDraft = () => active ? { content: source.value, name: fileName } : null;
   saveButton.addEventListener('click', () => saveDraft());
   saveAsButton.addEventListener('click', () => saveDraft(true));

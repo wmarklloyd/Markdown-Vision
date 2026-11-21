@@ -360,7 +360,9 @@ function sanitizeHtml(rawHtml) {
         continue;
       }
       if (tagName === 'img' && name === 'src') value = resolveDocumentImage(value);
-      if ((name === 'href' || name === 'src') && !isSafeUrl(value)) {
+      const documentImage = tagName === 'img' && name === 'src' && currentDocument?.imageBase
+        && value.startsWith(currentDocument.imageBase);
+      if ((name === 'href' || name === 'src') && !isSafeUrl(value) && !documentImage) {
         node.removeAttribute(attribute.name);
         continue;
       }
@@ -801,11 +803,21 @@ function openSearchPanel() {
   if (editorSearch()) runSearch({ preserve: true });
 }
 
+function containWideTables(container) {
+  for (const table of container.querySelectorAll('table')) {
+    const scroll = document.createElement('div');
+    scroll.className = 'markdown-table-scroll';
+    table.before(scroll);
+    scroll.append(table);
+  }
+}
+
 function showDocument(markdown, name = 'Untitled.md', documentId = null, imageBase = '') {
   currentDocument = { content: markdown, name, documentId, imageBase };
   renderedForPrint = null;
   clearSearchHighlights();
   elements.markdownOutput.innerHTML = parseMarkdown(markdown);
+  containWideTables(elements.markdownOutput);
   syncPictureSourcesToTheme();
   elements.fileName.textContent = name;
   document.title = name;
@@ -890,11 +902,14 @@ window.markdownVisionReader = {
     if (!elements.searchPanel.hidden) runSearch(options);
   },
   syncPictureSourcesToTheme,
+  containWideTables,
   showDocument
 };
 
 async function openPicker() {
   if (window.markdownVisionReader.isSaving?.()) return;
+  if (window.markdownVisionReader.hasUnsavedChanges?.()
+      && !window.confirm('Discard your unsaved changes and open another document?')) return;
   if (window.desktop?.openMarkdownFile) {
     const document = await window.desktop.openMarkdownFile();
     if (document) showDocument(document.content, document.name, document.documentId, document.imageBase);
@@ -1114,6 +1129,9 @@ async function checkForUpdates() {
 }
 
 document.getElementById('retryUpdateCheck').addEventListener('click', () => void checkForUpdates());
+document.querySelector('.about-menu').addEventListener('toggle', (event) => {
+  if (event.currentTarget.open) setTimeout(() => void checkForUpdates(), 0);
+});
 document.getElementById('updateLink').addEventListener('click', async (event) => {
   if (!window.desktop?.installUpdate) return;
   event.preventDefault();
@@ -1136,4 +1154,3 @@ window.addEventListener('load', async () => {
   if (currentDocument) return;
   if (initialDocument) showDocument(initialDocument.content, initialDocument.name, initialDocument.documentId, initialDocument.imageBase);
 });
-window.addEventListener('load', () => setTimeout(() => void checkForUpdates(), 0));

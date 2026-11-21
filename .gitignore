@@ -8,6 +8,7 @@ _restored_asar/
 *.tmp
 *.png
 !/docs/markdown-vision-recursive.png
+!/native-tauri/icons/*.png
 
 release/
 native-windows/bin/
@@ -16,3 +17,4 @@ native-cpp/*.obj
 native-cpp/*.res
 native-cpp/Debug/
 native-cpp/Release/
+native-tauri/target/
