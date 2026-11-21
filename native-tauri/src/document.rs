@@ -71,7 +71,16 @@ pub fn initial_document(state: State<'_, Mutex<Documents>>) -> Result<Option<Val
     documents.initial_consumed = true;
     #[cfg(target_os = "macos")]
     return Ok(None);
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
+    {
+        let cwd = std::env::current_dir().map_err(|error| error.to_string())?;
+        let mut startup = Documents::default();
+        queue_arguments(&mut startup, std::env::args_os().skip(1), &cwd);
+        startup.pending.append(&mut documents.pending);
+        documents.pending = startup.pending;
+        return Ok(None);
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     match std::env::args_os().nth(1) {
         Some(path) => open_path(&mut documents, path.into()).map(Some),
         None => Ok(None),
@@ -81,6 +90,20 @@ pub fn initial_document(state: State<'_, Mutex<Documents>>) -> Result<Option<Val
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub fn queue_open(documents: &mut Documents, path: PathBuf) {
     documents.pending.push_back(path);
+}
+
+#[cfg(target_os = "linux")]
+pub fn queue_arguments(documents: &mut Documents, arguments: impl IntoIterator<Item = std::ffi::OsString>, base: &std::path::Path) {
+    let mut positional_only = false;
+    for argument in arguments {
+        if !positional_only && argument == "--" {
+            positional_only = true;
+            continue;
+        }
+        if !positional_only && argument.to_string_lossy().starts_with('-') { continue; }
+        let path = PathBuf::from(argument);
+        queue_open(documents, if path.is_absolute() { path } else { base.join(path) });
+    }
 }
 
 #[tauri::command]
@@ -93,7 +116,10 @@ pub fn pending_document(state: State<'_, Mutex<Documents>>, accept: bool) -> Res
     let mut documents = state.lock().map_err(|e| e.to_string())?;
     let Some(path) = documents.pending.pop_front() else { return Ok(None) };
     if !accept { return Ok(Some(json!({ "discarded": true }))); }
-    open_path(&mut documents, path).map(Some)
+    Ok(Some(match open_path(&mut documents, path) {
+        Ok(document) => document,
+        Err(error) => json!({ "error": error }),
+    }))
 }
 
 #[tauri::command]
@@ -115,13 +141,7 @@ pub fn save_document(state: State<'_, Mutex<Documents>>, document_id: Option<Str
 
 fn save_impl(state: State<'_, Mutex<Documents>>, document_id: Option<String>, content: String, save_as: bool) -> Result<Option<Value>, String> {
     let mut documents = state.lock().map_err(|e| e.to_string())?;
-    let current = documents.current.as_ref().filter(|d| Some(&d.id) == document_id.as_ref());
-    if document_id.is_some() && current.is_none() && !save_as {
-        return Err("The document is no longer open. Use Save As.".into());
-    }
-    if !save_as && current.is_some_and(|d| !d.editable) {
-        return Err("This file has mixed line endings or invalid UTF-8. Use Save As.".into());
-    }
+    let current = current_for_save(&documents, document_id.as_deref(), save_as)?;
     let choose = save_as || current.is_none();
     let path = if choose {
         let Some(path) = rfd::FileDialog::new().add_filter("Markdown", &["md", "markdown"])
@@ -146,6 +166,17 @@ fn save_impl(state: State<'_, Mutex<Documents>>, document_id: Option<String>, co
     let document = open_path(&mut documents, path)?;
     Ok(Some(json!({ "status": "saved", "documentId": document["documentId"],
         "name": document["name"], "imageBase": document["imageBase"] })))
+}
+
+fn current_for_save<'a>(documents: &'a Documents, document_id: Option<&str>, save_as: bool) -> Result<Option<&'a OpenDocument>, String> {
+    let current = documents.current.as_ref().filter(|d| Some(d.id.as_str()) == document_id);
+    if document_id.is_some() && current.is_none() && !save_as {
+        return Err("The document is no longer open. Use Save As.".into());
+    }
+    if !save_as && current.is_some_and(|d| !d.editable) {
+        return Err("This file has mixed line endings or invalid UTF-8. Use Save As.".into());
+    }
+    Ok(current)
 }
 
 fn replace_document(path: &std::path::Path, bytes: &[u8], previous: Option<&[u8]>) -> Result<(), String> {
@@ -178,6 +209,17 @@ fn replace_document(path: &std::path::Path, bytes: &[u8], previous: Option<&[u8]
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_open_arguments_preserve_order_and_resolve_relative_paths() {
+        let mut documents = Documents::default();
+        let base = std::path::Path::new("/tmp/markdown-vision-test");
+        queue_arguments(&mut documents, ["--verbose", "one.md", "--", "-two.md", "/tmp/three.md"].map(std::ffi::OsString::from), base);
+        assert_eq!(documents.pending.into_iter().collect::<Vec<_>>(), vec![
+            base.join("one.md"), base.join("-two.md"), PathBuf::from("/tmp/three.md"),
+        ]);
+    }
+
     #[test]
     fn detects_bom_and_line_endings() {
         let directory = tempfile::tempdir().unwrap();
@@ -201,6 +243,21 @@ mod tests {
             open_path(&mut documents, path.clone()).unwrap();
             assert!(!documents.current.unwrap().editable);
         }
+    }
+
+    #[test]
+    fn stale_document_cannot_overwrite_the_current_document() {
+        let directory = tempfile::tempdir().unwrap();
+        let first = directory.path().join("first.md");
+        let second = directory.path().join("second.md");
+        fs::write(&first, "first").unwrap();
+        fs::write(&second, "second").unwrap();
+        let mut documents = Documents::default();
+        open_path(&mut documents, first).unwrap();
+        open_path(&mut documents, second.clone()).unwrap();
+        assert!(current_for_save(&documents, Some("1"), false).is_err());
+        assert!(current_for_save(&documents, Some("1"), true).unwrap().is_none());
+        assert_eq!(fs::read_to_string(second).unwrap(), "second");
     }
 
     #[test]

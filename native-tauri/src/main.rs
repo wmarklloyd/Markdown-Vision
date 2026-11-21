@@ -9,11 +9,7 @@ fn main() {
         let base = std::path::Path::new(&cwd);
         let state = app.state::<std::sync::Mutex<document::Documents>>();
         if let Ok(mut documents) = state.lock() {
-            for argument in args.into_iter().skip(1).filter(|arg| !arg.starts_with('-')) {
-                let path = std::path::PathBuf::from(argument);
-                let path = if path.is_absolute() { path } else { base.join(path) };
-                document::queue_open(&mut documents, path);
-            }
+            document::queue_arguments(&mut documents, args.into_iter().skip(1).map(std::ffi::OsString::from), base);
         }
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.show();
@@ -65,7 +61,7 @@ fn main() {
                 None => tauri::http::Response::builder().status(404).body(Vec::new()).unwrap(),
             }
         })
-        .invoke_handler(tauri::generate_handler![document::initial_document, document::open_document, document::save_document, document::has_pending_document, document::pending_document, preferences::get_preferences, preferences::save_preferences, confirm_discard, print_document, close_window])
+        .invoke_handler(tauri::generate_handler![document::initial_document, document::open_document, document::save_document, document::has_pending_document, document::pending_document, preferences::get_preferences, preferences::save_preferences, confirm_discard, show_open_error, print_document, close_window])
         .build(tauri::generate_context!())
         .expect("failed to build Markdown Vision")
         .run(|_app, _event| {
@@ -84,6 +80,16 @@ fn main() {
                 }
             }
         });
+}
+
+#[tauri::command]
+fn show_open_error(message: &str) {
+    rfd::MessageDialog::new()
+        .set_title("Could not open document")
+        .set_description(format!("The document could not be opened. Your current changes are still available.\n\n{message}"))
+        .set_level(rfd::MessageLevel::Error)
+        .set_buttons(rfd::MessageButtons::Ok)
+        .show();
 }
 
 #[tauri::command]

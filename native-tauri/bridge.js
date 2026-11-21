@@ -4,8 +4,9 @@
   let openCallback = null;
   let processing = false;
   let retryOpenQueue = false;
+  let startupPending = true;
   window.__markdownVisionProcessOpenQueue = async () => {
-    if (!openCallback) return;
+    if (!openCallback || startupPending) return;
     if (processing) {
       retryOpenQueue = true;
       return;
@@ -22,6 +23,10 @@
         const document = await invoke('pending_document', { accept });
         if (!document) break;
         if (document.discarded) continue;
+        if (document.error) {
+          await invoke('show_open_error', { message: String(document.error) });
+          continue;
+        }
         openCallback(document);
       }
     } catch (error) {
@@ -53,7 +58,15 @@
     savePreferences: (preferences) => invoke('save_preferences', { preferences }),
     printMarkdown: () => invoke('print_document'),
     confirmDiscard: (action) => invoke('confirm_discard', { action }),
-    getInitialDocument: () => invoke('initial_document'),
+    reportOpenError: (error) => invoke('show_open_error', { message: String(error) }),
+    getInitialDocument: async () => {
+      try {
+        return await invoke('initial_document');
+      } finally {
+        startupPending = false;
+        setTimeout(window.__markdownVisionProcessOpenQueue, 0);
+      }
+    },
     openMarkdownFile: () => invoke('open_document'),
     saveMarkdownFile: (documentId, content, saveAs) =>
       invoke('save_document', { documentId, content, saveAs }),

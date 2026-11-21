@@ -946,8 +946,13 @@ async function openPicker() {
     }
   }
   if (window.desktop?.openMarkdownFile) {
-    const document = await window.desktop.openMarkdownFile();
-    if (document) showDocument(document.content, document.name, document.documentId, document.imageBase);
+    try {
+      const document = await window.desktop.openMarkdownFile();
+      if (document) showDocument(document.content, document.name, document.documentId, document.imageBase);
+    } catch (error) {
+      if (window.desktop.reportOpenError) await window.desktop.reportOpenError(error);
+      else console.error('Could not open document:', error);
+    }
     return;
   }
   elements.fileInput.click();
@@ -1185,7 +1190,12 @@ document.getElementById('updateLink').addEventListener('click', async (event) =>
 });
 
 window.addEventListener('load', async () => {
-  const initialDocument = await window.desktop?.getInitialDocument?.();
-  if (currentDocument) return;
-  if (initialDocument) showDocument(initialDocument.content, initialDocument.name, initialDocument.documentId, initialDocument.imageBase);
+  try {
+    const initialDocument = await window.desktop?.getInitialDocument?.();
+    if (currentDocument) return;
+    if (initialDocument) showDocument(initialDocument.content, initialDocument.name, initialDocument.documentId, initialDocument.imageBase);
+  } catch (error) {
+    if (window.desktop?.reportOpenError) await window.desktop.reportOpenError(error);
+    else console.error('Could not open document:', error);
+  }
 });

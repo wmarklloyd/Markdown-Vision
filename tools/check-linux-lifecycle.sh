@@ -24,6 +24,21 @@ xdotool windowfocus --sync "$window" key ctrl+n
 sleep 2
 xdotool type --clearmodifiers 'Unsaved Linux test'
 sleep 2
+xdotool key ctrl+a ctrl+c
+sleep 1
+timeout 5 xclip -selection clipboard -o > "$evidence/clipboard.txt"
+grep -q 'Unsaved Linux test' "$evidence/clipboard.txt"
+xdotool key End ctrl+v ctrl+z ctrl+shift+z
+sleep 1
+xdotool key ctrl+a ctrl+c
+sleep 1
+timeout 5 xclip -selection clipboard -o > "$evidence/clipboard-after-redo.txt"
+test "$(grep -o 'Unsaved Linux test' "$evidence/clipboard-after-redo.txt" | wc -l)" -eq 2
+xdotool key ctrl+f
+xdotool type --clearmodifiers 'Linux'
+sleep 1
+import -window root "$evidence/linux-search.png"
+xdotool key Escape
 "$app" "$fixture" >"$evidence/second-instance.log" 2>&1 &
 second=$!
 sleep 5
