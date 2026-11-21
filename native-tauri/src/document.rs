@@ -242,4 +242,20 @@ mod tests {
         assert!(replace_document(&link, b"draft", Some(b"original")).is_err());
         assert_eq!(fs::read(&target).unwrap(), b"original");
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn images_cannot_follow_symlinks_outside_document_directory() {
+        use std::os::unix::fs::symlink;
+        let directory = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let path = directory.path().join("document.md");
+        let target = outside.path().join("outside.png");
+        fs::write(&path, "text").unwrap();
+        fs::write(&target, b"private").unwrap();
+        symlink(&target, directory.path().join("linked.png")).unwrap();
+        let mut documents = Documents::default();
+        open_path(&mut documents, path).unwrap();
+        assert!(read_image(&documents, "/1/linked.png").is_none());
+    }
 }
