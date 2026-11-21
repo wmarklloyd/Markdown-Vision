@@ -70,7 +70,16 @@ xdotool windowfocus --sync "$dialog" key Return
 sleep 2
 kill -0 "$pid"
 echo 'The already-running instance prompted before opening a file over unsaved changes.'
-xdotool windowclose "$window"
+/usr/bin/python3 - "$window" <<'PY'
+import sys
+from Xlib import display, protocol
+connection = display.Display()
+window = connection.create_resource_object('window', int(sys.argv[1]))
+event = protocol.event.ClientMessage(window=window, client_type=connection.intern_atom('WM_PROTOCOLS'),
+    data=(32, [connection.intern_atom('WM_DELETE_WINDOW'), 0, 0, 0, 0]))
+window.send_event(event, event_mask=0)
+connection.flush()
+PY
 sleep 2
 dialog=$(xdotool search --onlyvisible --name 'Unsaved changes' | head -n 1)
 test -n "$dialog"
