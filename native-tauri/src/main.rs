@@ -75,13 +75,23 @@ fn confirm_discard(action: &str) -> Result<bool, String> {
         "close" => "Discard your unsaved changes and close Markdown Vision?",
         _ => return Err("Unknown confirmation request".into()),
     };
+    // macOS assigns Escape to the second button. Zenity treats the cancel
+    // button and window dismissal alike, so Discard must be its extra button.
+    #[cfg(target_os = "macos")]
+    let buttons = rfd::MessageButtons::YesNoCancelCustom(
+        "Keep Editing".into(), "Cancel".into(), "Discard".into(),
+    );
+    #[cfg(not(target_os = "macos"))]
+    let buttons = rfd::MessageButtons::YesNoCancelCustom(
+        "Keep Editing".into(), "Discard".into(), "Cancel".into(),
+    );
     let result = rfd::MessageDialog::new()
         .set_title("Unsaved changes")
         .set_description(message)
         .set_level(rfd::MessageLevel::Warning)
-        .set_buttons(rfd::MessageButtons::YesNo)
+        .set_buttons(buttons)
         .show();
-    Ok(result == rfd::MessageDialogResult::Yes)
+    Ok(result == rfd::MessageDialogResult::Custom("Discard".into()))
 }
 
 #[tauri::command]

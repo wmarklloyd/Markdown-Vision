@@ -18,6 +18,7 @@
   "bundle": {
     "active": true,
     "icon": ["icons/icon.png", "icons/icon.icns", "../native-cpp/MarkdownVision.ico"],
+    "linux": { "deb": { "depends": ["zenity"] } },
     "fileAssociations": [
       { "ext": ["md", "markdown", "mdown", "mkd"], "name": "Markdown document", "mimeType": "text/markdown", "role": "Editor", "rank": "Alternate" }
     ]
