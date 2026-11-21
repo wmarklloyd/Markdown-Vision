@@ -130,9 +130,6 @@ fn save_impl(state: State<'_, Mutex<Documents>>, document_id: Option<String>, co
     } else {
         current.unwrap().path.clone()
     };
-    if fs::symlink_metadata(&path).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
-        return Err("Saving through a symbolic link is not supported. Use Save As.".into());
-    }
     let previous = if choose {
         match fs::read(&path) {
             Ok(bytes) => Some(bytes),
@@ -145,26 +142,34 @@ fn save_impl(state: State<'_, Mutex<Documents>>, document_id: Option<String>, co
     let normalized = content.replace("\r\n", "\n").replace('\r', "\n").replace('\n', ending);
     let mut bytes = if bom { vec![0xef, 0xbb, 0xbf] } else { Vec::new() };
     bytes.extend_from_slice(normalized.as_bytes());
+    replace_document(&path, &bytes, previous.as_deref())?;
+    let document = open_path(&mut documents, path)?;
+    Ok(Some(json!({ "status": "saved", "documentId": document["documentId"],
+        "name": document["name"], "imageBase": document["imageBase"] })))
+}
+
+fn replace_document(path: &std::path::Path, bytes: &[u8], previous: Option<&[u8]>) -> Result<(), String> {
+    if fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
+        return Err("Saving through a symbolic link is not supported. Use Save As.".into());
+    }
     let parent = path.parent().ok_or("Invalid destination")?;
     let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
     if previous.is_some() {
-        let metadata = fs::metadata(&path).map_err(|e| e.to_string())?;
+        let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
         temp.as_file().set_permissions(metadata.permissions()).map_err(|e| e.to_string())?;
     }
-    temp.write_all(&bytes).and_then(|_| temp.as_file().sync_all()).map_err(|e| e.to_string())?;
-    match (&previous, fs::read(&path)) {
-        (Some(old), Ok(now)) if *old == now => {},
+    temp.write_all(bytes).and_then(|_| temp.as_file().sync_all()).map_err(|e| e.to_string())?;
+    match (previous, fs::read(path)) {
+        (Some(old), Ok(now)) if old == now => {},
         (None, Err(e)) if e.kind() == std::io::ErrorKind::NotFound => {},
         _ => return Err("The destination changed on disk. Use Save As to preserve your edits.".into()),
     }
     if previous.is_some() {
-        temp.persist(&path).map_err(|e| e.to_string())?;
+        temp.persist(path).map_err(|e| e.to_string())?;
     } else {
-        temp.persist_noclobber(&path).map_err(|e| e.to_string())?;
+        temp.persist_noclobber(path).map_err(|e| e.to_string())?;
     }
-    let document = open_path(&mut documents, path)?;
-    Ok(Some(json!({ "status": "saved", "documentId": document["documentId"],
-        "name": document["name"], "imageBase": document["imageBase"] })))
+    Ok(())
 }
 
 #[cfg(test)]
@@ -210,5 +215,31 @@ mod tests {
         open_path(&mut documents, path).unwrap();
         assert!(read_image(&documents, "/1/image.png").is_none());
         assert!(read_image(&documents, "/2/image.png").is_some());
+    }
+
+    #[test]
+    fn save_detects_external_changes_and_preserves_contents() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("document.md");
+        fs::write(&path, b"external change").unwrap();
+        assert!(replace_document(&path, b"draft", Some(b"original")).is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"external change");
+        assert!(replace_document(&path, b"draft", None).is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"external change");
+        replace_document(&path, b"draft", Some(b"external change")).unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"draft");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_rejects_symbolic_links() {
+        use std::os::unix::fs::symlink;
+        let directory = tempfile::tempdir().unwrap();
+        let target = directory.path().join("target.md");
+        let link = directory.path().join("link.md");
+        fs::write(&target, b"original").unwrap();
+        symlink(&target, &link).unwrap();
+        assert!(replace_document(&link, b"draft", Some(b"original")).is_err());
+        assert_eq!(fs::read(&target).unwrap(), b"original");
     }
 }
