@@ -140,15 +140,25 @@ pub fn save_document(state: State<'_, Mutex<Documents>>, document_id: Option<Str
 }
 
 fn save_impl(state: State<'_, Mutex<Documents>>, document_id: Option<String>, content: String, save_as: bool) -> Result<Option<Value>, String> {
-    let mut documents = state.lock().map_err(|e| e.to_string())?;
-    let current = current_for_save(&documents, document_id.as_deref(), save_as)?;
-    let choose = save_as || current.is_none();
-    let path = if choose {
+    let choose = {
+        let documents = state.lock().map_err(|e| e.to_string())?;
+        let current = current_for_save(&documents, document_id.as_deref(), save_as)?;
+        save_as || current.is_none()
+    };
+    // File dialogs run a native event loop. Do not hold the document lock while
+    // they are open: Finder can deliver another open request on that same loop.
+    let chosen_path = if choose {
         let Some(path) = rfd::FileDialog::new().add_filter("Markdown", &["md", "markdown"])
             .set_file_name("Untitled.md").save_file() else { return Ok(None) };
-        path
+        Some(path)
     } else {
-        current.unwrap().path.clone()
+        None
+    };
+    let mut documents = state.lock().map_err(|e| e.to_string())?;
+    let current = current_for_save(&documents, document_id.as_deref(), save_as)?;
+    let path = match chosen_path {
+        Some(path) => path,
+        None => current.ok_or("The document is no longer open. Use Save As.")?.path.clone(),
     };
     let previous = if choose {
         match fs::read(&path) {
