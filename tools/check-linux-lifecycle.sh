@@ -45,10 +45,15 @@ xdotool key ctrl+f
 xdotool type --clearmodifiers 'Linux'
 sleep 1
 import -window root "$evidence/linux-search.png"
-convert "$evidence/linux-search.png" -crop 80x30+912+73 +repage -resize 500% "$evidence/search-count.png"
-tesseract "$evidence/search-count.png" stdout --psm 7 2>/dev/null > "$evidence/search-ocr.txt"
-grep -Eq '1[[:space:]]*of[[:space:]]*2' "$evidence/search-ocr.txt"
+convert "$evidence/linux-search.png" -crop 43x24+921+77 +repage -resize 500% "$evidence/search-count.png"
+tesseract "$evidence/search-count.png" stdout --psm 7 -c tessedit_char_whitelist=0123456789of 2>/dev/null > "$evidence/search-ocr.txt"
+grep -q 'of2' "$evidence/search-ocr.txt"
 xdotool key Escape
+xdotool mousemove 330 35 click 1
+sleep 1
+xdotool mousemove 70 165 click --repeat 2 --delay 100 1
+sleep 2
+import -window root "$evidence/linux-split-counterpart.png"
 "$app" "$fixture" >"$evidence/second-instance.log" 2>&1 &
 second=$!
 sleep 5
@@ -65,3 +70,12 @@ xdotool windowfocus --sync "$dialog" key Return
 sleep 2
 kill -0 "$pid"
 echo 'The already-running instance prompted before opening a file over unsaved changes.'
+xdotool windowclose "$window"
+sleep 2
+dialog=$(xdotool search --onlyvisible --name 'Unsaved changes' | head -n 1)
+test -n "$dialog"
+import -window root "$evidence/linux-close-confirm.png"
+xdotool windowfocus --sync "$dialog" key Return
+sleep 2
+kill -0 "$pid"
+echo 'Closing the dirty window prompted and allowed editing to continue.'

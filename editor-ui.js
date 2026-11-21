@@ -67,6 +67,7 @@
   let searchNeedsMeasurement = false;
   let searchFields = new Map();
   let counterpartTimer = null;
+  let counterpartVisualRange = null;
   const counterpartOverlay = document.createElement('div');
   counterpartOverlay.className = 'editor-search-overlay editor-counterpart-overlay';
   counterpartOverlay.setAttribute('aria-hidden', 'true');
@@ -1458,12 +1459,28 @@
   function clearCounterpart() {
     CSS.highlights?.delete('editor-counterpart');
     counterpartFieldMark = null;
+    counterpartVisualRange = null;
     counterpartOverlay.replaceChildren();
   }
 
   function paintCounterpartField() {
     counterpartOverlay.replaceChildren();
-    if (!counterpartFieldMark || !isSplit(panes.dataset.view)) return;
+    if (!isSplit(panes.dataset.view)) return;
+    if (counterpartVisualRange) {
+      const bounds = preview.getBoundingClientRect();
+      for (const rect of counterpartVisualRange.getClientRects()) {
+        const left = Math.max(bounds.left, rect.left);
+        const top = Math.max(bounds.top, rect.top);
+        const right = Math.min(bounds.right, rect.right);
+        const bottom = Math.min(bounds.bottom, rect.bottom);
+        if (right <= left || bottom <= top) continue;
+        const mark = document.createElement('span');
+        Object.assign(mark.style, { left: left + 'px', top: top + 'px', width: right - left + 'px', height: bottom - top + 'px' });
+        counterpartOverlay.append(mark);
+      }
+      return;
+    }
+    if (!counterpartFieldMark) return;
     const { field, start, end } = counterpartFieldMark;
     if (!field.isConnected || start >= end || end > field.value.length) return;
     withTextareaLayout(field, (text, origin) => {
@@ -1542,10 +1559,11 @@
     if (!match) return;
     if (fromSource && match.visual.range) {
       const range = match.visual.range;
-      if (CSS.highlights && typeof Highlight === 'function') CSS.highlights.set('editor-counterpart', new Highlight(range));
+      counterpartVisualRange = range;
       const rect = range.getBoundingClientRect();
       const bounds = preview.getBoundingClientRect();
       if (rect.top < bounds.top || rect.bottom > bounds.bottom) centerVisualMatch(range);
+      paintCounterpartField();
     } else {
       const mark = fromSource ? match.visual : { field: source, ...match.source };
       if (!mark.field) return;
