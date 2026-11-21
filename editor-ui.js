@@ -1379,22 +1379,20 @@
   function paintSearchOverlay() {
     const marks = document.createDocumentFragment();
     const visualBounds = preview.getBoundingClientRect();
-    if (!(CSS.highlights && typeof Highlight === 'function')) {
-      searchMatches.forEach(({ visual }, index) => {
-        if (!visual?.range) return;
-        for (const rect of visual.range.getClientRects()) {
-          const left = Math.max(visualBounds.left, rect.left);
-          const top = Math.max(visualBounds.top, rect.top);
-          const width = Math.min(visualBounds.right, rect.right) - left;
-          const height = Math.min(visualBounds.bottom, rect.bottom) - top;
-          if (width <= 0 || height <= 0) continue;
-          const highlight = document.createElement('span');
-          if (index === searchIndex) highlight.className = 'is-active';
-          Object.assign(highlight.style, { left: left + 'px', top: top + 'px', width: width + 'px', height: height + 'px' });
-          marks.append(highlight);
-        }
-      });
-    }
+    searchMatches.forEach(({ visual }, index) => {
+      if (!visual?.range) return;
+      for (const rect of visual.range.getClientRects()) {
+        const left = Math.max(visualBounds.left, rect.left);
+        const top = Math.max(visualBounds.top, rect.top);
+        const width = Math.min(visualBounds.right, rect.right) - left;
+        const height = Math.min(visualBounds.bottom, rect.bottom) - top;
+        if (width <= 0 || height <= 0) continue;
+        const highlight = document.createElement('span');
+        if (index === searchIndex) highlight.className = 'is-active';
+        Object.assign(highlight.style, { left: left + 'px', top: top + 'px', width: width + 'px', height: height + 'px' });
+        marks.append(highlight);
+      }
+    });
     for (const [field, entries] of searchFields) {
       const bounds = field.getBoundingClientRect();
       const right = bounds.left + field.clientWidth;
@@ -1577,16 +1575,6 @@
   function showEditorSearch(index, center) {
     searchIndex = index;
     const activeMatch = searchMatches[index];
-    if (CSS.highlights && typeof Highlight === 'function') {
-      const all = new Highlight();
-      for (const { visual } of searchMatches) {
-        if (visual?.range) all.add(visual.range);
-      }
-      CSS.highlights.set('editor-search', all);
-      const current = activeMatch?.visual?.range ? new Highlight(activeMatch.visual.range) : new Highlight();
-      current.priority = 1;
-      CSS.highlights.set('editor-search-active', current);
-    }
     if (center && activeMatch) {
       if (activeMatch.source && searchView !== 'visual') centerFieldMatch(source, activeMatch.source);
       if (activeMatch.visual?.field) {

@@ -45,8 +45,9 @@ xdotool key ctrl+f
 xdotool type --clearmodifiers 'Linux'
 sleep 1
 import -window root "$evidence/linux-search.png"
-tesseract "$evidence/linux-search.png" stdout 2>/dev/null > "$evidence/search-ocr.txt"
-grep -Eq '1 of 2' "$evidence/search-ocr.txt"
+convert "$evidence/linux-search.png" -crop 80x30+912+73 +repage -resize 500% "$evidence/search-count.png"
+tesseract "$evidence/search-count.png" stdout --psm 7 2>/dev/null > "$evidence/search-ocr.txt"
+grep -Eq '1[[:space:]]*of[[:space:]]*2' "$evidence/search-ocr.txt"
 xdotool key Escape
 "$app" "$fixture" >"$evidence/second-instance.log" 2>&1 &
 second=$!
