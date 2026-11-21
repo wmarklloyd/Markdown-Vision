@@ -1277,9 +1277,20 @@
   function addVisualSearchMatches(query, matches) {
     const extra = [];
     let cursor = 0;
-    for (const node of preview.children) {
-      const span = displayedBlock(node);
-      if (!span) continue;
+    for (const node of preview.childNodes) {
+      const span = node.nodeType === Node.ELEMENT_NODE ? displayedBlock(node) : null;
+      if (!span) {
+        // Newly typed text and insertion lines may not have a mapped block yet.
+        const visible = visibleSearchText(node);
+        for (const position of occurrences(visible.text, query)) {
+          const range = visibleSearchRange(visible.segments, position);
+          if (!range) continue;
+          const hit = matches[cursor++];
+          if (hit) hit.visual = { range };
+          else extra.push({ order: source.value.length + extra.length, visual: { range } });
+        }
+        continue;
+      }
       while (cursor < matches.length && matches[cursor].source.start < span.start) cursor += 1;
       const hits = [];
       while (cursor < matches.length && matches[cursor].source.start < span.end) {
@@ -1368,6 +1379,22 @@
   function paintSearchOverlay() {
     const marks = document.createDocumentFragment();
     const visualBounds = preview.getBoundingClientRect();
+    if (!(CSS.highlights && typeof Highlight === 'function')) {
+      searchMatches.forEach(({ visual }, index) => {
+        if (!visual?.range) return;
+        for (const rect of visual.range.getClientRects()) {
+          const left = Math.max(visualBounds.left, rect.left);
+          const top = Math.max(visualBounds.top, rect.top);
+          const width = Math.min(visualBounds.right, rect.right) - left;
+          const height = Math.min(visualBounds.bottom, rect.bottom) - top;
+          if (width <= 0 || height <= 0) continue;
+          const highlight = document.createElement('span');
+          if (index === searchIndex) highlight.className = 'is-active';
+          Object.assign(highlight.style, { left: left + 'px', top: top + 'px', width: width + 'px', height: height + 'px' });
+          marks.append(highlight);
+        }
+      });
+    }
     for (const [field, entries] of searchFields) {
       const bounds = field.getBoundingClientRect();
       const right = bounds.left + field.clientWidth;

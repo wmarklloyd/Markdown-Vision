@@ -18,8 +18,15 @@ sleep 5
 import -window root "$evidence/linux-print.png"
 print_dialog=$(xdotool search --onlyvisible --name 'Print' | head -n 1)
 test -n "$print_dialog"
-xdotool windowfocus --sync "$print_dialog" key Escape
-sleep 2
+xdotool mousemove --window "$print_dialog" 85 85 click 1
+sleep 1
+import -window root "$evidence/linux-print-to-file.png"
+xdotool mousemove --window "$print_dialog" 580 486 click 1
+sleep 5
+pdf=$(find "$HOME" -maxdepth 3 -type f -name '*.pdf' -print -quit)
+test -n "$pdf"
+file "$pdf" | grep -q 'PDF document'
+cp "$pdf" "$evidence/linux-print.pdf"
 xdotool windowfocus --sync "$window" key ctrl+n
 sleep 2
 xdotool type --clearmodifiers 'Unsaved Linux test'
@@ -38,6 +45,8 @@ xdotool key ctrl+f
 xdotool type --clearmodifiers 'Linux'
 sleep 1
 import -window root "$evidence/linux-search.png"
+tesseract "$evidence/linux-search.png" stdout 2>/dev/null > "$evidence/search-ocr.txt"
+grep -Eq '1 of 2' "$evidence/search-ocr.txt"
 xdotool key Escape
 "$app" "$fixture" >"$evidence/second-instance.log" 2>&1 &
 second=$!
