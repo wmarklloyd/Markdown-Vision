@@ -9,7 +9,6 @@ mkdir -p "$evidence"
 case "$app" in /*) ;; *) app="$(cd "$(dirname "$app")" && pwd)/$(basename "$app")" ;; esac
 case "$fixture" in /*) ;; *) fixture="$(cd "$(dirname "$fixture")" && pwd)/$(basename "$fixture")" ;; esac
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/markdown-vision-lifecycle.XXXXXX")
-if command -v setxkbmap >/dev/null 2>&1; then setxkbmap -layout us; fi
 wait_for_window() {
   title=$1
   attempt=0
@@ -98,13 +97,13 @@ xdotool type --clearmodifiers 'Linux'
 attempt=0
 while [ "$attempt" -lt 20 ]; do
   import -window root "$evidence/linux-search.png"
-  convert "$evidence/linux-search.png" -crop 43x24+921+77 +repage -resize 500% "$evidence/search-count.png"
+  convert "$evidence/linux-search.png" -crop 110x32+920+77 +repage -resize 500% "$evidence/search-count.png"
   tesseract "$evidence/search-count.png" stdout --psm 7 -c tessedit_char_whitelist=0123456789of 2>/dev/null > "$evidence/search-ocr.txt"
-  if grep -q 'of2' "$evidence/search-ocr.txt"; then break; fi
+  if tr -d ' \r\n' < "$evidence/search-ocr.txt" | grep -q '1of2'; then break; fi
   attempt=$((attempt + 1))
   sleep 0.5
 done
-grep -q 'of2' "$evidence/search-ocr.txt"
+tr -d ' \r\n' < "$evidence/search-ocr.txt" | grep -q '1of2'
 xdotool key Escape
 xdotool mousemove 330 35 click 1
 sleep 1

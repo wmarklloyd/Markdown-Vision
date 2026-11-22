@@ -43,7 +43,7 @@ jobs:
     steps:
       - name: Install Fedora build and desktop test dependencies
         run: |
-          dnf install -y git webkit2gtk4.1-devel openssl-devel curl wget file libappindicator-gtk3-devel librsvg2-devel libxdo-devel gcc gcc-c++ make pkgconf-pkg-config patchelf rpm-build zenity xdg-utils xorg-x11-server-Xvfb xorg-x11-xauth xorg-x11-xkb-utils dbus-daemon xdotool xclip tesseract ImageMagick python3-xlib shadow-utils
+          dnf install -y git webkit2gtk4.1-devel openssl-devel curl wget file libappindicator-gtk3-devel librsvg2-devel libxdo-devel gcc gcc-c++ make pkgconf-pkg-config patchelf rpm-build zenity xdg-utils xorg-x11-server-Xvfb xorg-x11-xauth dbus-daemon xdotool xclip tesseract ImageMagick python3-xlib shadow-utils
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
