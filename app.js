@@ -1,6 +1,15 @@
 const root = document.documentElement;
 const $ = (selector) => document.querySelector(selector);
 
+function applyShortcutLabels(platform = navigator.platform, userAgent = navigator.userAgent) {
+  const modifier = /Mac|iPhone|iPad/i.test(`${platform} ${userAgent}`) ? '⌘' : 'Ctrl';
+  document.querySelectorAll('[title]').forEach((element) => {
+    element.title = element.title.replace(/(?:Ctrl|⌘)\+/g, `${modifier}+`);
+  });
+  return modifier;
+}
+applyShortcutLabels();
+
 const elements = {
   openButton: $('#openButton'),
   fileInput: $('#fileInput'),
@@ -41,13 +50,18 @@ const legacyFonts = {
   mono: 'Consolas',
   humanist: 'Segoe UI'
 };
-const defaults = { theme: 'light', font: 'Georgia', monoFont: 'Consolas', size: '18', line: '1.75', width: '720' };
+const defaults = { theme: 'dark', font: 'Georgia', monoFont: 'Consolas', size: '18', line: '1.75', width: '720' };
 const preferenceStorageKey = 'markdown-vision-preferences';
 const fontCacheStorageKey = 'markdown-vision-font-cache';
 const fontCacheTtlMs = 7 * 24 * 60 * 60 * 1000;
 const storedPreferences = readLocalPreferences();
-const preferences = { ...defaults, ...JSON.parse(storedPreferences) };
+const preferences = { ...defaults, ...storedPreferences };
 preferences.font = legacyFonts[preferences.font] || preferences.font;
+let preferenceLoadPending = Boolean(window.desktop?.getPreferences);
+let preferenceNativeAvailable = true;
+let preferenceSnapshot = { ...preferences };
+const preferenceEdits = new Set();
+let preferenceWrite = Promise.resolve();
 let fontLoadPromise = null;
 let installedFonts = [];
 const fontPickers = [
@@ -65,9 +79,10 @@ let printStatusTimer = null;
 
 function readLocalPreferences() {
   try {
-    return localStorage.getItem(preferenceStorageKey) || '{}';
+    const value = JSON.parse(localStorage.getItem(preferenceStorageKey) || '{}');
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   } catch {
-    return '{}';
+    return {};
   }
 }
 
@@ -75,21 +90,42 @@ async function loadPreferences() {
   if (!window.desktop?.getPreferences) return;
   try {
     const stored = await window.desktop.getPreferences();
-    if (!stored || typeof stored !== 'object') {
-      savePreferences();
-      return;
+    if (stored && typeof stored === 'object') {
+      const merged = { ...defaults, ...stored };
+      for (const key of preferenceEdits) merged[key] = preferences[key];
+      Object.assign(preferences, merged);
+      preferences.font = legacyFonts[preferences.font] || preferences.font;
+      applyPreferences();
+      try { localStorage.setItem(preferenceStorageKey, JSON.stringify(preferences)); } catch {}
     }
-    Object.assign(preferences, defaults, stored);
-    preferences.font = legacyFonts[preferences.font] || preferences.font;
-    applyPreferences();
-  } catch {}
+    preferenceLoadPending = false;
+    preferenceSnapshot = { ...preferences };
+    if (!stored || preferenceEdits.size) persistNativePreferences();
+  } catch {
+    preferenceLoadPending = false;
+    preferenceNativeAvailable = false;
+    preferenceSnapshot = { ...preferences };
+  }
+}
+
+function persistNativePreferences() {
+  if (!preferenceNativeAvailable || !window.desktop?.savePreferences) return;
+  const snapshot = { ...preferences };
+  preferenceWrite = preferenceWrite.catch(() => {}).then(() => window.desktop.savePreferences(snapshot));
+  void preferenceWrite.catch(() => {});
 }
 
 function savePreferences() {
+  if (preferenceLoadPending) {
+    for (const key of Object.keys(defaults)) {
+      if (preferenceSnapshot[key] !== preferences[key]) preferenceEdits.add(key);
+    }
+  }
+  preferenceSnapshot = { ...preferences };
   try {
     localStorage.setItem(preferenceStorageKey, JSON.stringify(preferences));
   } catch {}
-  if (window.desktop?.savePreferences) void window.desktop.savePreferences(preferences);
+  if (!preferenceLoadPending) persistNativePreferences();
 }
 
 function applyFontStyle(preference, fontValue = preferences[preference]) {
@@ -360,7 +396,9 @@ function sanitizeHtml(rawHtml) {
         continue;
       }
       if (tagName === 'img' && name === 'src') value = resolveDocumentImage(value);
-      if ((name === 'href' || name === 'src') && !isSafeUrl(value)) {
+      const documentImage = tagName === 'img' && name === 'src' && currentDocument?.imageBase
+        && value.startsWith(currentDocument.imageBase);
+      if ((name === 'href' || name === 'src') && !isSafeUrl(value) && !documentImage) {
         node.removeAttribute(attribute.name);
         continue;
       }
@@ -801,11 +839,21 @@ function openSearchPanel() {
   if (editorSearch()) runSearch({ preserve: true });
 }
 
+function containWideTables(container) {
+  for (const table of container.querySelectorAll('table')) {
+    const scroll = document.createElement('div');
+    scroll.className = 'markdown-table-scroll';
+    table.before(scroll);
+    scroll.append(table);
+  }
+}
+
 function showDocument(markdown, name = 'Untitled.md', documentId = null, imageBase = '') {
   currentDocument = { content: markdown, name, documentId, imageBase };
   renderedForPrint = null;
   clearSearchHighlights();
   elements.markdownOutput.innerHTML = parseMarkdown(markdown);
+  containWideTables(elements.markdownOutput);
   syncPictureSourcesToTheme();
   elements.fileName.textContent = name;
   document.title = name;
@@ -860,7 +908,7 @@ async function printCurrentDocument() {
     }
   } catch {
     printSnapshot = null;
-    elements.printStatus.textContent = 'Windows could not open the print dialog.';
+    elements.printStatus.textContent = 'Could not open the print dialog.';
     elements.printStatus.hidden = false;
     printStatusTimer = setTimeout(() => { elements.printStatus.hidden = true; }, 6000);
   } finally {
@@ -875,6 +923,7 @@ window.addEventListener('afterprint', () => { printSnapshot = null; });
 
 // The editor uses the same renderer and document source as the reader.
 window.markdownVisionReader = {
+  applyShortcutLabels,
   getDocument: () => currentDocument ? { ...currentDocument } : null,
   render: (markdown) => parseMarkdown(markdown),
   renderBlocks: (markdown) => parseMarkdown(markdown, true),
@@ -890,14 +939,30 @@ window.markdownVisionReader = {
     if (!elements.searchPanel.hidden) runSearch(options);
   },
   syncPictureSourcesToTheme,
+  containWideTables,
   showDocument
 };
 
 async function openPicker() {
   if (window.markdownVisionReader.isSaving?.()) return;
+  if (window.markdownVisionReader.hasUnsavedChanges?.()) {
+    try {
+      const discard = window.desktop?.confirmDiscard
+        ? await window.desktop.confirmDiscard('open')
+        : window.confirm('Discard your unsaved changes and open another document?');
+      if (!discard) return;
+    } catch {
+      return;
+    }
+  }
   if (window.desktop?.openMarkdownFile) {
-    const document = await window.desktop.openMarkdownFile();
-    if (document) showDocument(document.content, document.name, document.documentId, document.imageBase);
+    try {
+      const document = await window.desktop.openMarkdownFile();
+      if (document) showDocument(document.content, document.name, document.documentId, document.imageBase);
+    } catch (error) {
+      if (window.desktop.reportOpenError) await window.desktop.reportOpenError(error);
+      else console.error('Could not open document:', error);
+    }
     return;
   }
   elements.fileInput.click();
@@ -1114,6 +1179,9 @@ async function checkForUpdates() {
 }
 
 document.getElementById('retryUpdateCheck').addEventListener('click', () => void checkForUpdates());
+document.querySelector('.about-menu').addEventListener('toggle', (event) => {
+  if (event.currentTarget.open) setTimeout(() => void checkForUpdates(), 0);
+});
 document.getElementById('updateLink').addEventListener('click', async (event) => {
   if (!window.desktop?.installUpdate) return;
   event.preventDefault();
@@ -1132,8 +1200,12 @@ document.getElementById('updateLink').addEventListener('click', async (event) =>
 });
 
 window.addEventListener('load', async () => {
-  const initialDocument = await window.desktop?.getInitialDocument?.();
-  if (currentDocument) return;
-  if (initialDocument) showDocument(initialDocument.content, initialDocument.name, initialDocument.documentId, initialDocument.imageBase);
+  try {
+    const initialDocument = await window.desktop?.getInitialDocument?.();
+    if (currentDocument) return;
+    if (initialDocument) showDocument(initialDocument.content, initialDocument.name, initialDocument.documentId, initialDocument.imageBase);
+  } catch (error) {
+    if (window.desktop?.reportOpenError) await window.desktop.reportOpenError(error);
+    else console.error('Could not open document:', error);
+  }
 });
-window.addEventListener('load', () => setTimeout(() => void checkForUpdates(), 0));

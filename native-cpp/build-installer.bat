@@ -4,17 +4,18 @@ setlocal
 set "ROOT=%~dp0.."
 set "MAKENSIS=%LOCALAPPDATA%\electron-builder\Cache\nsis-3.0.4.1\nsis-3.0.4.1-1mx3n\makensis.exe"
 
-if "%~1"=="" (
-  call "%~f0" x64
-  if errorlevel 1 exit /b %errorlevel%
-  call "%~f0" arm64
-  exit /b %errorlevel%
-)
+if not "%~1"=="" goto build
+call "%~f0" x64
+if errorlevel 1 exit /b %errorlevel%
+call "%~f0" arm64
+exit /b %errorlevel%
 
+:build
 set "ARCH=%~1"
-if "%ARCH%"=="" set "ARCH=x64"
 if /I not "%ARCH%"=="x64" if /I not "%ARCH%"=="arm64" exit /b 1
-call "%~dp0build.bat" "" "%ARCH%"
+set "APP_OUT_NAME=MarkdownVision-Native-Editor-2.8.13"
+if /I "%ARCH%"=="arm64" set "APP_OUT_NAME=MarkdownVision-Native-Editor-2.8.13-arm64"
+call "%~dp0build.bat" "%APP_OUT_NAME%" "%ARCH%"
 if errorlevel 1 exit /b %errorlevel%
 
 if not exist "%MAKENSIS%" (
@@ -33,7 +34,7 @@ popd
 if not "%RESULT%"=="0" exit /b %RESULT%
 
 if /I "%ARCH%"=="arm64" (
-  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.11-arm64.exe
+  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.13-arm64.exe
 ) else (
-  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.11.exe
+  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.13.exe
 )

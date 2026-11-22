@@ -5,12 +5,15 @@ set "ROOT=%~dp0.."
 set "ARCH=%~2"
 if "%ARCH%"=="" set "ARCH=x64"
 if /I not "%ARCH%"=="x64" if /I not "%ARCH%"=="arm64" exit /b 1
-set "OUT_NAME=MarkdownVision-Native-Editor-2.8.11"
-if /I "%ARCH%"=="arm64" set "OUT_NAME=MarkdownVision-Native-Editor-2.8.11-arm64"
+set "OUT_NAME=MarkdownVision-Native-Editor-2.8.13"
+if /I "%ARCH%"=="arm64" set "OUT_NAME=MarkdownVision-Native-Editor-2.8.13-arm64"
 if not "%~1"=="" set "OUT_NAME=%~1"
 set "OUT=%ROOT%\dist\%OUT_NAME%"
 set "WV2=%USERPROFILE%\.nuget\packages\microsoft.web.webview2\1.0.3537.50\build\native"
 if not exist "%OUT%" mkdir "%OUT%"
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0embed-web-assets.ps1" -Root "%ROOT%" -Output "%OUT%\EmbeddedWebAssets.h"
+if errorlevel 1 exit /b %errorlevel%
 
 call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=%ARCH% -host_arch=x64
 if errorlevel 1 exit /b %errorlevel%
@@ -24,6 +27,7 @@ if errorlevel 1 exit /b %errorlevel%
 
 cl /nologo /std:c++17 /O2 /EHsc /W4 /DUNICODE /D_UNICODE /DNOMINMAX ^
   /I"%WV2%\include" "%~dp0WebViewHost.cpp" "%OUT%\MarkdownVision.res" ^
+  /I"%OUT%" ^
   /Fo:"%OUT%\MarkdownVision.obj" ^
   /Fe:"%OUT%\Markdown-Vision.exe" ^
   /link /SUBSYSTEM:WINDOWS user32.lib gdi32.lib comctl32.lib comdlg32.lib ^
@@ -52,10 +56,10 @@ copy /y "%ROOT%\vendor\*" "%OUT%\web\vendor\" >nul
 if errorlevel 1 exit /b %errorlevel%
 
 set "ARCHIVE=%ROOT%\dist\%OUT_NAME%-win-%ARCH%.zip"
-if /I "%ARCH%"=="arm64" if "%~1"=="" set "ARCHIVE=%ROOT%\dist\MarkdownVision-Native-Editor-2.8.11-win-arm64.zip"
+if /I "%ARCH%"=="arm64" set "ARCHIVE=%ROOT%\dist\MarkdownVision-Native-Editor-2.8.13-win-arm64.zip"
 if exist "%ARCHIVE%" del "%ARCHIVE%"
 powershell.exe -NoProfile -NonInteractive -Command ^
-  "Compress-Archive -Path '%OUT%\*' -DestinationPath '%ARCHIVE%' -CompressionLevel Optimal"
+  "Compress-Archive -Path '%OUT%\Markdown-Vision.exe' -DestinationPath '%ARCHIVE%' -CompressionLevel Optimal"
 if errorlevel 1 exit /b %errorlevel%
 
 echo %ARCHIVE%

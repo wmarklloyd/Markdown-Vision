@@ -73,7 +73,7 @@ std::wstring g_font = L"Georgia";
 int g_fontSize = 18;
 int g_linePercent = 175;
 int g_width = 720;
-bool g_dark = false;
+bool g_dark = true;
 bool g_settingsVisible = false;
 bool g_fontsLoaded = false;
 std::vector<std::wstring> g_fonts;
@@ -779,7 +779,7 @@ void ApplyLoadedPreferences() {
     g_fontSize = std::clamp(_wtoi(ReadRegistryString(L"Size", L"18").c_str()), 14, 26);
     g_linePercent = std::clamp(_wtoi(ReadRegistryString(L"Line", L"175").c_str()), 135, 210);
     g_width = std::clamp(_wtoi(ReadRegistryString(L"Width", L"720").c_str()), 540, 920);
-    g_dark = ReadRegistryString(L"Theme", L"light") == L"dark";
+    g_dark = ReadRegistryString(L"Theme", L"dark") == L"dark";
 }
 
 std::wstring StartupDocument() {

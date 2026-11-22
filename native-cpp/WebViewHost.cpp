@@ -19,6 +19,8 @@
 #include <thread>
 #include <vector>
 
+#include "EmbeddedWebAssets.h"
+
 using Microsoft::WRL::Callback;
 using Microsoft::WRL::ComPtr;
 
@@ -34,9 +36,11 @@ ComPtr<ICoreWebView2Controller> g_controller;
 ComPtr<ICoreWebView2> g_webView;
 ComPtr<ICoreWebView2Environment> g_environment;
 std::wstring g_startupPath;
+std::wstring ModuleDirectory();
 bool g_initialTaken = false;
 bool g_saving = false;
 unsigned long long g_documentSequence = 0;
+std::wstring g_webContentDirectory;
 
 enum class LineEnding { lf, crlf, cr, mixed };
 
@@ -126,6 +130,54 @@ bool ReadFileBytes(const std::wstring& path, std::string& bytes) {
         bytes.append(buffer, static_cast<size_t>(stream.gcount()));
     }
     return stream.eof() && !stream.bad();
+}
+
+bool WriteEmbeddedWebAssets(const std::filesystem::path& webDirectory) {
+    try {
+        for (const auto& asset : kEmbeddedWebAssets) {
+            const auto destination = webDirectory / asset.path;
+            std::filesystem::create_directories(destination.parent_path());
+
+            std::string existing;
+            const std::string expected(reinterpret_cast<const char*>(asset.data), asset.size);
+            if (ReadFileBytes(destination.wstring(), existing) && existing == expected) continue;
+
+            const auto temporary = destination.wstring() + L".tmp." + std::to_wstring(GetCurrentProcessId());
+            {
+                std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+                if (!output) return false;
+                output.write(reinterpret_cast<const char*>(asset.data), static_cast<std::streamsize>(asset.size));
+                output.close();
+                if (!output) {
+                    DeleteFileW(temporary.c_str());
+                    return false;
+                }
+            }
+            if (!MoveFileExW(temporary.c_str(), destination.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+                DeleteFileW(temporary.c_str());
+                return false;
+            }
+        }
+    } catch (...) {
+        return false;
+    }
+    return true;
+}
+
+bool PrepareEmbeddedWebAssets() {
+    const auto adjacentWeb = std::filesystem::path(ModuleDirectory()) / L"web";
+    if (std::filesystem::exists(adjacentWeb / L"index.html") && WriteEmbeddedWebAssets(adjacentWeb)) {
+        g_webContentDirectory = adjacentWeb.wstring();
+        return true;
+    }
+
+    PWSTR localAppData = nullptr;
+    if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &localAppData)) || !localAppData) return false;
+    const auto cacheDirectory = std::filesystem::path(localAppData) / L"Markdown Vision Native" / L"web";
+    CoTaskMemFree(localAppData);
+    if (!WriteEmbeddedWebAssets(cacheDirectory)) return false;
+    g_webContentDirectory = cacheDirectory.wstring();
+    return true;
 }
 
 LineEnding DetectLineEnding(const std::string& bytes) {
@@ -365,8 +417,6 @@ std::wstring DecodeSavePayload(const std::wstring& text) {
     return output;
 }
 
-std::wstring ModuleDirectory();
-
 bool IsLocalAppMessage(ICoreWebView2WebMessageReceivedEventArgs* args) {
     LPWSTR url = nullptr;
     if (FAILED(args->get_Source(&url)) || !url) return false;
@@ -374,7 +424,7 @@ bool IsLocalAppMessage(ICoreWebView2WebMessageReceivedEventArgs* args) {
     DWORD length = static_cast<DWORD>(std::size(path));
     const HRESULT parsed = PathCreateFromUrlW(url, path, &length, 0);
     CoTaskMemFree(url);
-    const auto expected = std::filesystem::path(ModuleDirectory()) / L"web" / L"index.html";
+    const auto expected = std::filesystem::path(g_webContentDirectory) / L"index.html";
     return SUCCEEDED(parsed) && _wcsicmp(path, expected.c_str()) == 0;
 }
 
@@ -568,6 +618,11 @@ void ResizeWebView() {
 }
 
 void InitializeWebView() {
+    if (!PrepareEmbeddedWebAssets()) {
+        MessageBoxW(g_window, L"Markdown Vision could not prepare its application files in your local app data folder.",
+            kAppName, MB_OK | MB_ICONERROR);
+        return;
+    }
     PWSTR localAppData = nullptr;
     SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &localAppData);
     const auto userData = std::filesystem::path(localAppData) / L"Markdown Vision Native" / L"WebView2";
@@ -684,7 +739,7 @@ void InitializeWebView() {
                                         return S_OK;
                                     }).Get(), &token);
 
-                            const auto index = std::filesystem::path(ModuleDirectory()) / L"web" / L"index.html";
+                            const auto index = std::filesystem::path(g_webContentDirectory) / L"index.html";
                             std::wstring indexUrl = L"file:///" + index.wstring();
                             std::replace(indexUrl.begin(), indexUrl.end(), L'\\', L'/');
                             g_webView->Navigate(indexUrl.c_str());

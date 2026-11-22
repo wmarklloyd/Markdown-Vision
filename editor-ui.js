@@ -67,6 +67,7 @@
   let searchNeedsMeasurement = false;
   let searchFields = new Map();
   let counterpartTimer = null;
+  let counterpartVisualRange = null;
   const counterpartOverlay = document.createElement('div');
   counterpartOverlay.className = 'editor-search-overlay editor-counterpart-overlay';
   counterpartOverlay.setAttribute('aria-hidden', 'true');
@@ -335,7 +336,7 @@
       const result = await window.desktop.saveMarkdownFile(documentId, snapshot, saveAs);
       if (generation !== documentGeneration || result?.status === 'canceled') return;
       if (result?.status !== 'saved') {
-        saveError.textContent = result?.message || 'Windows could not save the draft. Your edits are still open.';
+        saveError.textContent = result?.message || 'Could not save the draft. Your edits are still open.';
         saveError.hidden = false;
         return;
       }
@@ -354,12 +355,13 @@
       }
     } catch {
       if (generation === documentGeneration) {
-        saveError.textContent = 'Windows could not save the draft. Your edits are still open.';
+        saveError.textContent = 'Could not save the draft. Your edits are still open.';
         saveError.hidden = false;
       }
     } finally {
       saving = false;
       updateDirty();
+      window.__markdownVisionProcessOpenQueue?.();
     }
   }
 
@@ -477,6 +479,7 @@
       else sourceAction.textContent = 'Edit table source';
     }
     window.markdownVisionReader.syncPictureSourcesToTheme(preview);
+    window.markdownVisionReader.containWideTables(preview);
     for (const block of visualBlocks.values()) block.html = block.node.outerHTML;
     preview.contentEditable = 'true';
     preview.tabIndex = 0;
@@ -1275,9 +1278,20 @@
   function addVisualSearchMatches(query, matches) {
     const extra = [];
     let cursor = 0;
-    for (const node of preview.children) {
-      const span = displayedBlock(node);
-      if (!span) continue;
+    for (const node of preview.childNodes) {
+      const span = node.nodeType === Node.ELEMENT_NODE ? displayedBlock(node) : null;
+      if (!span) {
+        // Newly typed text and insertion lines may not have a mapped block yet.
+        const visible = visibleSearchText(node);
+        for (const position of occurrences(visible.text, query)) {
+          const range = visibleSearchRange(visible.segments, position);
+          if (!range) continue;
+          const hit = matches[cursor++];
+          if (hit) hit.visual = { range };
+          else extra.push({ order: source.value.length + extra.length, visual: { range } });
+        }
+        continue;
+      }
       while (cursor < matches.length && matches[cursor].source.start < span.start) cursor += 1;
       const hits = [];
       while (cursor < matches.length && matches[cursor].source.start < span.end) {
@@ -1366,6 +1380,20 @@
   function paintSearchOverlay() {
     const marks = document.createDocumentFragment();
     const visualBounds = preview.getBoundingClientRect();
+    searchMatches.forEach(({ visual }, index) => {
+      if (!visual?.range) return;
+      for (const rect of visual.range.getClientRects()) {
+        const left = Math.max(visualBounds.left, rect.left);
+        const top = Math.max(visualBounds.top, rect.top);
+        const width = Math.min(visualBounds.right, rect.right) - left;
+        const height = Math.min(visualBounds.bottom, rect.bottom) - top;
+        if (width <= 0 || height <= 0) continue;
+        const highlight = document.createElement('span');
+        if (index === searchIndex) highlight.className = 'is-active';
+        Object.assign(highlight.style, { left: left + 'px', top: top + 'px', width: width + 'px', height: height + 'px' });
+        marks.append(highlight);
+      }
+    });
     for (const [field, entries] of searchFields) {
       const bounds = field.getBoundingClientRect();
       const right = bounds.left + field.clientWidth;
@@ -1431,12 +1459,28 @@
   function clearCounterpart() {
     CSS.highlights?.delete('editor-counterpart');
     counterpartFieldMark = null;
+    counterpartVisualRange = null;
     counterpartOverlay.replaceChildren();
   }
 
   function paintCounterpartField() {
     counterpartOverlay.replaceChildren();
-    if (!counterpartFieldMark || !isSplit(panes.dataset.view)) return;
+    if (!isSplit(panes.dataset.view)) return;
+    if (counterpartVisualRange) {
+      const bounds = preview.getBoundingClientRect();
+      for (const rect of counterpartVisualRange.getClientRects()) {
+        const left = Math.max(bounds.left, rect.left);
+        const top = Math.max(bounds.top, rect.top);
+        const right = Math.min(bounds.right, rect.right);
+        const bottom = Math.min(bounds.bottom, rect.bottom);
+        if (right <= left || bottom <= top) continue;
+        const mark = document.createElement('span');
+        Object.assign(mark.style, { left: left + 'px', top: top + 'px', width: right - left + 'px', height: bottom - top + 'px' });
+        counterpartOverlay.append(mark);
+      }
+      return;
+    }
+    if (!counterpartFieldMark) return;
     const { field, start, end } = counterpartFieldMark;
     if (!field.isConnected || start >= end || end > field.value.length) return;
     withTextareaLayout(field, (text, origin) => {
@@ -1515,10 +1559,11 @@
     if (!match) return;
     if (fromSource && match.visual.range) {
       const range = match.visual.range;
-      if (CSS.highlights && typeof Highlight === 'function') CSS.highlights.set('editor-counterpart', new Highlight(range));
+      counterpartVisualRange = range;
       const rect = range.getBoundingClientRect();
       const bounds = preview.getBoundingClientRect();
       if (rect.top < bounds.top || rect.bottom > bounds.bottom) centerVisualMatch(range);
+      paintCounterpartField();
     } else {
       const mark = fromSource ? match.visual : { field: source, ...match.source };
       if (!mark.field) return;
@@ -1548,16 +1593,6 @@
   function showEditorSearch(index, center) {
     searchIndex = index;
     const activeMatch = searchMatches[index];
-    if (CSS.highlights && typeof Highlight === 'function') {
-      const all = new Highlight();
-      for (const { visual } of searchMatches) {
-        if (visual?.range) all.add(visual.range);
-      }
-      CSS.highlights.set('editor-search', all);
-      const current = activeMatch?.visual?.range ? new Highlight(activeMatch.visual.range) : new Highlight();
-      current.priority = 1;
-      CSS.highlights.set('editor-search-active', current);
-    }
     if (center && activeMatch) {
       if (activeMatch.source && searchView !== 'visual') centerFieldMatch(source, activeMatch.source);
       if (activeMatch.visual?.field) {
@@ -2920,6 +2955,7 @@
   }
   $('#editorSaveActions').hidden = !window.desktop?.saveMarkdownFile;
   window.markdownVisionReader.isSaving = () => saving;
+  window.markdownVisionReader.hasUnsavedChanges = () => dirty;
   window.markdownVisionReader.getPrintDraft = () => active ? { content: source.value, name: fileName } : null;
   saveButton.addEventListener('click', () => saveDraft());
   saveAsButton.addEventListener('click', () => saveDraft(true));

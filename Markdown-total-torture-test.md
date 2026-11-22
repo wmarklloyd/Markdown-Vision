@@ -30,11 +30,11 @@ This combined test is organized by Markdown feature and editing behavior. The fi
 
 ## Tables and cell editing
 
-# Markdown Table Torture Test
+### Markdown Table Torture Test
 
 Use this document to exercise reading, Visual editing, Split view, search, and printing. Expected results appear next to each case. The Markdown syntax cases follow the [GitHub Flavored Markdown table specification](https://github.github.com/gfm/#tables-extension-).
 
-## Alignment and basic structure
+#### Alignment and basic structure
 
 The first column uses the default alignment, followed by left, center, and right. The numbers should align with their headers.
 
@@ -63,7 +63,7 @@ The next table has one column.
 | First row |
 | Second row |
 
-## Empty and irregular rows
+#### Empty and irregular rows
 
 There are four columns throughout. The short row has empty trailing cells. The extra field in the long row is ignored in the rendered table but must remain in the Markdown source.
 
@@ -75,7 +75,7 @@ There are four columns throughout. The short row has empty trailing cells. The e
 | Extra | cells | are | ignored | KEEP THIS EXTRA FIELD |
 | | | | |
 
-## Inline formatting and escaped pipes
+#### Inline formatting and escaped pipes
 
 Each row has two cells. All visible vertical bars in the second column belong to its content.
 
@@ -94,7 +94,7 @@ Each row has two cells. All visible vertical bars in the second column belong to
 
 [table-reference]: https://example.com/table-reference "Reference title"
 
-## Line breaks within cells
+#### Line breaks within cells
 
 Each cell below is a single Markdown table cell. The HTML break tags create visible lines inside it. In Visual editing, edit a word in the middle line, apply the change, then undo and redo. Confirm the other lines and cells remain intact.
 
@@ -105,7 +105,7 @@ Each cell below is a single Markdown table cell. The HTML break tags create visi
 | Literal tag | `<br>` is code<br>Actual second line |
 | Empty line | First<br><br>Third |
 
-## Unicode and layout
+#### Unicode and layout
 
 Make the Visual pane narrow in Split view. Long text should stay inside the table, and the surrounding document should remain readable. Check the same rows in print preview.
 
@@ -124,7 +124,7 @@ This wider table has twelve columns. Check that no data disappears in Reader, Vi
 | B01 | B02 | B03 | B04 | B05 | B06 | B07 | B08 | B09 | B10 | B11 | B12 |
 | C01 | C02 | C03 | C04 | C05 | C06 | C07 | C08 | C09 | C10 | C11 | C12 |
 
-## Block boundaries and containers
+#### Block boundaries and containers
 
 The following table ends before the blockquote.
 
@@ -163,7 +163,7 @@ The next code block contains table syntax as literal code.
 | Still | code |
 ```
 
-## Search and editing round trips
+#### Search and editing round trips
 
 Search for **tabletarget**. It appears in the header, in two regular cells, across a formatted boundary, in a code span, and in a link destination. Step through the matches in Split view and check the source and Visual highlighting.
 
@@ -187,7 +187,7 @@ Before-table sentinel.
 
 After-table sentinel.
 
-## Print pagination
+#### Print pagination
 
 Print or use print preview with enough scaling to span pages if needed. Rows should remain legible, long content should not overlap adjacent cells, and the header should repeat when a table continues onto another page.
 
@@ -222,11 +222,11 @@ Print or use print preview with enough scaling to span pages if needed. Rows sho
 
 ## Block structure and nesting
 
-# Torture Test 3: Containers and Block Boundaries
+### Torture Test 3: Containers and Block Boundaries
 
 This document stresses block nesting, interruption, indentation, and source-preserving edits. Edit the marked sentences and check that the surrounding markers remain unchanged.
 
-## Nested lists and paragraphs
+#### Nested lists and paragraphs
 
 - Parent item for the container survey.
 
@@ -245,7 +245,7 @@ This document stresses block nesting, interruption, indentation, and source-pres
 3. Ordered list starts at three.
 4. Another numbered item.
 
-## Tasks and lazy continuation
+#### Tasks and lazy continuation
 
 - [x] Parent task for inspection
   - [ ] First nested task
@@ -260,7 +260,7 @@ This document stresses block nesting, interruption, indentation, and source-pres
 *   This item uses a lazy continuation.
 Its next source line has no indentation.
 
-## Quotations and headings
+#### Quotations and headings
 
 > The outer quotation has plain text.
 >
@@ -275,7 +275,7 @@ The following line is a horizontal rule, not a heading underline.
 
 ---
 
-## Code and indentation
+#### Code and indentation
 
     First indented code line.
     Second indented code line.
@@ -291,11 +291,11 @@ The paragraph after the code block remains outside it.
 
 ## Inline syntax, links, and Unicode
 
-# Torture Test 4: Inline Syntax, References, and Unicode
+### Torture Test 4: Inline Syntax, References, and Unicode
 
 This document concentrates on inline delimiters, links, source-only reference targets, and Unicode. Edit the visible words without changing destinations or hidden definitions.
 
-## Emphasis and punctuation
+#### Emphasis and punctuation
 
 Plain before **bold text**, *italic text*, and ***nested emphasis*** after.
 
@@ -305,7 +305,7 @@ The phrase *flows across
 two source lines* while this line ends with a hard break.  
 The next rendered line starts here.
 
-## Reference links
+#### Reference links
 
 [Editable reference label][shared key] and [another reference label][SHARED KEY] have the same destination. An [unknown reference][missing key] remains literal.
 
@@ -313,11 +313,11 @@ The next rendered line starts here.
 
 An inline [external link](https://example.invalid/path_(part) "Title with spaces") and an <https://example.invalid/auto> autolink share this paragraph.
 
-## Inline code and entities
+#### Inline code and entities
 
 Short `code text`, a longer delimiter ``a ` tick``, and literal `&lt;` should remain code. Text entities include &amp;, &lt;, &#65;, and &#x1F680;.
 
-## Unicode and direction
+#### Unicode and direction
 
 Precomposed café and decomposed café should not silently become the same bytes. العربية and עברית share a paragraph with English. Emoji include 👩‍💻 and 🇺🇸.
 
@@ -327,11 +327,11 @@ The final lantern is here.
 
 <!-- Source: markdown-torture-5-tables.md -->
 
-# Torture Test 5: Tables and Cell Boundaries
+### Torture Test 5: Tables and Cell Boundaries
 
 This document stresses table recognition and cell editing. Edit existing plain cells, formatted cells, line breaks, escaped pipes, and Unicode while checking that neighboring cells and alignment stay intact.
 
-## Alignment, uneven rows, and escapes
+#### Alignment, uneven rows, and escapes
 
 | Left | Center | Right |
 | :--- | :----: | ----: |
@@ -342,7 +342,7 @@ This document stresses table recognition and cell editing. Edit existing plain c
 | backslash \\ value | café | 😀 |
 | entity &amp; word | &#x1F680; | &copy; notice |
 
-## Empty and single-column tables
+#### Empty and single-column tables
 
 | One column |
 | :---: |
@@ -354,7 +354,7 @@ This document stresses table recognition and cell editing. Edit existing plain c
 | - | :-: | -: |
 | | middle | |
 
-## Inline content within cells
+#### Inline content within cells
 
 | Name | Content |
 | --- | --- |
@@ -366,7 +366,7 @@ This document stresses table recognition and cell editing. Edit existing plain c
 
 [table-key]: https://example.invalid/target "Table link"
 
-## Non-table lookalikes
+#### Non-table lookalikes
 
 | One | Two | Three |
 | --- | --- |
@@ -376,11 +376,11 @@ An escaped \| pipe in ordinary text should not create a table.
     | Not | a | table |
     | --- | --- | --- |
 
-# Additional Markdown Specification Cases
+## Additional Markdown Specification Cases
 
 These cases complement the original files. They use the [CommonMark specification](https://spec.commonmark.org/0.31.2/), the [GitHub Flavored Markdown specification](https://github.github.com/gfm/), and the [markdown-it footnote documentation](https://github.com/markdown-it/markdown-it-footnote) as references. Extensions and sanitization behavior can differ between renderers; examples marked as comparisons are not a claim of full GFM compatibility.
 
-## Headings and block boundaries
+### Headings and block boundaries
 
 The following are a level-three heading and a paragraph beginning with a literal hash, respectively:
 
@@ -401,7 +401,7 @@ Paragraph before a quote.
 > A block quote can interrupt a paragraph.
 > Its second line remains in the quote.
 
-## Lists, interruption, and indentation
+### Lists, interruption, and indentation
 
 This paragraph is followed by a line beginning with 2; under CommonMark it does not start an ordered list here.
 2. A numbered line that follows a paragraph without a blank line.
@@ -423,7 +423,7 @@ This paragraph is followed by a line beginning with 2; under CommonMark it does 
 
 - Loose second item
 
-## Links, images, references, and autolinks
+### Links, images, references, and autolinks
 
 The same reference is used in full, collapsed, and shortcut forms: [full label][mixed ref], [mixed ref][], and [mixed ref]. The first definition wins when labels normalize to the same value.
 
@@ -438,7 +438,7 @@ An image with formatted alternative text: ![A **bold** label](https://example.in
 
 The unsafe destination [should not be an executable link](javascript:alert%281%29); inspect the result without clicking it. Raw HTML filtering is application-specific and should be checked independently from CommonMark parsing.
 
-## Inline delimiters, escapes, and line endings
+### Inline delimiters, escapes, and line endings
 
 Intraword underscores remain literal in alpha_beta_gamma. Compare **strong with *emphasis inside*** and *emphasis with **strong inside***. Unmatched delimiters stay visible: **open only and close only__.
 
@@ -450,7 +450,7 @@ the text continues without a forced HTML break.
 
 An entity outside code becomes text: &#x26; and &amp;. Inside code, `&#x26;` and `&amp;` remain literal. A code span can contain backticks: ``one ` tick``.
 
-## GFM and footnote comparisons
+### GFM and footnote comparisons
 
 The extension comparison below checks a task marker in a block quote, strikethrough next to punctuation, and a footnote defined after use. Task-list interaction and supported extensions may vary by renderer.
 
@@ -467,11 +467,11 @@ An inline footnote is here.^[Inline footnote with **emphasis**.] A separate late
 
 ## HTML, footnotes, tasks, and code
 
-# Torture Test 6: Embedded HTML, Footnotes, and Fences
+### Torture Test 6: Embedded HTML, Footnotes, and Fences
 
 This document combines Markdown extensions and embedded HTML. It distinguishes visible text that can be edited safely from generated content or HTML that may need source editing.
 
-## Disclosure sections
+#### Disclosure sections
 
 <details open>
 <summary>Open disclosure title</summary>
@@ -495,7 +495,7 @@ The hidden paragraph is available after expanding this section.
 
 </details>
 
-## Footnotes and reference reuse
+#### Footnotes and reference reuse
 
 The first note marker[^note] and the repeated note marker[^note] link to the same note. A different marker[^other] links to another note.
 
@@ -505,7 +505,7 @@ The first note marker[^note] and the repeated note marker[^note] link to the sam
 
 [^other]: Another footnote definition.
 
-## Raw HTML and sanitization
+#### Raw HTML and sanitization
 
 <div class="survey-container">
 
@@ -520,7 +520,7 @@ This Markdown paragraph is inside a raw HTML container.
 
 Inline HTML has <kbd>Ctrl</kbd> and <mark>marked text</mark> in a sentence.
 
-## Fenced code
+#### Fenced code
 
 ````python
 print("A nested fence follows")

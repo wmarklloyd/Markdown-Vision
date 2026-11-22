@@ -366,8 +366,10 @@ kbd { background: var(--surface); border: 1px solid var(--faint); border-radius:
 .markdown-body picture img { display: block; max-width: 100%; }
 .markdown-body img { max-width: 100%; border-radius: 5px; }
 .markdown-body hr { border: 0; border-top: 1px solid var(--faint); margin: 2.5em 0; }
-.markdown-body table { width: 100%; table-layout: fixed; overflow-wrap: anywhere; border-collapse: collapse; margin: 1.5em 0; font-size: .9em; }
-.markdown-body th, .markdown-body td { padding: .6em clamp(2px, .8vw, .8em); border: 1px solid var(--faint); text-align: left; }
+.markdown-body table { width: auto; max-width: 100%; table-layout: auto; overflow-wrap: anywhere; border-collapse: collapse; margin: 1.5em 0; font-size: .9em; }
+.markdown-body th, .markdown-body td { padding: .6em; border: 1px solid var(--faint); text-align: left; }
+.markdown-table-scroll { max-width: 100%; overflow-x: auto; margin: 1.5em 0; }
+.markdown-table-scroll > table { margin-block: 0; }
 .print-document { display: none; }
 
 @media print {
@@ -382,7 +384,7 @@ kbd { background: var(--surface); border: 1px solid var(--faint); border-radius:
   .print-document :is(h1, h2, h3, h4, h5, h6) { break-after: avoid; }
   .print-document :is(p, li) { orphans: 3; widows: 3; }
   .print-document pre { white-space: pre-wrap; overflow: visible; overflow-wrap: anywhere; border: 1px solid var(--faint); }
-  .print-document table { table-layout: fixed; overflow-wrap: anywhere; }
+  .print-document :is(th, td) { padding: .35em .45em; }
   .print-document thead { display: table-header-group; }
   .print-document tr { break-inside: avoid; }
   .print-document img { height: auto; max-height: 75vh; object-fit: contain; break-inside: avoid; }
