@@ -858,10 +858,11 @@ function showDocument(markdown, name = 'Untitled.md', documentId = null, imageBa
   elements.fileName.textContent = name;
   document.title = name;
   elements.readerShell.hidden = false;
+  if (document.activeElement === elements.openButton) elements.openButton.blur();
   document.dispatchEvent(new CustomEvent('markdownvision:documentchanged', { detail: { ...currentDocument } }));
   updatePrintButton();
   if (elements.searchInput.value.trim()) runSearch();
-  else window.scrollTo({ top: 0, behavior: 'smooth' });
+  else elements.readerShell.scrollTop = 0;
 }
 
 function printableDocument() {
@@ -970,6 +971,36 @@ async function openPicker() {
 
 elements.openButton.addEventListener('click', openPicker);
 elements.printButton.addEventListener('click', printCurrentDocument);
+window.__markdownVisionDispatchMenuCommand = (command) => {
+  if (command === 'about') {
+    document.querySelector('.about-menu').open = true;
+    return;
+  }
+  if (command === 'close') {
+    void window.__markdownVisionRequestClose?.();
+    return;
+  }
+  if (command === 'open' || command === 'print') {
+    document.querySelector(command === 'open' ? '#openButton' : '#printButton')?.click();
+    return;
+  }
+  const shortcuts = {
+    new: { key: 'n' },
+    save: { key: 's' },
+    saveAs: { key: 's', shiftKey: true }
+  };
+  const shortcut = shortcuts[command];
+  if (shortcut) {
+    const isMac = /Mac/i.test(navigator.userAgentData?.platform || navigator.platform);
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      ...shortcut,
+      bubbles: true,
+      cancelable: true,
+      metaKey: isMac,
+      ctrlKey: !isMac
+    }));
+  }
+};
 elements.searchButton.addEventListener('click', () => {
   if (elements.searchPanel.hidden) openSearchPanel();
   else closeSearchPanel();

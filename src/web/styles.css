@@ -70,17 +70,21 @@ button { color: inherit; }
 button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 .topbar {
-  padding: 4px;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 60px;
+  padding: 4px 12px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   position: fixed;
-  top: 10px;
-  right: 12px;
   z-index: 10;
-  max-width: calc(100vw - 24px);
+  width: 100%;
+  background: var(--bg);
+  border-bottom: 1px solid var(--faint);
 }
-body.is-editing .topbar { left: 0; max-width: none; padding-left: 0; }
+body.is-editing .topbar { padding-left: 12px; }
 .toolbar { display: flex; align-items: center; min-width: 0; max-width: 100%; }
 .toolbar > button { flex: none; }
 .toolbar > button:not(.editor-toggle) { margin-left: 7px; }
@@ -346,7 +350,15 @@ main { min-height: 100vh; }
 .text-button:hover { color: var(--accent); }
 kbd { background: var(--surface); border: 1px solid var(--faint); border-radius: 4px; box-shadow: 0 1px 0 var(--faint); padding: 3px 7px; font-family: inherit; }
 
-.reader-shell { padding: 54px 24px 100px; }
+.reader-shell {
+  position: fixed;
+  inset: 60px 0 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 24px 24px 100px;
+  background: var(--bg);
+}
 .document-meta { max-width: var(--reader-width); margin: 0 auto 50px; padding-bottom: 14px; border-bottom: 1px solid var(--faint); display: flex; gap: 9px; align-items: center; color: var(--muted); font-size: 12px; }
 .document-meta[hidden] { display: none; }
 .document-meta span:first-child { color: var(--text); font-weight: 650; }
@@ -392,12 +404,12 @@ kbd { background: var(--surface); border: 1px solid var(--faint); border-radius:
 
 @media (max-width: 600px) {
   .editor-header { flex-wrap: wrap; gap: 8px 12px; }
-  .topbar { top: 6px; right: 6px; }
+  .topbar { padding-inline: 6px; }
   .search-panel { right: 0; top: 48px; width: min(360px, calc(100vw - 18px)); }
   .search-box { grid-template-columns: 1fr 32px 32px 30px; }
   .search-count { grid-column: 1 / -1; grid-row: 2; }
   .settings { right: 0; top: 48px; width: min(290px, calc(100vw - 18px)); }
-  .reader-shell { padding: 38px 20px 70px; }
+  .reader-shell { padding: 18px 20px 70px; }
   .document-meta { margin-bottom: 36px; }
 }
 
