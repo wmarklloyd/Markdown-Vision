@@ -24,11 +24,11 @@
     "compression": "maximum",
     "icon": "build/icon",
     "files": [
-      "index.html",
-      "styles.css",
-      "vendor/**/*",
-      "app.js",
-      "editor-ui.js",
+      "src/web/index.html",
+      "src/web/styles.css",
+      "src/web/vendor/**/*",
+      "src/web/app.js",
+      "src/web/editor-ui.js",
       "main.cjs",
       "preload.cjs"
     ],

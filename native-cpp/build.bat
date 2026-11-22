@@ -47,12 +47,12 @@ del "%OUT%\MarkdownVision.obj" 2>nul
 del "%OUT%\PreviewHandler.obj" 2>nul
 copy /y "%ROOT%\LICENSE" "%OUT%\LICENSE" >nul
 if not exist "%OUT%\web" mkdir "%OUT%\web"
-copy /y "%ROOT%\index.html" "%OUT%\web\index.html" >nul
-copy /y "%ROOT%\styles.css" "%OUT%\web\styles.css" >nul
-copy /y "%ROOT%\app.js" "%OUT%\web\app.js" >nul
-copy /y "%ROOT%\editor-ui.js" "%OUT%\web\editor-ui.js" >nul
+copy /y "%ROOT%\src\web\index.html" "%OUT%\web\index.html" >nul
+copy /y "%ROOT%\src\web\styles.css" "%OUT%\web\styles.css" >nul
+copy /y "%ROOT%\src\web\app.js" "%OUT%\web\app.js" >nul
+copy /y "%ROOT%\src\web\editor-ui.js" "%OUT%\web\editor-ui.js" >nul
 if not exist "%OUT%\web\vendor" mkdir "%OUT%\web\vendor"
-copy /y "%ROOT%\vendor\*" "%OUT%\web\vendor\" >nul
+copy /y "%ROOT%\src\web\vendor\*" "%OUT%\web\vendor\" >nul
 if errorlevel 1 exit /b %errorlevel%
 
 set "ARCHIVE=%ROOT%\dist\%OUT_NAME%-win-%ARCH%.zip"

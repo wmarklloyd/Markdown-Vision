@@ -120,7 +120,7 @@ function createWindow(filePath = null) {
     }
   });
 
-  targetWindow.loadFile(path.join(__dirname, 'index.html'));
+  targetWindow.loadFile(path.join(__dirname, 'src', 'web', 'index.html'));
   targetWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
     return { action: 'deny' };

@@ -5,10 +5,11 @@
     "output": "dist"
   },
   "files": [
-    "index.html",
-    "styles.css",
-    "vendor/**/*",
-    "app.js",
+    "src/web/index.html",
+    "src/web/styles.css",
+    "src/web/vendor/**/*",
+    "src/web/app.js",
+    "src/web/editor-ui.js",
     "main.cjs",
     "preload.cjs",
     "package.json"

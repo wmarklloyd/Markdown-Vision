@@ -38,9 +38,9 @@ The pencil also returns to the reader, which can display the draft. **Save** in 
 | Component | Responsibility |
 | --- | --- |
 | [`native-cpp/WebViewHost.cpp`](../../native-cpp/WebViewHost.cpp) | Win32 window and WebView2 lifecycle, file picker, startup argument handling, UTF-8 reads, installed-font enumeration, native title updates, and the JavaScript bridge. This is the host compiled by the primary build. |
-| [`index.html`](../../index.html) and [`styles.css`](../../styles.css) | Shared reader and editor layout, toolbars, settings and search panels, theme variables, Markdown typography, and protected-block presentation. |
-| [`app.js`](../../app.js) | Renderer bootstrap, document display, Markdown parsing, HTML filtering, settings, font suggestions, and in-document search. |
-| [`editor-ui.js`](../../editor-ui.js) | In-memory draft, source and Visual editing, command handling, selection, history, and pane synchronization. |
+| [`index.html`](../../src/web/index.html) and [`styles.css`](../../src/web/styles.css) | Shared reader and editor layout, toolbars, settings and search panels, theme variables, Markdown typography, and protected-block presentation. |
+| [`app.js`](../../src/web/app.js) | Renderer bootstrap, document display, Markdown parsing, HTML filtering, settings, font suggestions, and in-document search. |
+| [`editor-ui.js`](../../src/web/editor-ui.js) | In-memory draft, source and Visual editing, command handling, selection, history, and pane synchronization. |
 | [`native-cpp/PreviewHandler.cpp`](../../native-cpp/PreviewHandler.cpp) | Explorer preview handler. Converts a Markdown subset to RTF and displays it in a Rich Edit control. |
 | [`native-cpp/installer.nsi`](../../native-cpp/installer.nsi) | Machine-wide setup, replacement of an earlier installation, application shortcuts, Markdown associations, and preview-handler registration. |
 

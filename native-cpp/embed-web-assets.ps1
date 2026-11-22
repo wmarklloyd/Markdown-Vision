@@ -6,12 +6,12 @@ param(
 $ErrorActionPreference = 'Stop'
 $rootPath = (Resolve-Path -LiteralPath $Root).Path
 $assets = @(
-    @{ RelativePath = 'index.html'; SourcePath = Join-Path $rootPath 'index.html' },
-    @{ RelativePath = 'styles.css'; SourcePath = Join-Path $rootPath 'styles.css' },
-    @{ RelativePath = 'app.js'; SourcePath = Join-Path $rootPath 'app.js' },
-    @{ RelativePath = 'editor-ui.js'; SourcePath = Join-Path $rootPath 'editor-ui.js' },
-    @{ RelativePath = 'vendor/markdown-it.js'; SourcePath = Join-Path $rootPath 'vendor/markdown-it.js' },
-    @{ RelativePath = 'vendor/markdown-it-footnote.js'; SourcePath = Join-Path $rootPath 'vendor/markdown-it-footnote.js' }
+    @{ RelativePath = 'index.html'; SourcePath = Join-Path (Join-Path $rootPath 'src/web') 'index.html' },
+    @{ RelativePath = 'styles.css'; SourcePath = Join-Path (Join-Path $rootPath 'src/web') 'styles.css' },
+    @{ RelativePath = 'app.js'; SourcePath = Join-Path (Join-Path $rootPath 'src/web') 'app.js' },
+    @{ RelativePath = 'editor-ui.js'; SourcePath = Join-Path (Join-Path $rootPath 'src/web') 'editor-ui.js' },
+    @{ RelativePath = 'vendor/markdown-it.js'; SourcePath = Join-Path (Join-Path $rootPath 'src/web') 'vendor/markdown-it.js' },
+    @{ RelativePath = 'vendor/markdown-it-footnote.js'; SourcePath = Join-Path (Join-Path $rootPath 'src/web') 'vendor/markdown-it-footnote.js' }
 )
 
 $builder = [System.Text.StringBuilder]::new()

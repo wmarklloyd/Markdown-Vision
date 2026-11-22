@@ -16,11 +16,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\index.html" Link="web\index.html" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\styles.css" Link="web\styles.css" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\vendor\*" Link="web\vendor\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\app.js" Link="web\app.js" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\editor-ui.js" Link="web\editor-ui.js" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\src\web\index.html" Link="web\index.html" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\src\web\styles.css" Link="web\styles.css" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\src\web\vendor\*" Link="web\vendor\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\src\web\app.js" Link="web\app.js" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\src\web\editor-ui.js" Link="web\editor-ui.js" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
