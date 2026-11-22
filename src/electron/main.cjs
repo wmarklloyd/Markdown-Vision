@@ -23,7 +23,7 @@ function detachFileLaunch() {
   if (!startupDocumentPath || process.argv.includes(detachedLaunchFlag)) return;
   const resolvedDocumentPath = path.resolve(startupDocumentPath);
   const childArgs = process.defaultApp
-    ? [__dirname, detachedLaunchFlag, resolvedDocumentPath]
+    ? [path.resolve(__dirname, '../..'), detachedLaunchFlag, resolvedDocumentPath]
     : [detachedLaunchFlag, resolvedDocumentPath];
   const child = spawn(process.execPath, childArgs, {
     cwd: process.cwd(),
@@ -120,7 +120,7 @@ function createWindow(filePath = null) {
     }
   });
 
-  targetWindow.loadFile(path.join(__dirname, 'src', 'web', 'index.html'));
+  targetWindow.loadFile(path.join(__dirname, '..', 'web', 'index.html'));
   targetWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
     return { action: 'deny' };

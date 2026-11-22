@@ -85,10 +85,10 @@ NSIS reads the architecture-specific 2.8.13 build directories and includes the c
 
 ## Repository and integration status
 
-- `main.cjs`, `preload.cjs`, and the Electron Builder configuration are retained from the earlier Electron edition. `native-windows/` is a separate WPF host with WebView2. The active native build uses neither host.
+- `src/electron/main.cjs`, `src/electron/preload.cjs`, and the Electron Builder configuration are retained from the earlier Electron edition. `native-windows/` is a separate WPF host with WebView2. The active native build uses neither host.
 - `native-cpp/MarkdownVision.cpp` is the earlier Win32 reader implementation. The active build script compiles `WebViewHost.cpp` and `PreviewHandler.cpp`.
-- `native-github/` is a separate native distribution snapshot. The active build takes assets from the workspace root.
-- `editor-session.js` prototypes document identity, revision tracking, save snapshots, and leave decisions. `editor-recovery.js` prototypes debounced draft storage through an injected store. `editor-fake-host.js` supplies an in-memory host for testing saves and conflicts. These modules are outside the native page's script list and package.
+- `native-github/` is a separate native distribution snapshot. The active build takes shared renderer assets from `src/web/`.
+- `src/prototypes/editor-session.js` prototypes document identity, revision tracking, save snapshots, and leave decisions. `src/prototypes/editor-recovery.js` prototypes debounced draft storage through an injected store. `src/prototypes/editor-fake-host.js` supplies an in-memory host for testing saves and conflicts. These modules are outside the native page's script list and package.
 - [The editor plan](MARKDOWN_EDITOR_PLAN.md) describes file durability, editor controls, and verification. The active implementation uses a textarea and a contenteditable Visual surface. Planned features include close and open guards, recovery, and replace.
 
 ## Verification

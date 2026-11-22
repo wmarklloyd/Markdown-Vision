@@ -50,7 +50,7 @@ Keep optional enhancements such as HTML/PDF export, live scroll sync, diagrams, 
 
 ## 5. Desktop storage contract
 
-The primary release is the native C++ WebView2 build. The root renderer is also consumed by Electron and WPF. Browser mode keeps file-picker Open and uses an explicit Download action for saving if a desktop capability is absent. Keep Preview Handler read-only. Treat `native-github/` as a separate copy and update it only if it is confirmed to be a release source.
+The primary release is the native C++ WebView2 build. The renderer in `src/web/` is also consumed by Electron and WPF. Browser mode keeps file-picker Open and uses an explicit Download action for saving if a desktop capability is absent. Keep Preview Handler read-only. Treat `native-github/` as a separate copy and update it only if it is confirmed to be a release source.
 
 | Operation | Shared contract |
 | --- | --- |
