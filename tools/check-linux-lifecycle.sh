@@ -9,6 +9,7 @@ mkdir -p "$evidence"
 case "$app" in /*) ;; *) app="$(cd "$(dirname "$app")" && pwd)/$(basename "$app")" ;; esac
 case "$fixture" in /*) ;; *) fixture="$(cd "$(dirname "$fixture")" && pwd)/$(basename "$fixture")" ;; esac
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/markdown-vision-lifecycle.XXXXXX")
+if command -v setxkbmap >/dev/null 2>&1; then setxkbmap -layout us; fi
 wait_for_window() {
   title=$1
   attempt=0
@@ -79,7 +80,7 @@ wait_for_file "$pdf"
 file "$pdf" | grep -q 'PDF document'
 cp "$pdf" "$evidence/linux-print.pdf"
 xdotool windowfocus --sync "$window" key ctrl+n
-xdotool key Multi_key apostrophe e
+xdotool type --clearmodifiers 'é'
 xdotool key ctrl+a ctrl+c
 wait_for_clipboard "$(printf '\303\251')" "$evidence/composition.txt"
 grep -q 'é' "$evidence/composition.txt"

@@ -64,7 +64,7 @@ jobs:
       - name: Install Ubuntu build and desktop test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev pkg-config rpm libfuse2t64 xvfb xauth dbus-x11 xdotool zenity xdg-utils imagemagick xclip tesseract-ocr python3-xlib
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev pkg-config rpm libfuse2t64 xvfb xauth dbus-x11 xdotool zenity xdg-utils imagemagick xclip tesseract-ocr python3-xlib x11-xkb-utils
       - name: Install Tauri CLI
         run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.6
       - name: Test native services
@@ -128,7 +128,7 @@ jobs:
           set -eu
           package=$(find native-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)
           expected_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' native-tauri/Cargo.toml | head -n 1)
-          sudo apt-get install -y "$package"
+          sudo apt-get install -y "./$package"
           installed=$(dpkg-query --show --showformat='${Status} ${Version} ${Architecture}' markdown-vision)
           test "$installed" = "install ok installed $expected_version $EXPECTED_DEB_ARCH"
       - name: Exercise installed application in a virtual desktop

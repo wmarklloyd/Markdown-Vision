@@ -43,7 +43,7 @@ jobs:
     steps:
       - name: Install Fedora build and desktop test dependencies
         run: |
-          dnf install -y git webkit2gtk4.1-devel openssl-devel curl wget file libappindicator-gtk3-devel librsvg2-devel libxdo-devel gcc gcc-c++ make pkgconf-pkg-config patchelf rpm-build zenity xdg-utils xorg-x11-server-Xvfb xorg-x11-xauth dbus-daemon xdotool xclip tesseract ImageMagick python3-xlib shadow-utils
+          dnf install -y git webkit2gtk4.1-devel openssl-devel curl wget file libappindicator-gtk3-devel librsvg2-devel libxdo-devel gcc gcc-c++ make pkgconf-pkg-config patchelf rpm-build zenity xdg-utils xorg-x11-server-Xvfb xorg-x11-xauth xorg-x11-xkb-utils dbus-daemon xdotool xclip tesseract ImageMagick python3-xlib shadow-utils
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -67,17 +67,18 @@ jobs:
           node tools/check-linux-release-map.cjs --distribution fedora --architecture "${{ matrix.architecture }}"
       - name: Record Fedora container and WebKitGTK versions
         run: |
-          mkdir -p "$RUNNER_TEMP/linux-evidence"
-          cat /etc/os-release | tee "$RUNNER_TEMP/linux-evidence/os-release.txt"
-          uname -a | tee "$RUNNER_TEMP/linux-evidence/uname.txt"
-          rustc --version --verbose | tee "$RUNNER_TEMP/linux-evidence/rustc-version.txt"
-          cargo --version | tee "$RUNNER_TEMP/linux-evidence/cargo-version.txt"
-          rustup target list --installed | tee "$RUNNER_TEMP/linux-evidence/rust-targets.txt"
-          node --version | tee "$RUNNER_TEMP/linux-evidence/node-version.txt"
-          npm --version | tee "$RUNNER_TEMP/linux-evidence/npm-version.txt"
-          "$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" --version | tee "$RUNNER_TEMP/linux-evidence/tauri-cli-version.txt"
-          pkg-config --modversion webkit2gtk-4.1 | tee "$RUNNER_TEMP/linux-evidence/webkitgtk-version.txt"
-          rpm -q --qf '%{NAME} %{VERSION} %{ARCH}\n' webkit2gtk4.1 gtk3 zenity xdg-utils | tee "$RUNNER_TEMP/linux-evidence/runtime-packages.txt"
+          evidence="$GITHUB_WORKSPACE/.tmp/fedora-linux-evidence"
+          mkdir -p "$evidence"
+          cat /etc/os-release | tee "$evidence/os-release.txt"
+          uname -a | tee "$evidence/uname.txt"
+          rustc --version --verbose | tee "$evidence/rustc-version.txt"
+          cargo --version | tee "$evidence/cargo-version.txt"
+          rustup target list --installed | tee "$evidence/rust-targets.txt"
+          node --version | tee "$evidence/node-version.txt"
+          npm --version | tee "$evidence/npm-version.txt"
+          "$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" --version | tee "$evidence/tauri-cli-version.txt"
+          pkg-config --modversion webkit2gtk-4.1 | tee "$evidence/webkitgtk-version.txt"
+          rpm -q --qf '%{NAME} %{VERSION} %{ARCH}\n' webkit2gtk4.1 gtk3 zenity xdg-utils | tee "$evidence/runtime-packages.txt"
       - name: Build Fedora RPM
         working-directory: native-tauri
         run: '"$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" build --bundles rpm -- --locked'
@@ -89,7 +90,7 @@ jobs:
           set -eu
           rpm_package=$(find native-tauri/target/release/bundle/rpm -maxdepth 1 -name '*.rpm' -print -quit)
           test -n "$rpm_package"
-          node tools/check-linux-release-map.cjs --distribution fedora --architecture "$LINUX_ARCH" --verify-outputs --manifest "$RUNNER_TEMP/linux-evidence/linux-release-manifest.json"
+          node tools/check-linux-release-map.cjs --distribution fedora --architecture "$LINUX_ARCH" --verify-outputs --manifest "$GITHUB_WORKSPACE/.tmp/fedora-linux-evidence/linux-release-manifest.json"
           expected_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' native-tauri/Cargo.toml | head -n 1)
           test -n "$expected_version"
           rpm -qpi "$rpm_package"
@@ -102,8 +103,10 @@ jobs:
           rpm -qpl "$rpm_package" | grep -Eq '/usr/bin/markdown-vision$'
           rpm -qpl "$rpm_package" | grep -Eq '/usr/share/applications/.*\.desktop$'
           file "$rpm_package"
-          stat -c '%n %s bytes' "$rpm_package" | tee "$RUNNER_TEMP/linux-evidence/package-sizes.txt"
-          sha256sum "$rpm_package" | tee "$RUNNER_TEMP/linux-evidence/package-sha256.txt"
+          evidence="$GITHUB_WORKSPACE/.tmp/fedora-linux-evidence"
+          mkdir -p "$evidence"
+          stat -c '%n %s bytes' "$rpm_package" | tee "$evidence/package-sizes.txt"
+          sha256sum "$rpm_package" | tee "$evidence/package-sha256.txt"
       - name: Install Fedora package and exercise desktop lifecycle
         run: |
           set -eu
@@ -113,14 +116,15 @@ jobs:
           installed=$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}' markdown-vision)
           test "$installed" = "markdown-vision $expected_version ${{ matrix.rpm_architecture }}"
           useradd --create-home --shell /bin/bash markdowntest
-          runtime_dir="$RUNNER_TEMP/xdg-runtime"
+          evidence="$GITHUB_WORKSPACE/.tmp/fedora-linux-evidence"
+          runtime_dir=/tmp/markdown-vision-xdg-runtime
           install -d -m 0700 -o markdowntest -g markdowntest "$runtime_dir"
-          install -d -m 0777 "$RUNNER_TEMP/linux-evidence"
+          install -d -m 0777 "$evidence"
           runuser -u markdowntest -- env HOME=/home/markdowntest XDG_RUNTIME_DIR="$runtime_dir" \
             xvfb-run -a dbus-run-session -- sh tools/check-linux-lifecycle.sh \
-              /usr/bin/markdown-vision "$GITHUB_WORKSPACE/tests/fixtures/Markdown-total-torture-test.md" "$RUNNER_TEMP/linux-evidence"
-          file "$RUNNER_TEMP/linux-evidence/linux-print.pdf"
-          sha256sum "$RUNNER_TEMP/linux-evidence/linux-print.pdf"
+              /usr/bin/markdown-vision "$GITHUB_WORKSPACE/tests/fixtures/Markdown-total-torture-test.md" "$evidence"
+          file "$evidence/linux-print.pdf"
+          sha256sum "$evidence/linux-print.pdf"
       - name: Retain Fedora RPM and validation evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -128,5 +132,5 @@ jobs:
           name: markdown-vision-fedora-${{ matrix.architecture }}-${{ github.run_id }}
           path: |
             native-tauri/target/release/bundle/rpm/*.rpm
-            ${{ runner.temp }}/linux-evidence/
+            .tmp/fedora-linux-evidence/
           if-no-files-found: warn
