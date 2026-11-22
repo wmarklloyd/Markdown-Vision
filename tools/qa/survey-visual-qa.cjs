@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const path = require('node:path');
 const delay = require('node:timers/promises').setTimeout;
+const fixtureRoot = path.resolve(__dirname, '../../tests/fixtures/torture-source');
 async function main() {
   let target; for(let i=0;i<100&&!target;i++){try{target=(await(await fetch('http://127.0.0.1:'+process.argv[2]+'/json/list')).json()).find(x=>x.url.includes('index.html'))}catch{}if(!target)await delay(150)}
   assert.ok(target); const socket=new WebSocket(target.webSocketDebuggerUrl);await new Promise(r=>socket.addEventListener('open',r));let id=0;
@@ -16,7 +18,7 @@ async function main() {
       {file:'markdown-torture-6-embedded.md',checks:'document.querySelectorAll("#editorPreview details").length===2 && document.querySelectorAll("#editorPreview .footnote-ref").length===3 && document.querySelectorAll("#editorPreview .visual-code-editor").length===3',from:'Open disclosure title',to:'Updated disclosure title',old:'<summary>Open disclosure title</summary>',replacement:'<summary>Updated disclosure title</summary>'}
     ];
     for(const fixture of fixtures){
-      const text=fs.readFileSync(fixture.file,'utf8').replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n');
+      const text=fs.readFileSync(path.join(fixtureRoot, fixture.file),'utf8').replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n');
       await ev('window.markdownVisionReader.showDocument('+JSON.stringify(text)+','+JSON.stringify(fixture.file)+')');
       assert.equal(await ev('document.querySelector("#markdownSource").value'),text,fixture.file+' load preserves source');
       assert.ok(await ev(fixture.checks),fixture.file+' render checks');

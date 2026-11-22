@@ -37,12 +37,12 @@ The pencil also returns to the reader, which can display the draft. **Save** in 
 
 | Component | Responsibility |
 | --- | --- |
-| [`native-cpp/WebViewHost.cpp`](native-cpp/WebViewHost.cpp) | Win32 window and WebView2 lifecycle, file picker, startup argument handling, UTF-8 reads, installed-font enumeration, native title updates, and the JavaScript bridge. This is the host compiled by the primary build. |
-| [`index.html`](index.html) and [`styles.css`](styles.css) | Shared reader and editor layout, toolbars, settings and search panels, theme variables, Markdown typography, and protected-block presentation. |
-| [`app.js`](app.js) | Renderer bootstrap, document display, Markdown parsing, HTML filtering, settings, font suggestions, and in-document search. |
-| [`editor-ui.js`](editor-ui.js) | In-memory draft, source and Visual editing, command handling, selection, history, and pane synchronization. |
-| [`native-cpp/PreviewHandler.cpp`](native-cpp/PreviewHandler.cpp) | Explorer preview handler. Converts a Markdown subset to RTF and displays it in a Rich Edit control. |
-| [`native-cpp/installer.nsi`](native-cpp/installer.nsi) | Machine-wide setup, replacement of an earlier installation, application shortcuts, Markdown associations, and preview-handler registration. |
+| [`native-cpp/WebViewHost.cpp`](../../native-cpp/WebViewHost.cpp) | Win32 window and WebView2 lifecycle, file picker, startup argument handling, UTF-8 reads, installed-font enumeration, native title updates, and the JavaScript bridge. This is the host compiled by the primary build. |
+| [`index.html`](../../index.html) and [`styles.css`](../../styles.css) | Shared reader and editor layout, toolbars, settings and search panels, theme variables, Markdown typography, and protected-block presentation. |
+| [`app.js`](../../app.js) | Renderer bootstrap, document display, Markdown parsing, HTML filtering, settings, font suggestions, and in-document search. |
+| [`editor-ui.js`](../../editor-ui.js) | In-memory draft, source and Visual editing, command handling, selection, history, and pane synchronization. |
+| [`native-cpp/PreviewHandler.cpp`](../../native-cpp/PreviewHandler.cpp) | Explorer preview handler. Converts a Markdown subset to RTF and displays it in a Rich Edit control. |
+| [`native-cpp/installer.nsi`](../../native-cpp/installer.nsi) | Machine-wide setup, replacement of an earlier installation, application shortcuts, Markdown associations, and preview-handler registration. |
 
 ### Native host and document flow
 
@@ -79,7 +79,7 @@ The primary build script targets x64, uses the configured Visual Studio Communit
 
 The default output directory is `dist\MarkdownVision-Native-Editor-2.8.13\`. Its archive is `dist\MarkdownVision-Native-Editor-2.8.13-win-x64.zip`; an ARM64 build produces its own ZIP. Build output folders contain installer assets, while portable ZIPs contain only `Markdown-Vision.exe`. The executable embeds its HTML, CSS, and JavaScript assets and prepares them under `%LOCALAPPDATA%\Markdown Vision Native\web` when no adjacent `web\` directory exists. Both architectures require the target machine's Microsoft Edge WebView2 Runtime.
 
-The [native installer entry point](native-cpp/build-installer.bat) invokes the standalone build and then uses the cached NSIS compiler. The script currently locates that compiler under an Electron Builder cache path. That path is a build-time dependency only. The setup defaults to `%ProgramFiles%\MarkdownVision`, uses the previous product's uninstall identity for replacement, and registers the app and Explorer handler for the four Markdown extensions. The setup checkbox controls the registry association written for `.md`.
+The [native installer entry point](../../native-cpp/build-installer.bat) invokes the standalone build and then uses the cached NSIS compiler. The script currently locates that compiler under an Electron Builder cache path. That path is a build-time dependency only. The setup defaults to `%ProgramFiles%\MarkdownVision`, uses the previous product's uninstall identity for replacement, and registers the app and Explorer handler for the four Markdown extensions. The setup checkbox controls the registry association written for `.md`.
 
 NSIS reads the architecture-specific 2.8.13 build directories and includes the complete web asset list. Its outputs are `dist\Markdown-Vision-Native-Setup-2.8.13-Intel-AMD-x64.exe` and `dist\Markdown-Vision-Native-Setup-2.8.13-Windows-ARM64.exe`. The executables and installers expose version 2.8.13 in Windows file properties.
 

@@ -26,7 +26,7 @@ This combined test is organized by Markdown feature and editing behavior. The fi
 - [Reader and editor behavior](#search-and-editing-round-trips)
   - [Search, editing, undo, and print](#search-and-editing-round-trips)
 
-<!-- Source: markdown-table-torture-test.md -->
+<!-- Source: torture-source/markdown-table-torture-test.md -->
 
 ## Tables and cell editing
 
@@ -218,7 +218,7 @@ Print or use print preview with enough scaling to span pages if needed. Rows sho
 | 23 | A long record with enough text to make pagination and wrapping observable in a narrow print layout. |
 | 24 | A long record with enough text to make pagination and wrapping observable in a narrow print layout. |
 
-<!-- Source: markdown-torture-3-structure.md -->
+<!-- Source: torture-source/markdown-torture-3-structure.md -->
 
 ## Block structure and nesting
 
@@ -287,7 +287,7 @@ The next shorter marker is code.
 
 The paragraph after the code block remains outside it.
 
-<!-- Source: markdown-torture-4-inline.md -->
+<!-- Source: torture-source/markdown-torture-4-inline.md -->
 
 ## Inline syntax, links, and Unicode
 
@@ -325,7 +325,7 @@ Repeated word: lantern. Later in this same paragraph: lantern. Another paragraph
 
 The final lantern is here.
 
-<!-- Source: markdown-torture-5-tables.md -->
+<!-- Source: torture-source/markdown-torture-5-tables.md -->
 
 ### Torture Test 5: Tables and Cell Boundaries
 
@@ -463,7 +463,7 @@ An inline footnote is here.^[Inline footnote with **emphasis**.] A separate late
 
 [^additional-note]: A later-defined note with `code` and a [reference link][mixed ref].
 
-<!-- Source: markdown-torture-6-embedded.md -->
+<!-- Source: torture-source/markdown-torture-6-embedded.md -->
 
 ## HTML, footnotes, tasks, and code
 

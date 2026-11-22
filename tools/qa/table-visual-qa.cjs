@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const path = require('node:path');
 const { setTimeout: delay } = require('node:timers/promises');
+const fixtureRoot = path.resolve(__dirname, '../../tests/fixtures/torture-source');
 
 async function run(port) {
   let target;
@@ -38,7 +40,7 @@ async function run(port) {
   try {
     for (let attempt = 0; attempt < 60 && !await evaluate('!!window.markdownVisionReader'); attempt += 1) await delay(150);
     const file = 'markdown-table-torture-test.md';
-    const original = fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n');
+    const original = fs.readFileSync(path.join(fixtureRoot, file), 'utf8').replace(/\r\n?/g, '\n');
     await evaluate(`window.markdownVisionReader.showDocument(${JSON.stringify(original)}, ${JSON.stringify(file)});
       if (document.querySelector('#editorWorkspace').hidden) document.querySelector('#editorToggle').click()`);
     assert.equal(await source(), original);

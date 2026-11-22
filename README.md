@@ -23,8 +23,8 @@ Both editions require the Microsoft Edge WebView2 Runtime.
 
 The ZIP and setup executable are written to `dist\`.
 
-See [the project description](PROJECT_DESCRIPTION.md) for architecture and verification status, and [the native build notes](native-cpp/README.md) for prerequisites.
+See [the project description](docs/project/PROJECT_DESCRIPTION.md) for architecture and verification status, [the editor implementation plan](docs/project/MARKDOWN_EDITOR_PLAN.md), and [the native build notes](native-cpp/README.md) for prerequisites.
 
 ## Markdown renderer test document
 
-[Markdown-total-torture-test.md](Markdown-total-torture-test.md) exercises the renderer with a broad range of Markdown syntax and embedded content.
+[Markdown-total-torture-test.md](tests/fixtures/Markdown-total-torture-test.md) exercises the renderer with a broad range of Markdown syntax and embedded content.
