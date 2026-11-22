@@ -1,0 +1,132 @@
+name: Fedora package validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/fedora-build.yml'
+      - '.github/workflows/linux-build.yml'
+      - 'src/web/**'
+      - 'tests/fixtures/**'
+      - 'native-tauri/**'
+      - 'tools/stage-tauri.cjs'
+      - 'docs/linux-release-targets.json'
+      - 'tools/check-linux-lifecycle.sh'
+      - 'tools/check-linux-release-map.cjs'
+      - 'tools/check-cross-platform-metadata.cjs'
+      - 'tools/test-tauri-open-queue.cjs'
+  push:
+    branches:
+      - codex/linux-matrix-build
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  fedora:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            architecture: x86_64
+            rpm_architecture: x86_64
+          - runner: ubuntu-24.04-arm
+            architecture: aarch64
+            rpm_architecture: aarch64
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: fedora:44
+    timeout-minutes: 60
+    steps:
+      - name: Install Fedora build and desktop test dependencies
+        run: |
+          dnf install -y git webkit2gtk4.1-devel openssl-devel curl wget file libappindicator-gtk3-devel librsvg2-devel libxdo-devel gcc gcc-c++ make pkgconf-pkg-config patchelf rpm-build zenity xdg-utils xorg-x11-server-Xvfb xorg-x11-xauth dbus-daemon xdotool xclip tesseract ImageMagick python3-xlib shadow-utils
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify native runner architecture
+        env:
+          EXPECTED_ARCH: ${{ matrix.architecture }}
+        run: |
+          set -eu
+          actual=$(uname -m)
+          test "$actual" = "$EXPECTED_ARCH"
+      - name: Install Tauri CLI
+        run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.6
+      - name: Test native services
+        run: |
+          node tools/stage-tauri.cjs
+          cargo test --locked --manifest-path native-tauri/Cargo.toml
+          node tools/test-tauri-open-queue.cjs
+          node tools/check-cross-platform-metadata.cjs
+          node tools/check-linux-release-map.cjs --distribution fedora --architecture "${{ matrix.architecture }}"
+      - name: Record Fedora container and WebKitGTK versions
+        run: |
+          mkdir -p "$RUNNER_TEMP/linux-evidence"
+          cat /etc/os-release | tee "$RUNNER_TEMP/linux-evidence/os-release.txt"
+          uname -a | tee "$RUNNER_TEMP/linux-evidence/uname.txt"
+          rustc --version --verbose | tee "$RUNNER_TEMP/linux-evidence/rustc-version.txt"
+          cargo --version | tee "$RUNNER_TEMP/linux-evidence/cargo-version.txt"
+          rustup target list --installed | tee "$RUNNER_TEMP/linux-evidence/rust-targets.txt"
+          node --version | tee "$RUNNER_TEMP/linux-evidence/node-version.txt"
+          npm --version | tee "$RUNNER_TEMP/linux-evidence/npm-version.txt"
+          "$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" --version | tee "$RUNNER_TEMP/linux-evidence/tauri-cli-version.txt"
+          pkg-config --modversion webkit2gtk-4.1 | tee "$RUNNER_TEMP/linux-evidence/webkitgtk-version.txt"
+          rpm -q --qf '%{NAME} %{VERSION} %{ARCH}\n' webkit2gtk4.1 gtk3 zenity xdg-utils | tee "$RUNNER_TEMP/linux-evidence/runtime-packages.txt"
+      - name: Build Fedora RPM
+        working-directory: native-tauri
+        run: '"$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" build --bundles rpm -- --locked'
+      - name: Inspect RPM metadata and verify architecture
+        env:
+          LINUX_ARCH: ${{ matrix.architecture }}
+          RPM_ARCH: ${{ matrix.rpm_architecture }}
+        run: |
+          set -eu
+          rpm_package=$(find native-tauri/target/release/bundle/rpm -maxdepth 1 -name '*.rpm' -print -quit)
+          test -n "$rpm_package"
+          node tools/check-linux-release-map.cjs --distribution fedora --architecture "$LINUX_ARCH" --verify-outputs --manifest "$RUNNER_TEMP/linux-evidence/linux-release-manifest.json"
+          expected_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' native-tauri/Cargo.toml | head -n 1)
+          test -n "$expected_version"
+          rpm -qpi "$rpm_package"
+          rpm_info=$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}' "$rpm_package")
+          test "$rpm_info" = "markdown-vision $expected_version $RPM_ARCH"
+          rpm_requires=$(rpm -qp --requires "$rpm_package")
+          for required in webkit2gtk4.1 gtk3 zenity xdg-utils; do
+            printf '%s\n' "$rpm_requires" | grep -Fxq "$required"
+          done
+          rpm -qpl "$rpm_package" | grep -Eq '/usr/bin/markdown-vision$'
+          rpm -qpl "$rpm_package" | grep -Eq '/usr/share/applications/.*\.desktop$'
+          file "$rpm_package"
+          stat -c '%n %s bytes' "$rpm_package" | tee "$RUNNER_TEMP/linux-evidence/package-sizes.txt"
+          sha256sum "$rpm_package" | tee "$RUNNER_TEMP/linux-evidence/package-sha256.txt"
+      - name: Install Fedora package and exercise desktop lifecycle
+        run: |
+          set -eu
+          rpm_package=$(find native-tauri/target/release/bundle/rpm -maxdepth 1 -name '*.rpm' -print -quit)
+          dnf install -y "$rpm_package"
+          expected_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' native-tauri/Cargo.toml | head -n 1)
+          installed=$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}' markdown-vision)
+          test "$installed" = "markdown-vision $expected_version ${{ matrix.rpm_architecture }}"
+          useradd --create-home --shell /bin/bash markdowntest
+          runtime_dir="$RUNNER_TEMP/xdg-runtime"
+          install -d -m 0700 -o markdowntest -g markdowntest "$runtime_dir"
+          install -d -m 0777 "$RUNNER_TEMP/linux-evidence"
+          runuser -u markdowntest -- env HOME=/home/markdowntest XDG_RUNTIME_DIR="$runtime_dir" \
+            xvfb-run -a dbus-run-session -- sh tools/check-linux-lifecycle.sh \
+              /usr/bin/markdown-vision "$GITHUB_WORKSPACE/tests/fixtures/Markdown-total-torture-test.md" "$RUNNER_TEMP/linux-evidence"
+          file "$RUNNER_TEMP/linux-evidence/linux-print.pdf"
+          sha256sum "$RUNNER_TEMP/linux-evidence/linux-print.pdf"
+      - name: Retain Fedora RPM and validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: markdown-vision-fedora-${{ matrix.architecture }}-${{ github.run_id }}
+          path: |
+            native-tauri/target/release/bundle/rpm/*.rpm
+            ${{ runner.temp }}/linux-evidence/
+          if-no-files-found: warn

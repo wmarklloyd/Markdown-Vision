@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "versionSource": "native-tauri/tauri.conf.json",
+  "buildBaselines": { "ubuntu": "ubuntu-24.04", "fedora": "fedora-44" },
+  "architectures": ["x86_64", "aarch64"],
+  "bundles": [
+    {
+      "format": "deb",
+      "distribution": "ubuntu",
+      "architectures": ["x86_64", "aarch64"],
+      "tauriTarget": "deb",
+      "outputDirectory": "native-tauri/target/release/bundle/deb",
+      "fileSuffix": ".deb",
+      "githubAssetName": "Markdown-Vision-{version}-linux-{architecture}.deb",
+      "state": "pilot"
+    },
+    {
+      "format": "rpm",
+      "distribution": "fedora",
+      "architectures": ["x86_64", "aarch64"],
+      "tauriTarget": "rpm",
+      "outputDirectory": "native-tauri/target/release/bundle/rpm",
+      "fileSuffix": ".rpm",
+      "githubAssetName": "Markdown-Vision-{version}-linux-{architecture}.rpm",
+      "state": "build-validation"
+    },
+    {
+      "format": "appimage",
+      "distribution": "ubuntu",
+      "architectures": ["x86_64"],
+      "tauriTarget": "appimage",
+      "outputDirectory": "native-tauri/target/release/bundle/appimage",
+      "fileSuffix": ".AppImage",
+      "githubAssetName": "Markdown-Vision-{version}-linux-{architecture}.AppImage",
+      "state": "build-validation"
+    }
+  ],
+  "channels": [
+    { "name": "GitHub Releases", "state": "validation-only-no-assets-published" },
+    { "name": "Ubuntu PPA", "state": "account-and-source-package-setup-required" },
+    { "name": "OBS/COPR", "state": "project-and-target-matrix-setup-required" },
+    { "name": "Flathub", "state": "human-authored-manifest-and-review-required" },
+    { "name": "Snap Store", "state": "name-registration-and-credential-setup-required" },
+    { "name": "Arch AUR", "state": "maintainer-review-and-repository-setup-required" }
+  ]
+}

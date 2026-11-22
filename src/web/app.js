@@ -976,8 +976,8 @@ window.__markdownVisionDispatchMenuCommand = (command) => {
     document.querySelector('.about-menu').open = true;
     return;
   }
-  if (command === 'close') {
-    void window.__markdownVisionRequestClose?.();
+  if (command === 'close' || command === 'quit') {
+    void window.__markdownVisionRequestClose?.(command === 'quit');
     return;
   }
   if (command === 'open' || command === 'print') {

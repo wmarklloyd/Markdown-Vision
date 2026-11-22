@@ -1,0 +1,22 @@
+# Cross-platform release gate review
+
+This is the Terra engineering review for the experimental Tauri host. It does not replace Luna's assigned release checks or authorize publishing.
+
+## Current evidence
+
+- Native service tests cover encoding detection, conflict handling, image containment, preferences, and Unix symbolic-link and read-only cases. The tests have run on Windows, macOS, and Ubuntu.
+- An unsigned Apple Silicon build was exercised on macOS with opening, first save, editing, undo, redo, a split view, Visual search, printing to a saved 13-page PDF, and unsaved-change prompts for open, close, and quit. A separate Finder-style open of another file showed the prompt without extra input, and Keep Editing preserved the draft. When a Finder request arrived during first save, the save completed with its contents intact and the queued document opened afterward. An Option-E, E dead-key sequence produced and saved U+00E9.
+- An Ubuntu 22.04 build produced a Debian package with WebKitGTK, GTK, zenity, and `xdg-utils` dependencies. Graphical checks exercised startup with a file, compose-key entry of U+00E9, clipboard, undo, redo, Visual search highlights, both split layouts and counterpart highlighting, prompts for opening and closing a dirty document, and printing to a saved 16-page PDF. The extracted PDF text includes the torture-test title. Other Linux interaction and distributions remain to be verified.
+- Native File menus now expose New, Open, Save, Save As, Print, and Close; macOS also gets About and Quit under the application menu, while Linux gets About and Quit in Help. Commands route through existing renderer controls or keyboard handling. Close destroys the window and Quit exits the app after the shared unsaved-change prompt. The bridge route for canceling Close and confirming Quit is covered by a local queue/lifecycle fixture; native menu interaction has not yet been exercised on macOS or Linux.
+- A minimal Tao/Wry reference host loads the shared renderer and accepts a startup Markdown file for the planned T2 comparison. Its frontend path is now resolved to an absolute path and its launch instructions point to `src/web` after the repository reorganization; this correction still needs a macOS/Linux run. CI is configured to build it; no comparative startup, memory, or package-size measurements have been collected yet.
+- RPM metadata explicitly requests Fedora's WebKitGTK 4.1 and GTK 3 runtime packages, zenity, and `xdg-utils` for default-browser integration. The Linux workflow checks these generated `Requires` entries; no RPM has yet been installed or exercised on a Fedora runner.
+- The signing workflow is prepared for a protected environment and accepts matching `vX.Y.Z` tags as well as `master`; signing and notarization secrets are now scoped to the credential check, keychain import, and signing build steps, so dependency installation and native tests do not receive them. The workflow has not been validated with signing credentials or on a clean Mac.
+
+## Gates still open
+
+1. Exercise native menu accelerators and actions on macOS and Linux, then complete remaining native lifecycle and input-method verification, including input methods beyond the tested dead-key and compose-key sequences.
+2. Verify signed and notarized universal macOS output and Gatekeeper behavior using the user's Apple Developer credentials and a clean Mac. On the newest supported macOS, confirm the hardened-runtime WKWebView content process starts and renders; add an entitlement only if that run demonstrates it is needed, then repeat notarization and Gatekeeper checks.
+3. Complete the release checks assigned to Luna, including the platform matrix, upgrade and installation checks, and the measured performance and size comparisons. Do not infer a pass from a successful build.
+4. Review the resulting failures and artifacts before selecting releases. There has not yet been a macOS/Linux release, so the plan's post-release decision on a Tauri Windows host is premature; the existing Win32 host remains the production path.
+
+The Ubuntu 22.04 build baseline is not a blanket compatibility guarantee. The examined x86-64 development executable contains glibc symbol-version strings through `GLIBC_2.34`; the package also requires WebKitGTK 4.1, GTK 3, zenity, and `xdg-utils`. That observation is not a complete compatibility floor: shared libraries and the distribution's package versions also matter. Package dependencies and actual installation behavior must be checked on each selected supported distribution.
