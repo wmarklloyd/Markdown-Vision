@@ -8,10 +8,10 @@ Unicode True
 !define APP_ID "8d1dd6d6-9e38-5fc2-8139-94aece1f4a40"
 !ifdef ARM64
 !define SOURCE_DIR "..\dist\MarkdownVision-Native-Editor-${APP_VERSION}-arm64"
-!define SETUP_SUFFIX "-arm64"
+!define SETUP_SUFFIX "-Windows-ARM64"
 !else
 !define SOURCE_DIR "..\dist\MarkdownVision-Native-Editor-${APP_VERSION}"
-!define SETUP_SUFFIX ""
+!define SETUP_SUFFIX "-Intel-AMD-x64"
 !endif
 !define APP_EXE "Markdown-Vision.exe"
 !define APP_PROGID "MarkdownVision.Document"

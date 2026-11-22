@@ -4,7 +4,7 @@ A native Windows Markdown reader and editor with Intel/AMD x64 and ARM64 builds.
 
 ## Download for Windows
 
-**[Windows installer — Intel/AMD x64 (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.13/Markdown-Vision-Native-Setup-2.8.13.exe)** · **[Windows installer — ARM64 (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.13/Markdown-Vision-Native-Setup-2.8.13-arm64.exe)**
+**[Windows installer — Intel/AMD x64 (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.13/Markdown-Vision-Native-Setup-2.8.13-Intel-AMD-x64.exe)** · **[Windows installer — ARM64 (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.13/Markdown-Vision-Native-Setup-2.8.13-Windows-ARM64.exe)**
 
 Portable ZIPs: [Windows x64](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.13/MarkdownVision-Native-Editor-2.8.13-win-x64.zip) · [Windows ARM64](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.13/MarkdownVision-Native-Editor-2.8.13-win-arm64.zip)
 

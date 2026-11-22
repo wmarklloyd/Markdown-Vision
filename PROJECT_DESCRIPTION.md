@@ -81,7 +81,7 @@ The default output directory is `dist\MarkdownVision-Native-Editor-2.8.13\`. Its
 
 The [native installer entry point](native-cpp/build-installer.bat) invokes the standalone build and then uses the cached NSIS compiler. The script currently locates that compiler under an Electron Builder cache path. That path is a build-time dependency only. The setup defaults to `%ProgramFiles%\MarkdownVision`, uses the previous product's uninstall identity for replacement, and registers the app and Explorer handler for the four Markdown extensions. The setup checkbox controls the registry association written for `.md`.
 
-NSIS reads the default 2.8.13 build directory and includes the complete web asset list. Its outputs are `dist\Markdown-Vision-Native-Setup-2.8.13.exe` and `dist\Markdown-Vision-Native-Setup-2.8.13-arm64.exe`. The executables and installers expose version 2.8.13 in Windows file properties.
+NSIS reads the architecture-specific 2.8.13 build directories and includes the complete web asset list. Its outputs are `dist\Markdown-Vision-Native-Setup-2.8.13-Intel-AMD-x64.exe` and `dist\Markdown-Vision-Native-Setup-2.8.13-Windows-ARM64.exe`. The executables and installers expose version 2.8.13 in Windows file properties.
 
 ## Repository and integration status
 

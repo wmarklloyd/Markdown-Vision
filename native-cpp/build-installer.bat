@@ -34,7 +34,7 @@ popd
 if not "%RESULT%"=="0" exit /b %RESULT%
 
 if /I "%ARCH%"=="arm64" (
-  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.13-arm64.exe
+  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.13-Windows-ARM64.exe
 ) else (
-  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.13.exe
+  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.13-Intel-AMD-x64.exe
 )
