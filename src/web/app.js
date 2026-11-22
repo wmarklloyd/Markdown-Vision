@@ -1194,7 +1194,7 @@ async function checkForUpdates() {
       const version = latest.join('.');
       const architecture = await window.desktop.updateArchitecture();
       if (!['x64', 'arm64'].includes(architecture)) throw new Error('Unsupported architecture');
-      const suffix = architecture === 'arm64' ? '-arm64' : '';
+      const suffix = architecture === 'arm64' ? '-Windows-ARM64' : '-Intel-AMD-x64';
       const asset = release.assets?.find((item) => item.name === `Markdown-Vision-Native-Setup-${version}${suffix}.exe`);
       const digest = /^sha256:([0-9a-f]{64})$/.exec(asset?.digest || '');
       if (!digest) throw new Error('Installer verification is unavailable');

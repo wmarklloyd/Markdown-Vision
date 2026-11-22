@@ -4,7 +4,7 @@
 
 Markdown Vision is a reading-first Windows desktop application for Markdown and plain-text documents. It combines a formatted reader, configurable typography, document search, and an in-memory Markdown editor. The primary application is the x64 Win32 C++ build in `native-cpp/`. It uses Microsoft Edge WebView2 to display the bundled interface and needs no Electron, Node.js, or .NET runtime.
 
-The current version is **2.8.14**. Visual view supports direct edits to mapped formatting, code spans, and link labels in table cells, including supported tables inside lists and quotes. Empty positions in short rows can be filled through the Visual cell editor. Version 2.8.3 expanded direct editing in references, quotations, and HTML containers.
+The current version is **2.8.15**. Visual view supports direct edits to mapped formatting, code spans, and link labels in table cells, including supported tables inside lists and quotes. Empty positions in short rows can be filled through the Visual cell editor. Version 2.8.3 expanded direct editing in references, quotations, and HTML containers.
 
 | Area | Current state |
 | --- | --- |
@@ -77,11 +77,11 @@ The primary build script targets x64, uses the configured Visual Studio Communit
 .\native-cpp\build-installer.bat
 ```
 
-The default output directory is `dist\MarkdownVision-Native-Editor-2.8.14\`. Its archive is `dist\MarkdownVision-Native-Editor-2.8.14-win-x64.zip`; an ARM64 build produces its own ZIP. Build output folders contain installer assets, while portable ZIPs contain only `Markdown-Vision.exe`. The executable embeds its HTML, CSS, and JavaScript assets and prepares them under `%LOCALAPPDATA%\Markdown Vision Native\web` when no adjacent `web\` directory exists. Both architectures require the target machine's Microsoft Edge WebView2 Runtime.
+The default output directory is `dist\MarkdownVision-Native-Editor-2.8.15\`. Its archive is `dist\MarkdownVision-Native-Editor-2.8.15-win-x64.zip`; an ARM64 build produces its own ZIP. Build output folders contain installer assets, while portable ZIPs contain only `Markdown-Vision.exe`. The executable embeds its HTML, CSS, and JavaScript assets and prepares them under `%LOCALAPPDATA%\Markdown Vision Native\web` when no adjacent `web\` directory exists. Both architectures require the target machine's Microsoft Edge WebView2 Runtime.
 
 The [native installer entry point](../../native-cpp/build-installer.bat) invokes the standalone build and then uses the cached NSIS compiler. The script currently locates that compiler under an Electron Builder cache path. That path is a build-time dependency only. The setup defaults to `%ProgramFiles%\MarkdownVision`, uses the previous product's uninstall identity for replacement, and registers the app and Explorer handler for the four Markdown extensions. The setup checkbox controls the registry association written for `.md`.
 
-NSIS reads the architecture-specific 2.8.14 build directories and includes the complete web asset list. Its outputs are `dist\Markdown-Vision-Native-Setup-2.8.14-Intel-AMD-x64.exe` and `dist\Markdown-Vision-Native-Setup-2.8.14-Windows-ARM64.exe`. The executables and installers expose version 2.8.14 in Windows file properties.
+NSIS reads the architecture-specific 2.8.15 build directories and includes the complete web asset list. Its outputs are `dist\Markdown-Vision-Native-Setup-2.8.15-Intel-AMD-x64.exe` and `dist\Markdown-Vision-Native-Setup-2.8.15-Windows-ARM64.exe`. The executables and installers expose version 2.8.15 in Windows file properties.
 
 ## Repository and integration status
 

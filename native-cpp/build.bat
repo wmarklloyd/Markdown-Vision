@@ -5,8 +5,8 @@ set "ROOT=%~dp0.."
 set "ARCH=%~2"
 if "%ARCH%"=="" set "ARCH=x64"
 if /I not "%ARCH%"=="x64" if /I not "%ARCH%"=="arm64" exit /b 1
-set "OUT_NAME=MarkdownVision-Native-Editor-2.8.14"
-if /I "%ARCH%"=="arm64" set "OUT_NAME=MarkdownVision-Native-Editor-2.8.14-arm64"
+set "OUT_NAME=MarkdownVision-Native-Editor-2.8.15"
+if /I "%ARCH%"=="arm64" set "OUT_NAME=MarkdownVision-Native-Editor-2.8.15-arm64"
 if not "%~1"=="" set "OUT_NAME=%~1"
 set "OUT=%ROOT%\dist\%OUT_NAME%"
 set "WV2=%USERPROFILE%\.nuget\packages\microsoft.web.webview2\1.0.3537.50\build\native"
@@ -56,7 +56,7 @@ copy /y "%ROOT%\src\web\vendor\*" "%OUT%\web\vendor\" >nul
 if errorlevel 1 exit /b %errorlevel%
 
 set "ARCHIVE=%ROOT%\dist\%OUT_NAME%-win-%ARCH%.zip"
-if /I "%ARCH%"=="arm64" set "ARCHIVE=%ROOT%\dist\MarkdownVision-Native-Editor-2.8.14-win-arm64.zip"
+if /I "%ARCH%"=="arm64" set "ARCHIVE=%ROOT%\dist\MarkdownVision-Native-Editor-2.8.15-win-arm64.zip"
 if exist "%ARCHIVE%" del "%ARCHIVE%"
 powershell.exe -NoProfile -NonInteractive -Command ^
   "Compress-Archive -Path '%OUT%\Markdown-Vision.exe' -DestinationPath '%ARCHIVE%' -CompressionLevel Optimal"

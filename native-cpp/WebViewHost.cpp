@@ -514,7 +514,7 @@ void DownloadUpdate(std::wstring id, std::wstring version, std::wstring digest, 
     if (GetTempPathW(MAX_PATH, directory) && GetTempFileNameW(directory, L"mdv", 0, temporary)) {
         result->path = std::wstring(temporary) + L".exe";
         DeleteFileW(temporary);
-        const std::wstring suffix = architecture == L"arm64" ? L"-arm64" : L"";
+        const std::wstring suffix = architecture == L"arm64" ? L"-Windows-ARM64" : L"-Intel-AMD-x64";
         const std::wstring url = L"https://github.com/wmarklloyd/Markdown-Vision/releases/download/v"
             + version + L"/Markdown-Vision-Native-Setup-" + version + suffix + L".exe";
         result->verified = SUCCEEDED(URLDownloadToFileW(nullptr, url.c_str(), result->path.c_str(), 0, nullptr))
