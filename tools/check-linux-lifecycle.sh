@@ -97,13 +97,19 @@ xdotool type --clearmodifiers 'Linux'
 attempt=0
 while [ "$attempt" -lt 20 ]; do
   import -window root "$evidence/linux-search.png"
-  convert "$evidence/linux-search.png" -crop 110x32+920+77 +repage -resize 500% "$evidence/search-count.png"
-  tesseract "$evidence/search-count.png" stdout --psm 7 -c tessedit_char_whitelist=0123456789of 2>/dev/null > "$evidence/search-ocr.txt"
+  screen_width=$(identify -format '%w' "$evidence/linux-search.png")
+  convert "$evidence/linux-search.png" -crop "${screen_width}x220+0+0" +repage -colorspace Gray -resize 200% "$evidence/search-count.png"
+  tesseract "$evidence/search-count.png" stdout --psm 11 -c tessedit_char_whitelist=0123456789of 2>/dev/null > "$evidence/search-ocr.txt"
   if tr -d ' \r\n' < "$evidence/search-ocr.txt" | grep -q '1of2'; then break; fi
   attempt=$((attempt + 1))
   sleep 0.5
 done
-tr -d ' \r\n' < "$evidence/search-ocr.txt" | grep -q '1of2'
+if ! tr -d ' \r\n' < "$evidence/search-ocr.txt" | grep -q '1of2'; then
+  echo 'Search result counter did not OCR as "1 of 2"; final OCR output:' >&2
+  cat "$evidence/search-ocr.txt" >&2
+  echo "Display geometry: $(xdotool getdisplaygeometry | tr '\n' ' ')" >&2
+  exit 1
+fi
 xdotool key Escape
 xdotool mousemove 330 35 click 1
 sleep 1
