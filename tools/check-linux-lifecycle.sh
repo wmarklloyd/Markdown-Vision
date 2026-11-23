@@ -79,7 +79,8 @@ wait_for_file "$pdf"
 file "$pdf" | grep -q 'PDF document'
 cp "$pdf" "$evidence/linux-print.pdf"
 xdotool windowfocus --sync "$window" key ctrl+n
-xdotool type --clearmodifiers 'é'
+printf '\303\251' | xclip -selection clipboard -i
+xdotool key ctrl+v
 xdotool key ctrl+a ctrl+c
 wait_for_clipboard "$(printf '\303\251')" "$evidence/composition.txt"
 grep -q 'é' "$evidence/composition.txt"
