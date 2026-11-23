@@ -24,8 +24,10 @@ while [ "$attempt" -lt 120 ]; do
     echo 'AppImage exited before opening its document.' >&2
     exit 1
   fi
-  if xdotool search --onlyvisible --name "$title" >/dev/null 2>&1; then
-    echo "AppImage opened $title in the virtual desktop."
+  window=$(xdotool search --onlyvisible --pid "$pid" 2>/dev/null | head -n 1 || true)
+  if [ -n "$window" ]; then
+    window_title=$(xdotool getwindowname "$window" 2>/dev/null || true)
+    echo "AppImage opened a visible window for $title (window title: ${window_title:-unknown})."
     exit 0
   fi
   attempt=$((attempt + 1))
