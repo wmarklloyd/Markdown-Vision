@@ -8,6 +8,17 @@ A native Windows Markdown reader and editor with Intel/AMD x64 and ARM64 builds.
 
 Portable ZIPs: [Windows x64](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.15/MarkdownVision-Native-Editor-2.8.15-win-x64.zip) · [Windows ARM64](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.15/MarkdownVision-Native-Editor-2.8.15-win-arm64.zip)
 
+## Linux builds (v2.8.15)
+
+These Linux packages passed build and desktop validation. Download the package for your distribution and processor:
+
+- Ubuntu/Debian x86_64: [DEB package and AppImage](https://github.com/wmarklloyd/Markdown-Vision/actions/runs/45100946243)
+- Ubuntu/Debian ARM64: [DEB package](https://github.com/wmarklloyd/Markdown-Vision/actions/runs/45100946243)
+- Fedora x86_64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/actions/runs/45100946151)
+- Fedora ARM64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/actions/runs/45100946151)
+
+Open the workflow run and download the matching architecture artifact. GitHub Actions artifacts are temporary and expire after the repository's artifact retention period.
+
 ![Markdown Vision showing its own README five levels deep](docs/markdown-vision-recursive.png)
 
 Run setup to install `Markdown-Vision.exe`, add Markdown file associations, and register the Explorer Preview Pane handler. The standalone ZIP build contains a single `Markdown-Vision.exe`; extract it and run it directly. When no adjacent `web` folder is present, the app prepares its embedded web assets in your local app data folder. You can pass a Markdown file path as a command-line argument.
