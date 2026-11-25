@@ -4,20 +4,22 @@ A native Windows Markdown reader and editor with Intel/AMD x64 and ARM64 builds.
 
 ## Download for Windows
 
+**Current Windows version: v2.8.16**
+
 **[Windows installer — Intel/AMD x64 (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.16/Markdown-Vision-Native-Setup-2.8.16-Intel-AMD-x64.exe)** · **[Windows installer — ARM64 (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.16/Markdown-Vision-Native-Setup-2.8.16-Windows-ARM64.exe)**
 
 Portable ZIPs: [Windows x64](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.16/MarkdownVision-Native-Editor-2.8.16-win-x64.zip) · [Windows ARM64](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.16/MarkdownVision-Native-Editor-2.8.16-win-arm64.zip)
 
-## Linux builds (v2.8.15)
+## Linux downloads (v2.8.15)
 
-These Linux packages passed build and desktop validation. Download the package for your distribution and processor:
+These Linux packages passed build and desktop validation. Download a package for your distribution and processor:
 
-- Ubuntu/Debian x86_64: [DEB package and AppImage](https://github.com/wmarklloyd/Markdown-Vision/actions/runs/45100946243)
-- Ubuntu/Debian ARM64: [DEB package](https://github.com/wmarklloyd/Markdown-Vision/actions/runs/45100946243)
-- Fedora x86_64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/actions/runs/45100946151)
-- Fedora ARM64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/actions/runs/45100946151)
+- Ubuntu/Debian x86_64: [DEB package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.15/Markdown-Vision-2.8.15-ubuntu-x86_64.deb) · [AppImage](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.15/Markdown-Vision-2.8.15-ubuntu-x86_64.AppImage)
+- Ubuntu/Debian ARM64: [DEB package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.15/Markdown-Vision-2.8.15-ubuntu-aarch64.deb)
+- Fedora x86_64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.15/Markdown-Vision-2.8.15-fedora-x86_64.rpm)
+- Fedora ARM64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.15/Markdown-Vision-2.8.15-fedora-aarch64.rpm)
 
-Open the workflow run and download the matching architecture artifact. GitHub Actions artifacts are temporary and expire after the repository's artifact retention period.
+The links download the packages directly from the GitHub release. Ubuntu x86_64 users can install the DEB with `sudo apt install ./Markdown-Vision-2.8.15-ubuntu-x86_64.deb` or run the AppImage.
 
 ![Markdown Vision showing its own README five levels deep](docs/markdown-vision-recursive.png)
 
