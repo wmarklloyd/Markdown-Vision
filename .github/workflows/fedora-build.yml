@@ -2,6 +2,11 @@ name: Fedora package validation
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub release tag to attach these packages to
+        required: false
+        type: string
   pull_request:
     paths:
       - '.github/workflows/fedora-build.yml'
@@ -22,7 +27,7 @@ on:
       - 'v*'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   fedora:
@@ -43,7 +48,7 @@ jobs:
     steps:
       - name: Install Fedora build and desktop test dependencies
         run: |
-          dnf install -y git webkit2gtk4.1-devel openssl-devel curl wget file libappindicator-gtk3-devel librsvg2-devel libxdo-devel gcc gcc-c++ make pkgconf-pkg-config patchelf rpm-build zenity xdg-utils xorg-x11-server-Xvfb xorg-x11-xauth dbus-daemon xdotool xclip tesseract ImageMagick python3-xlib shadow-utils
+          dnf install -y git gh webkit2gtk4.1-devel openssl-devel curl wget file libappindicator-gtk3-devel librsvg2-devel libxdo-devel gcc gcc-c++ make pkgconf-pkg-config patchelf rpm-build zenity xdg-utils xorg-x11-server-Xvfb xorg-x11-xauth dbus-daemon xdotool xclip tesseract ImageMagick python3-xlib shadow-utils
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -134,3 +139,27 @@ jobs:
             native-tauri/target/release/bundle/rpm/*.rpm
             .tmp/fedora-linux-evidence/
           if-no-files-found: warn
+      - name: Attach Fedora RPM to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != '' || github.ref == 'refs/heads/codex/linux-matrix-build'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINUX_ARCH: ${{ matrix.architecture }}
+        run: |
+          set -eu
+          if [ "$GITHUB_REF" = "refs/tags/${GITHUB_REF_NAME}" ]; then
+            release_tag="$GITHUB_REF_NAME"
+          elif [ -n "${{ inputs.release_tag }}" ]; then
+            release_tag="${{ inputs.release_tag }}"
+          else
+            version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' native-tauri/Cargo.toml | head -n 1)
+            release_tag="v$version"
+            if ! gh release view "$release_tag" >/dev/null 2>&1; then
+              echo "No GitHub Release exists for $release_tag; retaining the package as a workflow artifact."
+              exit 0
+            fi
+          fi
+          version=${release_tag#v}
+          rpm_package=$(find native-tauri/target/release/bundle/rpm -maxdepth 1 -name '*.rpm' -print -quit)
+          asset="$RUNNER_TEMP/Markdown-Vision-${version}-fedora-${LINUX_ARCH}.rpm"
+          cp "$rpm_package" "$asset"
+          gh release upload "$release_tag" "$asset" --clobber

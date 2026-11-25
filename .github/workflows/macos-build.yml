@@ -1,0 +1,69 @@
+name: macOS universal build
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub release tag to attach the DMG to
+        required: false
+        type: string
+  push:
+    branches:
+      - codex/linux-matrix-build
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - name: Verify release version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          test "${GITHUB_REF_NAME#v}" = "$(node -p "require('./native-tauri/tauri.conf.json').version")"
+      - name: Install Tauri CLI
+        run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.6
+      - name: Build unsigned universal DMG
+        working-directory: native-tauri
+        run: '"$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" build --target universal-apple-darwin --bundles dmg -- --locked'
+      - name: Retain unsigned macOS DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: markdown-vision-macos-universal-${{ github.run_id }}
+          path: native-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+      - name: Attach DMG to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != '' || github.ref == 'refs/heads/codex/linux-matrix-build'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            release_tag="$GITHUB_REF_NAME"
+          elif [ -n "${{ inputs.release_tag }}" ]; then
+            release_tag="${{ inputs.release_tag }}"
+          else
+            version=$(node -p "require('./native-tauri/tauri.conf.json').version")
+            release_tag="v$version"
+            if ! gh release view "$release_tag" >/dev/null 2>&1; then
+              echo "No GitHub Release exists for $release_tag; retaining the DMG as a workflow artifact."
+              exit 0
+            fi
+          fi
+          version=${release_tag#v}
+          dmg=$(find native-tauri/target/universal-apple-darwin/release/bundle/dmg -maxdepth 1 -name '*.dmg' -print -quit)
+          test -n "$dmg"
+          asset="$RUNNER_TEMP/Markdown-Vision-${version}-macos-universal.dmg"
+          cp "$dmg" "$asset"
+          gh release upload "$release_tag" "$asset" --clobber

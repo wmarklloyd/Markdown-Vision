@@ -50,7 +50,15 @@ const legacyFonts = {
   mono: 'Consolas',
   humanist: 'Segoe UI'
 };
-const defaults = { theme: 'dark', font: 'Georgia', monoFont: 'Consolas', size: '18', line: '1.75', width: '720' };
+const usesSystemFontDefaults = /Mac|Linux/i.test(`${navigator.platform} ${navigator.userAgent}`);
+const defaults = {
+  theme: 'dark',
+  font: usesSystemFontDefaults ? 'system-ui' : 'Georgia',
+  monoFont: usesSystemFontDefaults ? 'monospace' : 'Consolas',
+  size: '18',
+  line: '1.75',
+  width: '720'
+};
 const preferenceStorageKey = 'markdown-vision-preferences';
 const fontCacheStorageKey = 'markdown-vision-font-cache';
 const fontCacheTtlMs = 7 * 24 * 60 * 60 * 1000;
@@ -131,9 +139,13 @@ function savePreferences() {
 function applyFontStyle(preference, fontValue = preferences[preference]) {
   const safeFont = String(fontValue || defaults[preference]).replace(/["'\\]/g, '');
   if (preference === 'font') {
-    root.style.setProperty('--reader-font', `"${safeFont}", serif`);
+    const fontStack = safeFont === 'system-ui' ? 'system-ui, sans-serif' : `"${safeFont}", serif`;
+    root.style.setProperty('--reader-font', fontStack);
   } else {
-    root.style.setProperty('--reader-mono-font', `"${safeFont}", ui-monospace, SFMono-Regular, Consolas, monospace`);
+    const fontStack = safeFont === 'monospace'
+      ? 'monospace'
+      : `"${safeFont}", ui-monospace, SFMono-Regular, Consolas, monospace`;
+    root.style.setProperty('--reader-mono-font', fontStack);
   }
 }
 
@@ -179,16 +191,18 @@ function normalizeFontName(value) {
   return String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 }
 
-function getFontSuggestions(query) {
+function getFontSuggestions(picker, query) {
   const normalizedQuery = normalizeFontName(query);
-  if (!installedFonts.length) return [];
-  if (!normalizedQuery) return installedFonts.slice(0, 200);
+  const expectedWidthKind = picker.key === 'mono' ? 'Fixed-width' : 'Variable-width';
+  const availableFonts = installedFonts.filter((font) => getFontWidthKind(font) === expectedWidthKind);
+  if (!availableFonts.length) return [];
+  if (!normalizedQuery) return availableFonts.slice(0, 200);
 
   const startsWithMatches = [];
   const wordMatches = [];
   const containsMatches = [];
 
-  for (const font of installedFonts) {
+  for (const font of availableFonts) {
     const normalizedFont = normalizeFontName(font);
     if (normalizedFont.startsWith(normalizedQuery)) {
       startsWithMatches.push(font);
@@ -213,9 +227,9 @@ function getFontWidthKind(font) {
   let kind = 'Variable-width';
   if (fontMeasureContext) {
     fontMeasureContext.font = `16px "${String(font).replace(/["'\\]/g, '')}"`;
-    const narrowWidth = fontMeasureContext.measureText('iiiiiiii').width;
-    const wideWidth = fontMeasureContext.measureText('WWWWWWWW').width;
-    if (Math.abs(narrowWidth - wideWidth) < 0.5) kind = 'Fixed-width';
+    const probe = ' iIl1W@#0oO.,:;';
+    const widths = Array.from(probe, (character) => fontMeasureContext.measureText(character).width);
+    if (Math.max(...widths) - Math.min(...widths) < 0.5) kind = 'Fixed-width';
   }
   fontWidthKinds.set(font, kind);
   return kind;
@@ -265,10 +279,7 @@ function renderFontSuggestions(picker, items) {
     option.dataset.font = font;
     const name = document.createElement('span');
     name.textContent = font;
-    const kind = document.createElement('small');
-    kind.className = 'font-kind';
-    kind.textContent = getFontWidthKind(font);
-    option.append(name, kind);
+    option.append(name);
     return option;
   }));
 
@@ -278,17 +289,20 @@ function renderFontSuggestions(picker, items) {
 }
 
 function updateFontSuggestions(picker, query = picker.input.value) {
-  const suggestions = getFontSuggestions(query);
+  const suggestions = getFontSuggestions(picker, query);
   renderFontSuggestions(picker, suggestions);
   if (!installedFonts.length) {
     picker.status.textContent = 'Loading installed fonts...';
     return;
   }
   if (!normalizeFontName(query)) {
-    picker.status.textContent = `${installedFonts.length.toLocaleString()} installed fonts available.`;
+    const fontType = picker.key === 'mono' ? 'fixed-width' : 'variable-width';
+    picker.status.textContent = `${suggestions.length.toLocaleString()} ${fontType} fonts available.`;
     return;
   }
-  picker.status.textContent = `${suggestions.length.toLocaleString()} matches for "${query}".`;
+  picker.status.textContent = suggestions.length
+    ? `${suggestions.length.toLocaleString()} matches for "${query}".`
+    : `No ${picker.key === 'mono' ? 'fixed-width' : 'variable-width'} fonts match "${query}".`;
 }
 
 function updateAllFontSuggestions() {
@@ -1180,26 +1194,76 @@ async function checkForUpdates() {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {
-    const response = await fetch('https://api.github.com/repos/wmarklloyd/Markdown-Vision/releases/latest', {
+    const isWindowsUpdater = Boolean(window.desktop?.installUpdate);
+    const response = await fetch(isWindowsUpdater
+      ? 'https://api.github.com/repos/wmarklloyd/Markdown-Vision/releases/latest'
+      : 'https://api.github.com/repos/wmarklloyd/Markdown-Vision/releases?per_page=100', {
       signal: controller.signal, cache: 'no-store', headers: { Accept: 'application/vnd.github+json' }
     });
     if (!response.ok) throw new Error('Release check failed');
-    const release = await response.json();
-    const latest = versionParts(release.tag_name || '');
-    if (!installed || !latest) throw new Error('Unrecognized version');
-    latestLabel.textContent = `Latest version: ${latest.join('.')}`;
-    const difference = latest.findIndex((part, index) => part !== installed[index]);
-    updateLink.hidden = difference < 0 || latest[difference] < installed[difference];
-    if (!updateLink.hidden && window.desktop?.installUpdate) {
-      const version = latest.join('.');
-      const architecture = await window.desktop.updateArchitecture();
-      if (!['x64', 'arm64'].includes(architecture)) throw new Error('Unsupported architecture');
-      const suffix = architecture === 'arm64' ? '-Windows-ARM64' : '-Intel-AMD-x64';
-      const asset = release.assets?.find((item) => item.name === `Markdown-Vision-Native-Setup-${version}${suffix}.exe`);
-      const digest = /^sha256:([0-9a-f]{64})$/.exec(asset?.digest || '');
-      if (!digest) throw new Error('Installer verification is unavailable');
-      availableUpdate = { version, digest: digest[1] };
+    const releases = isWindowsUpdater ? [await response.json()] : await response.json();
+    if (!installed || !Array.isArray(releases)) throw new Error('Unrecognized release list');
+
+    if (isWindowsUpdater) {
+      const release = releases[0];
+      const latest = versionParts(release?.tag_name || '');
+      if (!latest) throw new Error('Unrecognized version');
+      latestLabel.textContent = `Latest version: ${latest.join('.')}`;
+      const difference = latest.findIndex((part, index) => part !== installed[index]);
+      updateLink.hidden = difference < 0 || latest[difference] < installed[difference];
+      if (!updateLink.hidden) {
+        const version = latest.join('.');
+        const architecture = await window.desktop.updateArchitecture();
+        if (!['x64', 'arm64'].includes(architecture)) throw new Error('Unsupported architecture');
+        const suffix = architecture === 'arm64' ? '-Windows-ARM64' : '-Intel-AMD-x64';
+        const asset = release.assets?.find((item) => item.name === `Markdown-Vision-Native-Setup-${version}${suffix}.exe`);
+        const digest = /^sha256:([0-9a-f]{64})$/.exec(asset?.digest || '');
+        if (!digest) throw new Error('Installer verification is unavailable');
+        availableUpdate = { version, digest: digest[1] };
+      }
+      return;
     }
+
+    const platform = await window.desktop?.getPlatformInfo?.();
+    if (!['linux', 'macos'].includes(platform?.platform)) throw new Error('Unsupported platform');
+    const architecture = platform.architecture === 'x86_64' ? 'x86_64'
+      : platform.architecture === 'aarch64' ? 'aarch64' : null;
+    if (!architecture) throw new Error('Unsupported architecture');
+    const isFedora = ['fedora', 'rhel', 'centos', 'rocky', 'almalinux'].includes(platform.distribution);
+    const candidates = releases.map((release) => ({
+      release,
+      version: versionParts(release.tag_name || ''),
+      asset: platform.platform === 'macos'
+        ? release.assets?.find((item) => /\.dmg$/i.test(item.name))
+        : release.assets?.find((item) => {
+          const name = item.name.toLowerCase();
+          const matchesArch = name.includes(`-${architecture}.`);
+          const matchesFormat = isFedora ? name.endsWith('.rpm')
+            : name.endsWith('.deb') || (architecture === 'x86_64' && name.endsWith('.appimage'));
+          const matchesDistro = isFedora ? name.includes('fedora') || !name.includes('ubuntu')
+            : !name.includes('fedora');
+          return matchesArch && matchesFormat && matchesDistro;
+        }),
+    })).filter(({ version, asset, release }) => {
+      if (!version || !asset || release.draft || release.prerelease) return false;
+      const difference = version.findIndex((part, index) => part !== installed[index]);
+      return difference >= 0 && version[difference] > installed[difference];
+    }).sort((a, b) => {
+      for (let i = 0; i < 3; i += 1) {
+        if (a.version[i] !== b.version[i]) return b.version[i] - a.version[i];
+      }
+      return 0;
+    });
+    const candidate = candidates[0];
+    if (!candidate) {
+      latestLabel.textContent = `Latest compatible version: ${installed.join('.')}`;
+      updateLink.hidden = true;
+      return;
+    }
+    latestLabel.textContent = `Latest compatible version: ${candidate.version.join('.')}`;
+    updateLink.href = candidate.asset.browser_download_url;
+    updateLink.textContent = platform.platform === 'macos' ? 'Download macOS update' : 'Download Linux update';
+    updateLink.hidden = false;
   } catch {
     latestLabel.textContent = 'Unable to check for updates. Check your internet connection and try again.';
     updateLink.hidden = true;

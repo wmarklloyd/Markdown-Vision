@@ -120,7 +120,7 @@ fn main() {
                 None => tauri::http::Response::builder().status(404).body(Vec::new()).unwrap(),
             }
         })
-        .invoke_handler(tauri::generate_handler![document::initial_document, document::open_document, document::save_document, document::has_pending_document, document::pending_document, preferences::get_preferences, preferences::save_preferences, confirm_discard, show_open_error, print_document, close_window, quit_application])
+        .invoke_handler(tauri::generate_handler![platform_info, document::initial_document, document::open_document, document::save_document, document::has_pending_document, document::pending_document, preferences::get_preferences, preferences::save_preferences, confirm_discard, show_open_error, print_document, close_window, quit_application])
         .build(tauri::generate_context!())
         .expect("failed to build Markdown Vision")
         .run(|_app, _event| {
@@ -139,6 +139,31 @@ fn main() {
                 }
             }
         });
+}
+
+#[tauri::command]
+fn platform_info() -> serde_json::Value {
+    #[cfg(target_os = "macos")]
+    let platform = "macos";
+    #[cfg(target_os = "linux")]
+    let platform = "linux";
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    let platform = "unknown";
+
+    #[cfg(target_os = "linux")]
+    let distribution = std::fs::read_to_string("/etc/os-release")
+        .ok()
+        .and_then(|contents| contents.lines().find_map(|line| line.strip_prefix("ID=")))
+        .map(|id| id.trim_matches('"').to_ascii_lowercase())
+        .unwrap_or_default();
+    #[cfg(not(target_os = "linux"))]
+    let distribution = String::new();
+
+    serde_json::json!({
+        "platform": platform,
+        "architecture": std::env::consts::ARCH,
+        "distribution": distribution,
+    })
 }
 
 #[tauri::command]

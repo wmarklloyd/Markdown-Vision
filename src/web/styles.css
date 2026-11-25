@@ -335,7 +335,6 @@ body.is-editing .search-panel { width: min(430px, calc(100vw - 24px)); }
   cursor: pointer;
   text-align: left;
 }
-.font-kind { flex: none; color: var(--muted); font-size: 10px; white-space: nowrap; }
 .font-suggestion:hover,
 .font-suggestion[aria-selected="true"] {
   background: var(--code-bg);

@@ -2,6 +2,11 @@ name: Ubuntu package validation
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub release tag to attach these packages to
+        required: false
+        type: string
   pull_request:
     paths:
       - '.github/workflows/linux-build.yml'
@@ -24,7 +29,7 @@ on:
       - 'v*'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   ubuntu:
@@ -155,3 +160,32 @@ jobs:
             native-tauri/target/release/bundle/appimage/*.AppImage
             ${{ runner.temp }}/linux-evidence/
           if-no-files-found: warn
+      - name: Attach Ubuntu packages to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != '' || github.ref == 'refs/heads/codex/linux-matrix-build'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINUX_ARCH: ${{ matrix.architecture }}
+        run: |
+          set -eu
+          if [ "$GITHUB_REF" = "refs/tags/${GITHUB_REF_NAME}" ]; then
+            release_tag="$GITHUB_REF_NAME"
+          elif [ -n "${{ inputs.release_tag }}" ]; then
+            release_tag="${{ inputs.release_tag }}"
+          else
+            version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' native-tauri/Cargo.toml | head -n 1)
+            release_tag="v$version"
+            if ! gh release view "$release_tag" >/dev/null 2>&1; then
+              echo "No GitHub Release exists for $release_tag; retaining the package as a workflow artifact."
+              exit 0
+            fi
+          fi
+          version=${release_tag#v}
+          assets="$RUNNER_TEMP/release-assets"
+          mkdir -p "$assets"
+          deb=$(find native-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)
+          cp "$deb" "$assets/Markdown-Vision-${version}-ubuntu-${LINUX_ARCH}.deb"
+          if [ "$LINUX_ARCH" = x86_64 ]; then
+            appimage=$(find native-tauri/target/release/bundle/appimage -maxdepth 1 -iname '*.appimage' -print -quit)
+            cp "$appimage" "$assets/Markdown-Vision-${version}-ubuntu-${LINUX_ARCH}.AppImage"
+          fi
+          gh release upload "$release_tag" "$assets"/* --clobber

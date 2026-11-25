@@ -11,7 +11,7 @@
       "tauriTarget": "deb",
       "outputDirectory": "native-tauri/target/release/bundle/deb",
       "fileSuffix": ".deb",
-      "githubAssetName": "Markdown-Vision-{version}-linux-{architecture}.deb",
+      "githubAssetName": "Markdown-Vision-{version}-ubuntu-{architecture}.deb",
       "state": "pilot"
     },
     {
@@ -21,7 +21,7 @@
       "tauriTarget": "rpm",
       "outputDirectory": "native-tauri/target/release/bundle/rpm",
       "fileSuffix": ".rpm",
-      "githubAssetName": "Markdown-Vision-{version}-linux-{architecture}.rpm",
+      "githubAssetName": "Markdown-Vision-{version}-fedora-{architecture}.rpm",
       "state": "build-validation"
     },
     {
@@ -31,7 +31,7 @@
       "tauriTarget": "appimage",
       "outputDirectory": "native-tauri/target/release/bundle/appimage",
       "fileSuffix": ".AppImage",
-      "githubAssetName": "Markdown-Vision-{version}-linux-{architecture}.AppImage",
+      "githubAssetName": "Markdown-Vision-{version}-ubuntu-{architecture}.AppImage",
       "state": "build-validation"
     }
   ],
