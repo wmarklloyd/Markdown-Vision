@@ -153,7 +153,12 @@ fn platform_info() -> serde_json::Value {
     #[cfg(target_os = "linux")]
     let distribution = std::fs::read_to_string("/etc/os-release")
         .ok()
-        .and_then(|contents| contents.lines().find_map(|line| line.strip_prefix("ID=")))
+        .and_then(|contents| {
+            contents
+                .lines()
+                .find_map(|line| line.strip_prefix("ID="))
+                .map(str::to_owned)
+        })
         .map(|id| id.trim_matches('"').to_ascii_lowercase())
         .unwrap_or_default();
     #[cfg(not(target_os = "linux"))]
