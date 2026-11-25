@@ -179,16 +179,18 @@ function normalizeFontName(value) {
   return String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 }
 
-function getFontSuggestions(query) {
+function getFontSuggestions(picker, query) {
   const normalizedQuery = normalizeFontName(query);
-  if (!installedFonts.length) return [];
-  if (!normalizedQuery) return installedFonts.slice(0, 200);
+  const expectedWidthKind = picker.key === 'mono' ? 'Fixed-width' : 'Variable-width';
+  const availableFonts = installedFonts.filter((font) => getFontWidthKind(font) === expectedWidthKind);
+  if (!availableFonts.length) return [];
+  if (!normalizedQuery) return availableFonts.slice(0, 200);
 
   const startsWithMatches = [];
   const wordMatches = [];
   const containsMatches = [];
 
-  for (const font of installedFonts) {
+  for (const font of availableFonts) {
     const normalizedFont = normalizeFontName(font);
     if (normalizedFont.startsWith(normalizedQuery)) {
       startsWithMatches.push(font);
@@ -213,9 +215,9 @@ function getFontWidthKind(font) {
   let kind = 'Variable-width';
   if (fontMeasureContext) {
     fontMeasureContext.font = `16px "${String(font).replace(/["'\\]/g, '')}"`;
-    const narrowWidth = fontMeasureContext.measureText('iiiiiiii').width;
-    const wideWidth = fontMeasureContext.measureText('WWWWWWWW').width;
-    if (Math.abs(narrowWidth - wideWidth) < 0.5) kind = 'Fixed-width';
+    const probe = ' iIl1W@#0oO.,:;';
+    const widths = Array.from(probe, (character) => fontMeasureContext.measureText(character).width);
+    if (Math.max(...widths) - Math.min(...widths) < 0.5) kind = 'Fixed-width';
   }
   fontWidthKinds.set(font, kind);
   return kind;
@@ -265,10 +267,7 @@ function renderFontSuggestions(picker, items) {
     option.dataset.font = font;
     const name = document.createElement('span');
     name.textContent = font;
-    const kind = document.createElement('small');
-    kind.className = 'font-kind';
-    kind.textContent = getFontWidthKind(font);
-    option.append(name, kind);
+    option.append(name);
     return option;
   }));
 
@@ -278,17 +277,20 @@ function renderFontSuggestions(picker, items) {
 }
 
 function updateFontSuggestions(picker, query = picker.input.value) {
-  const suggestions = getFontSuggestions(query);
+  const suggestions = getFontSuggestions(picker, query);
   renderFontSuggestions(picker, suggestions);
   if (!installedFonts.length) {
     picker.status.textContent = 'Loading installed fonts...';
     return;
   }
   if (!normalizeFontName(query)) {
-    picker.status.textContent = `${installedFonts.length.toLocaleString()} installed fonts available.`;
+    const fontType = picker.key === 'mono' ? 'fixed-width' : 'variable-width';
+    picker.status.textContent = `${suggestions.length.toLocaleString()} ${fontType} fonts available.`;
     return;
   }
-  picker.status.textContent = `${suggestions.length.toLocaleString()} matches for "${query}".`;
+  picker.status.textContent = suggestions.length
+    ? `${suggestions.length.toLocaleString()} matches for "${query}".`
+    : `No ${picker.key === 'mono' ? 'fixed-width' : 'variable-width'} fonts match "${query}".`;
 }
 
 function updateAllFontSuggestions() {
