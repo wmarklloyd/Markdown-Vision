@@ -34,10 +34,12 @@ const elements = {
   monoFontSuggestions: $('#monoFontSuggestions'),
   monoFontStatus: $('#monoFontStatus'),
   fontSize: $('#fontSize'),
+  autoFontSize: $('#autoFontSize'),
   fontSizeOutput: $('#fontSizeOutput'),
   lineHeight: $('#lineHeight'),
   lineHeightOutput: $('#lineHeightOutput'),
   readingWidth: $('#readingWidth'),
+  autoReadingWidth: $('#autoReadingWidth'),
   readingWidthOutput: $('#readingWidthOutput'),
   readerShell: $('#readerShell'),
   markdownOutput: $('#markdownOutput'),
@@ -54,9 +56,9 @@ const defaults = {
   theme: 'dark',
   font: 'Libertinus Serif',
   monoFont: 'Libertinus Mono',
-  size: '18',
+  size: 'auto',
   line: '1.75',
-  width: '720'
+  width: 'auto'
 };
 const preferenceStorageKey = 'markdown-vision-preferences';
 const fontCacheStorageKey = 'markdown-vision-font-cache';
@@ -149,21 +151,33 @@ function applyFontStyle(preference, fontValue = preferences[preference]) {
   }
 }
 
+function updateReadingControls() {
+  const style = getComputedStyle(elements.markdownOutput);
+  const settings = [
+    [elements.autoFontSize, elements.fontSize, elements.fontSizeOutput, preferences.size, style.fontSize],
+    [elements.autoReadingWidth, elements.readingWidth, elements.readingWidthOutput, preferences.width, style.maxWidth]
+  ];
+  for (const [automatic, slider, output, setting, effective] of settings) {
+    automatic.checked = setting === 'auto';
+    const pixels = Math.round(parseFloat(effective));
+    slider.disabled = automatic.checked;
+    slider.value = automatic.checked ? String(pixels) : setting;
+    output.value = `${pixels}px`;
+  }
+}
+
 function applyPreferences() {
   root.dataset.theme = preferences.theme;
   applyFontStyle('font');
   applyFontStyle('monoFont');
-  root.style.setProperty('--reader-size', `${preferences.size}px`);
+  root.style.setProperty('--reader-size', preferences.size === 'auto' ? '' : `${preferences.size}px`);
   root.style.setProperty('--reader-line', preferences.line);
-  root.style.setProperty('--reader-width', `${preferences.width}px`);
+  root.style.setProperty('--reader-width', preferences.width === 'auto' ? '' : `${preferences.width}px`);
   elements.fontInput.value = preferences.font;
   elements.monoFontInput.value = preferences.monoFont;
-  elements.fontSize.value = preferences.size;
   elements.lineHeight.value = preferences.line;
-  elements.readingWidth.value = preferences.width;
-  elements.fontSizeOutput.value = `${preferences.size}px`;
   elements.lineHeightOutput.value = preferences.line;
-  elements.readingWidthOutput.value = `${preferences.width}px`;
+  updateReadingControls();
   elements.themeButton.setAttribute('aria-label', `Switch to ${preferences.theme === 'light' ? 'dark' : 'light'} mode`);
   syncPictureSourcesToTheme();
   window.markdownVisionEditorSearch?.remeasure();
@@ -1191,6 +1205,17 @@ fontPickers.forEach(bindFontPicker);
 elements.fontSize.addEventListener('input', () => { preferences.size = elements.fontSize.value; applyPreferences(); savePreferences(); });
 elements.lineHeight.addEventListener('input', () => { preferences.line = elements.lineHeight.value; applyPreferences(); savePreferences(); });
 elements.readingWidth.addEventListener('input', () => { preferences.width = elements.readingWidth.value; applyPreferences(); savePreferences(); });
+for (const [automatic, slider, key] of [
+  [elements.autoFontSize, elements.fontSize, 'size'],
+  [elements.autoReadingWidth, elements.readingWidth, 'width']
+]) {
+  automatic.addEventListener('change', () => {
+    preferences[key] = automatic.checked ? 'auto' : slider.value;
+    applyPreferences();
+    savePreferences();
+  });
+}
+window.addEventListener('resize', updateReadingControls);
 
 document.addEventListener('keydown', (event) => {
   if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'p') {

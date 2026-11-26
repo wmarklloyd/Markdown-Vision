@@ -169,9 +169,9 @@ public partial class MainWindow : Window
             ["theme"] = "light",
             ["font"] = "Libertinus Serif",
             ["monoFont"] = "Libertinus Mono",
-            ["size"] = "18",
+            ["size"] = "auto",
             ["line"] = "1.75",
-            ["width"] = "720"
+            ["width"] = "auto"
         };
         if (payload.ValueKind == JsonValueKind.Object)
         {

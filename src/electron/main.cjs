@@ -10,7 +10,7 @@ const detachedLaunchFlag = '--markdown-vision-detached';
 const initialDocuments = new Map();
 const startupDocumentPath = getDocumentPath();
 const preferencesPath = path.join(app.getPath('appData'), 'Markdown Vision', 'preferences.json');
-const defaultPreferences = { theme: 'dark', font: 'Libertinus Serif', monoFont: 'Libertinus Mono', size: '18', line: '1.75', width: '720' };
+const defaultPreferences = { theme: 'dark', font: 'Libertinus Serif', monoFont: 'Libertinus Mono', size: 'auto', line: '1.75', width: 'auto' };
 
 function getDocumentPath(argv = process.argv) {
   return argv

@@ -69,6 +69,28 @@ async function run() {
     assert.equal(await calls('getInitialDocument'), 1, 'startup UI path requests its initial document');
     assert.equal(await evaluate(window, 'document.querySelector("#fontInput").value'), 'Libertinus Serif');
     assert.equal(await evaluate(window, 'document.querySelector("#monoFontInput").value'), 'Libertinus Mono');
+    const measureReadingLayout = () => evaluate(window, `(() => {
+      const page = document.querySelector('#markdownOutput');
+      const viewport = document.querySelector('#readerShell');
+      const style = getComputedStyle(page);
+      return { size: parseFloat(style.fontSize), limit: parseFloat(style.maxWidth),
+        width: page.getBoundingClientRect().width, viewport: viewport.clientWidth,
+        horizontalOverflow: viewport.scrollWidth > viewport.clientWidth };
+    })()`);
+    await evaluate(window, "window.markdownVisionReader.showDocument('A responsive reading column.', 'layout.md')");
+    assert.equal(await evaluate(window, "document.querySelector('#autoFontSize').checked && document.querySelector('#autoReadingWidth').checked"), true);
+    window.setContentSize(420, 400);
+    await waitFor(window, 'innerWidth === 420', 'compact reading window');
+    const compact = await measureReadingLayout();
+    assert.equal(compact.horizontalOverflow, false);
+    assert.ok(compact.width < compact.viewport && compact.width > compact.viewport * .85, 'compact reader uses the available width');
+    window.setContentSize(1280, 750);
+    await waitFor(window, 'innerWidth === 1280', 'wide reading window');
+    const wide = await measureReadingLayout();
+    assert.ok(wide.size > compact.size && wide.limit > compact.limit, 'automatic settings scale with window width');
+    assert.ok(wide.width < wide.viewport * .8, 'wide window keeps a readable column');
+    window.setContentSize(1000, 750);
+    await waitFor(window, 'innerWidth === 1000', 'normal reading window');
     assert.equal(await evaluate(window, `Promise.all([
       document.fonts.load('400 18px "Libertinus Serif"'),
       document.fonts.load('italic 700 18px "Libertinus Serif"'),
@@ -136,6 +158,20 @@ async function run() {
     assert.equal(await evaluate(window, 'document.querySelector("#fontInput").value'), 'Georgia');
     assert.equal(await evaluate(window, 'document.querySelector("#monoFontInput").value'), 'Consolas');
     await waitFor(window, 'window.__desktopFixture.calls.some(([name, value]) => name === "savePreferences" && value.theme === "light" && value.size === "20" && value.width === "800")', 'persisting merged preferences');
+    window.setContentSize(420, 400);
+    await waitFor(window, 'innerWidth === 420', 'compact window with manual settings');
+    const manual = await measureReadingLayout();
+    assert.equal(manual.size, 20);
+    assert.equal(manual.limit, 800);
+    assert.equal(manual.horizontalOverflow, false, 'manual page width is capped by the available space');
+    await click('#autoFontSize');
+    await click('#autoReadingWidth');
+    const reset = await measureReadingLayout();
+    assert.equal(reset.size, compact.size, 'switching back to automatic restores responsive text sizing');
+    assert.equal(reset.limit, compact.limit, 'switching back to automatic restores responsive width');
+    await waitFor(window, 'window.__desktopFixture.calls.some(([name, value]) => name === "savePreferences" && value.size === "auto" && value.width === "auto")', 'persisting automatic settings');
+    window.setContentSize(1000, 750);
+    await waitFor(window, 'innerWidth === 1000', 'restored reading window');
     await evaluate(window, 'window.__desktopFixture.setScenario("default")');
     await click('#openButton');
     await waitFor(window, 'document.title === "opened.md"', 'toolbar Open');

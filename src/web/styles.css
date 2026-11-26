@@ -19,9 +19,10 @@
   --shadow: 0 18px 50px rgba(0, 0, 0, .35);
   --reader-font: 'Libertinus Serif', serif;
   --reader-mono-font: 'Libertinus Mono', monospace;
-  --reader-size: 18px;
+  --reader-size: clamp(1rem, calc(.875rem + .4vw), 1.375rem);
   --reader-line: 1.75;
-  --reader-width: 720px;
+  --reader-width: calc(var(--reader-size) * 40);
+  --reading-gutter: clamp(12px, 3vw, 24px);
 }
 
 [data-theme="light"] {
@@ -170,7 +171,7 @@ body.is-editing .toolbar { width: 100%; }
 .editor-divider:is(:hover, :active, :focus-visible)::after { background: var(--accent); }
 .editor-panes[data-view="source"] .source-pane h2 { display: none; }
 .source-pane h2 { margin: 0; padding: 10px 18px 0; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
-.editor-pane textarea { flex: 1; width: 100%; min-height: 0; resize: none; padding: 18px; border: 0; outline: 0; color: var(--text); background: transparent; font-family: var(--reader-mono-font, Consolas, monospace); font-size: 15px; line-height: 1.65; tab-size: 2; }
+.editor-pane textarea { flex: 1; width: 100%; min-height: 0; resize: none; padding: 18px; border: 0; outline: 0; color: var(--text); background: transparent; font-family: var(--reader-mono-font, Consolas, monospace); font-size: max(.875rem, calc(var(--reader-size) * .85)); line-height: 1.65; tab-size: 2; }
 .source-position-mirror { position: fixed; top: 0; left: 0; visibility: hidden; pointer-events: none; }
 .editor-search-overlay { position: fixed; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
 .editor-search-overlay span { position: absolute; border-radius: 2px; background: #f4c04b55; }
@@ -186,7 +187,7 @@ body.is-editing .toolbar { width: 100%; }
   margin: 0;
   overflow: auto;
   padding-block: 24px;
-  padding-inline: max(24px, calc((100% - var(--reader-width)) / 2));
+  padding-inline: max(var(--reading-gutter), calc((100% - var(--reader-width)) / 2));
 }
 .editor-preview-content[contenteditable="true"] { cursor: text; }
 .editor-preview-content [data-editable-list-link] { cursor: text; border-radius: 2px; }
@@ -308,6 +309,7 @@ body.is-editing .search-panel { width: min(430px, calc(100vw - 24px)); }
 
 .settings {
   position: absolute; right: 0; top: 48px; width: 290px; padding: 22px;
+  max-height: calc(100vh - 60px); overflow-y: auto;
   background: var(--surface); border: 1px solid var(--faint); box-shadow: var(--shadow); border-radius: 12px;
 }
 .settings-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
@@ -350,6 +352,8 @@ body.is-editing .search-panel { width: min(430px, calc(100vw - 24px)); }
 }
 .font-status { margin-top: 7px; color: var(--muted); font-size: 11px; line-height: 1.4; }
 .settings input[type="range"] { width: 100%; accent-color: var(--accent); }
+.settings .automatic-setting { justify-content: flex-start; align-items: center; gap: 6px; margin: 4px 0 8px; }
+.settings .automatic-setting input { margin: 0; accent-color: var(--accent); }
 
 main { min-height: 100vh; }
 .primary-button { border: 0; border-radius: 5px; padding: 13px 19px; background: var(--accent); color: #fff; cursor: pointer; font-size: 14px; font-weight: 650; }
@@ -364,7 +368,7 @@ kbd { background: var(--surface); border: 1px solid var(--faint); border-radius:
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  padding: 24px 24px 100px;
+  padding: 24px var(--reading-gutter) 100px;
   background: var(--bg);
 }
 .document-meta { max-width: var(--reader-width); margin: 0 auto 50px; padding-bottom: 14px; border-bottom: 1px solid var(--faint); display: flex; gap: 9px; align-items: center; color: var(--muted); font-size: 12px; }
@@ -428,7 +432,7 @@ kbd { background: var(--surface); border: 1px solid var(--faint); border-radius:
   .search-box { grid-template-columns: 1fr 32px 32px 30px; }
   .search-count { grid-column: 1 / -1; grid-row: 2; }
   .settings { right: 0; top: 48px; width: min(290px, calc(100vw - 18px)); }
-  .reader-shell { padding: 18px 20px 70px; }
+  .reader-shell { padding-block: 18px 70px; }
   .document-meta { margin-bottom: 36px; }
 }
 

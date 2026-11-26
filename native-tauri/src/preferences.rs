@@ -15,9 +15,9 @@ fn validate(value: &Value) -> Result<Value, String> {
         let valid = match key {
             "theme" => matches!(text, "light" | "dark"),
             "font" | "monoFont" => text.len() <= 256 && !text.chars().any(char::is_control),
-            "size" => text.parse::<f64>().is_ok_and(|n| (14.0..=26.0).contains(&n)),
+            "size" => text == "auto" || text.parse::<f64>().is_ok_and(|n| (14.0..=26.0).contains(&n)),
             "line" => text.parse::<f64>().is_ok_and(|n| (1.35..=2.1).contains(&n)),
-            "width" => text.parse::<f64>().is_ok_and(|n| (540.0..=920.0).contains(&n)),
+            "width" => text == "auto" || text.parse::<f64>().is_ok_and(|n| (540.0..=920.0).contains(&n)),
             _ => false,
         };
         if !valid { return Err(format!("Invalid {key}")); }
