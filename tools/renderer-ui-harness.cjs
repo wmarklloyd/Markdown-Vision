@@ -119,13 +119,16 @@ async function run() {
       const before = button.getBoundingClientRect().toJSON();
       const codeTop = code.getBoundingClientRect().top;
       const overflow = pre.scrollWidth > pre.clientWidth;
+      const trackHeight = pre.offsetHeight - pre.clientHeight;
+      const clearance = pre.getBoundingClientRect().top + pre.clientHeight - code.getBoundingClientRect().bottom;
       pre.scrollLeft = pre.scrollWidth;
       const after = button.getBoundingClientRect().toJSON();
-      return { near, before, after, codeTop, overflow };
+      return { near, before, after, codeTop, overflow, trackHeight, clearance };
     })()`);
     assert.equal(copyLayout.near.overflow, false, 'nearly full code block does not scroll');
     assert.ok(copyLayout.near.code.top >= copyLayout.near.button.bottom, 'copy icon does not cover a nearly full line');
     assert.equal(copyLayout.overflow, true, 'long code block scrolls');
+    assert.ok(copyLayout.trackHeight > 0 && copyLayout.clearance > 0, 'horizontal scrollbar has a separate track below reader code');
     assert.ok(copyLayout.codeTop >= copyLayout.before.bottom, 'copy icon does not cover an overflowing line');
     assert.ok(Math.abs(copyLayout.before.right - copyLayout.after.right) < 2, 'copy icon stays at the right while scrolling');
     assert.equal(await evaluate(window, 'document.querySelectorAll("#printDocument .code-copy-button").length'), 0, 'print output has no copy controls');
@@ -198,6 +201,13 @@ async function run() {
     await click('#editorPreview pre .code-copy-button');
     await waitFor(window, 'window.__copiedCode === "visual code"', 'copying editable code');
     assert.equal(await evaluate(window, 'document.querySelector("#markdownSource").value'), '```\nvisual code\n```\n', 'copy does not modify Markdown source');
+    await editSource('~~~js\n' + 'M'.repeat(180) + '\n~~~\n');
+    await waitFor(window, 'document.querySelector("#editorPreview .visual-code-editor")?.value.length === 180', 'long editable code block');
+    assert.equal(await evaluate(window, `(() => {
+      const field = document.querySelector('#editorPreview .visual-code-editor');
+      return field.scrollWidth > field.clientWidth && field.offsetHeight > field.clientHeight
+        && field.clientHeight >= parseFloat(getComputedStyle(field).lineHeight);
+    })()`), true, 'editable code fits a full line above its horizontal scrollbar');
     await editSource('# Unsaved draft\n');
     await click('#editorSaveAs');
     await waitFor(window, 'window.__desktopFixture.calls.some(([name, id, text, saveAs]) => name === "saveMarkdownFile" && saveAs === true && text.includes("Unsaved draft"))', 'Save As toolbar');
