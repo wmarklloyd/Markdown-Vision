@@ -102,7 +102,7 @@ jobs:
           rpm_info=$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}' "$rpm_package")
           test "$rpm_info" = "markdown-vision $expected_version $RPM_ARCH"
           rpm_requires=$(rpm -qp --requires "$rpm_package")
-          for required in webkit2gtk4.1 gtk3 zenity xdg-utils; do
+          for required in webkit2gtk4.1 gtk3 zenity xdg-utils fontconfig curl polkit dnf; do
             printf '%s\n' "$rpm_requires" | grep -Fxq "$required"
           done
           rpm -qpl "$rpm_package" | grep -Eq '/usr/bin/markdown-vision$'
@@ -112,10 +112,15 @@ jobs:
           mkdir -p "$evidence"
           stat -c '%n %s bytes' "$rpm_package" | tee "$evidence/package-sizes.txt"
           sha256sum "$rpm_package" | tee "$evidence/package-sha256.txt"
-      - name: Install Fedora package and exercise desktop lifecycle
+      - name: Upgrade Fedora package and exercise desktop lifecycle
         run: |
           set -eu
           rpm_package=$(find native-tauri/target/release/bundle/rpm -maxdepth 1 -name '*.rpm' -print -quit)
+          curl --fail --location --silent --show-error \
+            "https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.22/Markdown-Vision-2.8.22-fedora-${{ matrix.architecture }}.rpm" \
+            --output /tmp/markdown-vision-previous.rpm
+          dnf install -y /tmp/markdown-vision-previous.rpm
+          test "$(rpm -q --qf '%{VERSION}' markdown-vision)" = 2.8.22
           dnf install -y "$rpm_package"
           expected_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' native-tauri/Cargo.toml | head -n 1)
           installed=$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}' markdown-vision)

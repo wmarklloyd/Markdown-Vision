@@ -1353,7 +1353,7 @@ async function checkForUpdates() {
     latestLabel.textContent = `Latest compatible version: ${candidate.version.join('.')}`;
     updateLink.href = candidate.asset.browser_download_url;
     const digest = /^sha256:([0-9a-f]{64})$/i.exec(candidate.asset.digest || '');
-    if (platform.platform === 'linux' && !isFedora && /\.deb$/i.test(candidate.asset.name)
+    if (platform.platform === 'linux' && (isFedora ? /\.rpm$/i : /\.deb$/i).test(candidate.asset.name)
         && digest && window.desktop?.installLinuxUpdate) {
       linuxUpdate = { version: candidate.version.join('.'), digest: digest[1] };
     }

@@ -13,8 +13,8 @@ exit /b %errorlevel%
 :build
 set "ARCH=%~1"
 if /I not "%ARCH%"=="x64" if /I not "%ARCH%"=="arm64" exit /b 1
-set "APP_OUT_NAME=MarkdownVision-Native-Editor-2.8.22"
-if /I "%ARCH%"=="arm64" set "APP_OUT_NAME=MarkdownVision-Native-Editor-2.8.22-arm64"
+set "APP_OUT_NAME=MarkdownVision-Native-Editor-2.8.23"
+if /I "%ARCH%"=="arm64" set "APP_OUT_NAME=MarkdownVision-Native-Editor-2.8.23-arm64"
 call "%~dp0build.bat" "%APP_OUT_NAME%" "%ARCH%"
 if errorlevel 1 exit /b %errorlevel%
 
@@ -34,7 +34,7 @@ popd
 if not "%RESULT%"=="0" exit /b %RESULT%
 
 if /I "%ARCH%"=="arm64" (
-  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.22-Windows-ARM64.exe
+  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.23-Windows-ARM64.exe
 ) else (
-  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.22-Intel-AMD-x64.exe
+  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.23-Intel-AMD-x64.exe
 )

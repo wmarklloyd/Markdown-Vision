@@ -26,7 +26,7 @@ assert.equal(tauri.identifier, 'com.markdownvision.desktop');
 assert.equal(tauri.productName, 'Markdown Vision');
 assert.ok(tauri.bundle.linux.deb.depends.includes('zenity'), 'Linux confirmation dialog dependency is missing');
 assert.ok(tauri.bundle.linux.deb.depends.includes('xdg-utils'), 'Linux default-browser integration dependency is missing');
-for (const required of ['webkit2gtk4.1', 'gtk3', 'zenity', 'xdg-utils']) {
+for (const required of ['webkit2gtk4.1', 'gtk3', 'zenity', 'xdg-utils', 'fontconfig', 'curl', 'polkit', 'dnf']) {
   assert.ok(tauri.bundle.linux.rpm.depends.includes(required), `Linux RPM runtime dependency is missing: ${required}`);
 }
 console.log(`Metadata checks passed: version ${versions[0][1]}, product identity, Markdown associations, and DEB/RPM dialog dependencies.`);
