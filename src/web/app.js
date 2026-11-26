@@ -1259,6 +1259,7 @@ void loadPreferences();
 let availableUpdate = null;
 let linuxUpdate = null;
 let linuxUpdateInProgress = false;
+let linuxUpdateInstalled = false;
 
 function versionParts(value) {
   const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(value);
@@ -1281,6 +1282,7 @@ async function checkForUpdates() {
   const latestLabel = document.getElementById('latestVersion');
   const updateLink = document.getElementById('updateLink');
   const retryButton = document.getElementById('retryUpdateCheck');
+  if (linuxUpdateInstalled) return;
   const installed = versionParts(document.getElementById('installedVersion').dataset.version);
   latestLabel.textContent = 'Latest version: checking…';
   retryButton.hidden = true;
@@ -1384,7 +1386,9 @@ document.getElementById('updateLink').addEventListener('click', async (event) =>
     try {
       await window.desktop.installLinuxUpdate(update.version, update.digest);
       linuxUpdate = null;
-      status.textContent = 'Update installed. Restart Markdown Vision to use the new version.';
+      linuxUpdateInstalled = true;
+      status.textContent = 'Update installed. Restart to use the new version.';
+      document.getElementById('restartAfterUpdate').hidden = !window.desktop?.restartAfterUpdate;
     } catch (error) {
       status.textContent = `Update failed: ${String(error)}`;
       link.hidden = false;
@@ -1406,6 +1410,24 @@ document.getElementById('updateLink').addEventListener('click', async (event) =>
   else {
     status.textContent = 'Could not download, verify, or start the installer. Please try again.';
     link.hidden = false;
+  }
+});
+
+document.getElementById('restartAfterUpdate').addEventListener('click', async (event) => {
+  if (window.markdownVisionReader.isSaving?.()) return;
+  if (window.markdownVisionReader.hasUnsavedChanges?.()) {
+    const discard = window.desktop?.confirmDiscard
+      ? await window.desktop.confirmDiscard('quit')
+      : window.confirm('Discard unsaved changes and restart?');
+    if (!discard) return;
+  }
+  const button = event.currentTarget;
+  button.disabled = true;
+  try {
+    await window.desktop.restartAfterUpdate(window.markdownVisionReader.getDocument()?.documentId || null);
+  } catch (error) {
+    document.getElementById('latestVersion').textContent = `Could not restart: ${String(error)}`;
+    button.disabled = false;
   }
 });
 

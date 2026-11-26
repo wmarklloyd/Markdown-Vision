@@ -36,11 +36,13 @@ UninstallIcon "MarkdownVision.ico"
 Page directory
 Page custom DefaultMarkdownPage DefaultMarkdownPageLeave
 Page instfiles
+Page custom FinishPage FinishPageLeave
 UninstPage uninstConfirm
 UninstPage instfiles
 
 Var DefaultMarkdownCheckbox
 Var SetAsDefaultMarkdown
+Var LaunchAfterInstallCheckbox
 
 Function .onInit
 !ifdef ARM64
@@ -141,6 +143,27 @@ Function DefaultMarkdownPageLeave
     StrCpy $SetAsDefaultMarkdown "1"
   ${Else}
     StrCpy $SetAsDefaultMarkdown "0"
+  ${EndIf}
+FunctionEnd
+
+Function FinishPage
+  nsDialogs::Create 1018
+  Pop $0
+  ${If} $0 == error
+    Abort
+  ${EndIf}
+  ${NSD_CreateLabel} 0 0 100% 28u "Markdown Vision has been installed."
+  Pop $0
+  ${NSD_CreateCheckbox} 0 32u 100% 12u "Open Markdown Vision when setup closes"
+  Pop $LaunchAfterInstallCheckbox
+  ${NSD_SetState} $LaunchAfterInstallCheckbox ${BST_CHECKED}
+  nsDialogs::Show
+FunctionEnd
+
+Function FinishPageLeave
+  ${NSD_GetState} $LaunchAfterInstallCheckbox $0
+  ${If} $0 = ${BST_CHECKED}
+    Exec '"$WINDIR\explorer.exe" "$INSTDIR\${APP_EXE}"'
   ${EndIf}
 FunctionEnd
 

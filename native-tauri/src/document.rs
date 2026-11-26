@@ -10,6 +10,11 @@ pub struct Documents {
     pending: VecDeque<PathBuf>,
 }
 
+pub fn current_path(documents: &Documents, document_id: Option<&str>) -> Option<PathBuf> {
+    documents.current.as_ref().filter(|document| Some(document.id.as_str()) == document_id)
+        .map(|document| document.path.clone())
+}
+
 struct OpenDocument {
     id: String,
     path: PathBuf,

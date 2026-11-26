@@ -59,6 +59,7 @@
     getPlatformInfo: () => invoke('platform_info'),
     listSystemFonts: () => invoke('list_system_fonts'),
     installLinuxUpdate: (version, digest) => invoke('install_linux_update', { version, digest }),
+    restartAfterUpdate: (documentId) => invoke('restart_after_update', { documentId }),
     savePreferences: (preferences) => invoke('save_preferences', { preferences }),
     printMarkdown: () => invoke('print_document'),
     confirmDiscard: (action) => invoke('confirm_discard', { action }),

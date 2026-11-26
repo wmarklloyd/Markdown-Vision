@@ -4,6 +4,23 @@ pub async fn install_linux_update(version: String, digest: String) -> Result<(),
         .await.map_err(|_| "The update process failed.".to_string())?
 }
 
+#[tauri::command]
+pub fn restart_after_update(app: tauri::AppHandle, state: tauri::State<'_, std::sync::Mutex<crate::document::Documents>>, document_id: Option<String>) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    {
+        let path = crate::document::current_path(&state.lock().map_err(|_| "Could not restore the open document.")?, document_id.as_deref());
+        let mut command = std::process::Command::new("/bin/sh");
+        command.args(["-c", "while kill -0 \"$1\" 2>/dev/null; do sleep 0.2; done; shift; exec \"$@\"", "markdown-vision-restart"])
+            .arg(std::process::id().to_string()).arg("/usr/bin/markdown-vision");
+        if let Some(path) = path { command.arg(path); }
+        command.spawn().map_err(|_| "Could not restart Markdown Vision.")?;
+        app.exit(0);
+        Ok(())
+    }
+    #[cfg(not(target_os = "linux"))]
+    { let _ = (app, state, document_id); Err("Restart is not available on this platform.".into()) }
+}
+
 #[cfg(target_os = "linux")]
 fn install(version: &str, digest: &str) -> Result<(), String> {
     use std::process::Command;

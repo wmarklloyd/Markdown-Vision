@@ -225,6 +225,18 @@ async function run() {
     await evaluate(window, `window.fetch = async () => ({ ok: true, json: async () => [{ tag_name: "v${newerVersion}", assets: [{name: 'Markdown-Vision-${newerVersion}-ubuntu-x86_64.deb', browser_download_url: 'https://example.com/update.deb'}] }] }); document.querySelector(".about-menu").open = false; document.querySelector(".about-menu").open = true`);
     await waitFor(window, `document.querySelector("#latestVersion").textContent === "Latest compatible version: ${newerVersion}"`, 'About newer-version state');
     assert.equal(await evaluate(window, 'document.querySelector("#updateLink").hidden'), false, 'manual release link appears without auto-updater capability');
+    await evaluate(window, `window.__upgradeCalls = []; window.desktop.installLinuxUpdate = async (version, digest) => window.__upgradeCalls.push(['install', version, digest]); window.desktop.restartAfterUpdate = async id => window.__upgradeCalls.push(['restart', id]); window.fetch = async () => ({ ok: true, json: async () => [{ tag_name: 'v${newerVersion}', assets: [{name: 'Markdown-Vision-${newerVersion}-ubuntu-x86_64.deb', browser_download_url: 'https://example.com/update.deb', digest: 'sha256:' + 'a'.repeat(64)}] }] }); document.querySelector('.about-menu').open = false; document.querySelector('.about-menu').open = true;`);
+    await waitFor(window, 'document.querySelector("#updateLink").textContent === "Upgrade Markdown Vision"', 'graphical upgrade button');
+    await click('#updateLink');
+    await waitFor(window, '!document.querySelector("#restartAfterUpdate").hidden', 'restart option after installation');
+    await evaluate(window, `window.__oldDirtyCheck = window.markdownVisionReader.hasUnsavedChanges; window.markdownVisionReader.hasUnsavedChanges = () => true; window.__desktopFixture.setScenario('keep-editing');`);
+    await click('#restartAfterUpdate');
+    await waitFor(window, 'window.__desktopFixture.calls.some(([name, action]) => name === "confirmDiscard" && action === "quit")', 'unsaved changes prompt before restart');
+    assert.equal(await evaluate(window, 'window.__upgradeCalls.some(([name]) => name === "restart")'), false, 'cancelled restart keeps the app open');
+    await evaluate(window, `window.markdownVisionReader.hasUnsavedChanges = () => false; void 0;`);
+    await click('#restartAfterUpdate');
+    await waitFor(window, 'window.__upgradeCalls.some(([name]) => name === "restart")', 'restart request');
+    await evaluate(window, `window.markdownVisionReader.hasUnsavedChanges = window.__oldDirtyCheck; void 0;`);
 
     await editSource('# Quit handling draft\n');
     await evaluate(window, `window.__shutdownRequests = []; window.__markdownVisionRequestClose = async (quit = false) => { const action = quit ? 'quit' : 'close'; const discard = !window.markdownVisionReader.hasUnsavedChanges() || await window.desktop.confirmDiscard(action); if (discard) window.__shutdownRequests.push(action); }; window.__desktopFixture.setScenario('keep-editing'); window.__markdownVisionDispatchMenuCommand('quit')`);
