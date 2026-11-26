@@ -127,6 +127,8 @@ mod tests {
     fn compares_rpm_versions_numerically_and_rejects_invalid_versions() {
         assert!(is_newer_version("2.8.23", "2.8.22"));
         assert!(is_newer_version("2.10.0", "2.9.99"));
+        assert!(is_newer_version("2.9.0", "2.8.99"));
+        assert!(!is_newer_version("2.9.0", "2.10.0"));
         assert!(!is_newer_version("2.8.22", "2.8.22"));
         assert!(!is_newer_version("2.8.21", "2.8.22"));
         assert!(!is_newer_version("2.8.23", "invalid"));
