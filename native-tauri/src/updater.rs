@@ -8,7 +8,9 @@ pub async fn install_linux_update(version: String, digest: String) -> Result<(),
 pub fn restart_after_update(app: tauri::AppHandle, state: tauri::State<'_, std::sync::Mutex<crate::document::Documents>>, document_id: Option<String>) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
-        let path = crate::document::current_path(&state.lock().map_err(|_| "Could not restore the open document.")?, document_id.as_deref());
+        let documents = state.lock().map_err(|_| "Could not restore the open document.")?;
+        let path = crate::document::current_path(&documents, document_id.as_deref());
+        drop(documents);
         let mut command = std::process::Command::new("/bin/sh");
         command.args(["-c", "while kill -0 \"$1\" 2>/dev/null; do sleep 0.2; done; shift; exec \"$@\"", "markdown-vision-restart"])
             .arg(std::process::id().to_string()).arg("/usr/bin/markdown-vision");
