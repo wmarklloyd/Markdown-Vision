@@ -47,7 +47,12 @@ if (!checkOnly) {
   }
 
   const indexPath = path.join(destination, 'index.html');
-  const stagedHtml = fs.readFileSync(indexPath, 'utf8');
+  const version = JSON.parse(fs.readFileSync(path.join(root, 'native-tauri', 'tauri.conf.json'), 'utf8')).version;
+  if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Invalid application version.');
+  let stagedHtml = fs.readFileSync(indexPath, 'utf8');
+  const versionElement = /(<span id="installedVersion" data-version=")[^"]+(">Version )[^<]+(<\/span>)/;
+  if (!versionElement.test(stagedHtml)) throw new Error('Could not locate installed version in index.html.');
+  stagedHtml = stagedHtml.replace(versionElement, (_, start, middle, end) => `${start}${version}${middle}${version}${end}`);
   if (!stagedHtml.includes('<script src="app.js"></script>')) {
     throw new Error('Could not locate app.js in index.html to inject the Tauri bridge.');
   }

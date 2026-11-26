@@ -75,6 +75,7 @@ jobs:
       - name: Test native services
         run: |
           node tools/stage-tauri.cjs
+          node -e 'const fs = require("fs"); const v = require("./native-tauri/tauri.conf.json").version; const html = fs.readFileSync(".tmp/tauri-frontend/index.html", "utf8"); if (!html.includes(`data-version="${v}">Version ${v}</span>`)) throw Error("Staged version mismatch");'
           cargo test --locked --manifest-path native-tauri/Cargo.toml
           node tools/test-tauri-open-queue.cjs
           node tools/check-cross-platform-metadata.cjs
