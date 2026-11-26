@@ -68,6 +68,7 @@
   let searchFields = new Map();
   let counterpartTimer = null;
   let counterpartVisualRange = null;
+  let readerPosition = null;
   const counterpartOverlay = document.createElement('div');
   counterpartOverlay.className = 'editor-search-overlay editor-counterpart-overlay';
   counterpartOverlay.setAttribute('aria-hidden', 'true');
@@ -2170,8 +2171,73 @@
     paintCounterpartField();
   }
 
+  function rememberReaderPosition(node, offset) {
+    const output = $('#markdownOutput');
+    if (active || !node || !output.contains(node)) return;
+    const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    if (element?.closest('button, input, textarea')) return;
+    let block = element;
+    while (block && block.parentElement !== output) block = block.parentElement;
+    if (!block) return;
+    try {
+      const text = block.textContent || '';
+      const within = textOffset(block, node, offset);
+      const earlier = [...output.children].slice(0, [...output.children].indexOf(block))
+        .filter((child) => child.textContent === text).length;
+      readerPosition = { text, within, earlier, nodeText: node.nodeType === Node.TEXT_NODE ? node.data : '', nodeOffset: offset };
+    } catch { /* Ignore selections that cross document boundaries. */ }
+  }
+
+  function restoreReaderPosition(position) {
+    if (!position) return;
+    const template = document.createElement('template');
+    const matches = window.markdownVisionReader.renderBlocks(source.value).map((block, index) => {
+      template.innerHTML = block.html;
+      return { ...block, index, text: template.content.textContent };
+    }).filter((block) => block.text === position.text);
+    const block = matches[position.earlier];
+    if (!block) return;
+    const visual = visualBlocks.get(String(block.index));
+    const rendered = visual?.locked ? visual.node.firstElementChild : visual?.node;
+    const code = rendered?.querySelector('.visual-code-editor');
+    if (panes.dataset.view !== 'source' && code) {
+      const at = Math.min(position.within, code.value.length);
+      code.focus({ preventScroll: true });
+      code.setSelectionRange(at, at);
+      code.scrollIntoView({ block: 'center', inline: 'nearest' });
+      return;
+    }
+    if (panes.dataset.view === 'source' || visual?.locked) {
+      let offset = -1;
+      if (position.nodeText) {
+        const beforeNode = position.text.slice(0, Math.max(0, position.within - position.nodeOffset));
+        let occurrence = beforeNode.split(position.nodeText).length - 1;
+        let search = 0;
+        do {
+          offset = block.source.indexOf(position.nodeText, search);
+          search = offset + position.nodeText.length;
+        } while (offset >= 0 && occurrence-- > 0);
+      }
+      offset = offset >= 0 ? offset + position.nodeOffset : 0;
+      if (panes.dataset.view !== 'source') selectView('source');
+      source.focus({ preventScroll: true });
+      const at = Math.min(block.end, block.start + offset);
+      source.setSelectionRange(at, at);
+      source.scrollTop = Math.max(0, (source.value.slice(0, at).split('\n').length - 3) * parseFloat(getComputedStyle(source).lineHeight));
+      updateCursor();
+      return;
+    }
+    if (!rendered) return;
+    const [node, offset] = pointAtTextOffset(rendered, position.within, true);
+    preview.focus({ preventScroll: true });
+    const selection = window.getSelection();
+    selection?.collapse(node, offset);
+    (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement)?.scrollIntoView({ block: 'center', inline: 'nearest' });
+  }
+
   function setActive(value) {
     hideRestriction();
+    const position = value && !active ? readerPosition : null;
     const newDocument = value && !window.markdownVisionReader.getDocument();
     if (newDocument) {
       window.markdownVisionReader.showDocument('', 'Untitled.md');
@@ -2190,6 +2256,7 @@
     if (value) {
       tools.scrollLeft = 0;
       selectView(newDocument ? 'visual' : panes.dataset.view);
+      if (!newDocument) restoreReaderPosition(position);
     } else if (dirty || (saved && (window.markdownVisionReader.getDocument()?.content !== source.value
         || window.markdownVisionReader.getDocument()?.documentId !== documentId))) {
       showDraftInReader();
@@ -2931,6 +2998,10 @@
     }, true);
   }
 
+  toggle.addEventListener('pointerdown', () => {
+    const selection = window.getSelection();
+    if (!active && selection?.focusNode) rememberReaderPosition(selection.focusNode, selection.focusOffset);
+  });
   toggle.addEventListener('click', () => setActive(!active));
   newFileButton.addEventListener('click', () => {
     if (saving || newFileDialog.open) return;
@@ -3003,6 +3074,10 @@
     resizeSplit(widths[event.key]);
   });
   document.addEventListener('selectionchange', () => {
+    if (!active) {
+      const selection = window.getSelection();
+      if (selection?.focusNode) rememberReaderPosition(selection.focusNode, selection.focusOffset);
+    }
     if (active && editingSurface === preview) updateTools();
     if (active) scheduleCounterpart();
   });
@@ -3218,6 +3293,7 @@
     }
   });
   document.addEventListener('markdownvision:documentchanged', (event) => {
+    if (!showingDraft) readerPosition = null;
     fileName = event.detail.name;
     if (showingDraft) return;
     documentId = event.detail.documentId || null;

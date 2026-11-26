@@ -383,9 +383,9 @@ kbd { background: var(--surface); border: 1px solid var(--faint); border-radius:
 .markdown-body pre { padding: 1.15em; background: var(--code-bg); border-radius: 7px; overflow-x: auto; line-height: 1.55; font-family: var(--reader-mono-font, ui-monospace, SFMono-Regular, Consolas, monospace); }
 .markdown-body pre code { padding: 0; background: none; }
 .markdown-body pre .code-copy-button {
-  position: sticky; top: 0; right: 0; float: right; z-index: 1;
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px; margin: -4px -4px 0 -32px; padding: 6px;
+  position: sticky; left: calc(100% - 32px); z-index: 1;
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; margin: -4px 0 8px auto; padding: 6px;
   border: 1px solid var(--faint); border-radius: 5px; background: var(--surface);
   color: var(--text); cursor: pointer;
 }

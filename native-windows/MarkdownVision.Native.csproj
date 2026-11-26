@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Markdown Vision Native</AssemblyName>
     <RootNamespace>MarkdownVision.Native</RootNamespace>
-    <Version>2.8.21</Version>
+    <Version>2.8.22</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
