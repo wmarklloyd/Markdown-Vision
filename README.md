@@ -4,28 +4,28 @@ A native Windows Markdown reader and editor with Intel/AMD x64 and ARM64 builds.
 
 ## Download for Windows
 
-**Current Windows version: v2.8.23**
+**Current Windows version: v2.8.24**
 
-**[Windows installer — Intel/AMD x64 (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.23/Markdown-Vision-Native-Setup-2.8.23-Intel-AMD-x64.exe)** · **[Windows installer — ARM64 (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.23/Markdown-Vision-Native-Setup-2.8.23-Windows-ARM64.exe)**
+**[Windows installer — Intel/AMD x64 (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.24/Markdown-Vision-Native-Setup-2.8.24-Intel-AMD-x64.exe)** · **[Windows installer — ARM64 (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.24/Markdown-Vision-Native-Setup-2.8.24-Windows-ARM64.exe)**
 
-Portable ZIPs: [Windows x64](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.23/MarkdownVision-Native-Editor-2.8.23-win-x64.zip) · [Windows ARM64](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.23/MarkdownVision-Native-Editor-2.8.23-win-arm64.zip)
+Portable ZIPs: [Windows x64](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.24/MarkdownVision-Native-Editor-2.8.24-win-x64.zip) · [Windows ARM64](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.24/MarkdownVision-Native-Editor-2.8.24-win-arm64.zip)
 
-## Linux downloads (v2.8.23)
+## Linux downloads (v2.8.24)
 
 The release workflows build and attach packages for these distributions and processors:
 
-- Ubuntu/Debian x86_64: [DEB package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.23/Markdown-Vision-2.8.23-ubuntu-x86_64.deb) · [AppImage](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.23/Markdown-Vision-2.8.23-ubuntu-x86_64.AppImage)
-- Ubuntu/Debian ARM64: [DEB package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.23/Markdown-Vision-2.8.23-ubuntu-aarch64.deb)
-- Fedora x86_64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.23/Markdown-Vision-2.8.23-fedora-x86_64.rpm)
-- Fedora ARM64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.23/Markdown-Vision-2.8.23-fedora-aarch64.rpm)
+- Ubuntu/Debian x86_64: [DEB package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.24/Markdown-Vision-2.8.24-ubuntu-x86_64.deb) · [AppImage](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.24/Markdown-Vision-2.8.24-ubuntu-x86_64.AppImage)
+- Ubuntu/Debian ARM64: [DEB package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.24/Markdown-Vision-2.8.24-ubuntu-aarch64.deb)
+- Fedora x86_64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.24/Markdown-Vision-2.8.24-fedora-x86_64.rpm)
+- Fedora ARM64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.24/Markdown-Vision-2.8.24-fedora-aarch64.rpm)
 
-The links download the packages directly from the GitHub release. Ubuntu x86_64 users can install the DEB with `sudo apt install ./Markdown-Vision-2.8.23-ubuntu-x86_64.deb` or run the AppImage.
+The links download the packages directly from the GitHub release. Ubuntu x86_64 users can install the DEB with `sudo apt install ./Markdown-Vision-2.8.24-ubuntu-x86_64.deb` or run the AppImage.
 
-## macOS download (v2.8.23)
+## macOS download (v2.8.24)
 
 Download the universal macOS disk image. This build is unsigned, so macOS may ask you to approve opening it in Privacy & Security settings:
 
-- [macOS universal DMG](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.23/Markdown-Vision-2.8.23-macos-universal.dmg)
+- [macOS universal DMG](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.24/Markdown-Vision-2.8.24-macos-universal.dmg)
 
 ![Markdown Vision showing its own README five levels deep](docs/markdown-vision-recursive.png)
 
