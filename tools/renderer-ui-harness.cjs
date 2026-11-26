@@ -12,6 +12,10 @@ const newerVersion = installedVersion.replace(/(\d+)$/, (_, patch) => String(Num
 const copyFiles = [
   'index.html', 'styles.css', 'app.js', 'editor-ui.js',
   'vendor/markdown-it.js', 'vendor/markdown-it-footnote.js',
+  'fonts/libertinus/LibertinusSerif-Regular.woff2', 'fonts/libertinus/LibertinusSerif-Italic.woff2',
+  'fonts/libertinus/LibertinusSerif-Semibold.woff2', 'fonts/libertinus/LibertinusSerif-SemiboldItalic.woff2',
+  'fonts/libertinus/LibertinusSerif-Bold.woff2', 'fonts/libertinus/LibertinusSerif-BoldItalic.woff2',
+  'fonts/libertinus/LibertinusMono-Regular.woff2',
 ];
 const wait = (ms = 40) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -49,7 +53,7 @@ async function run() {
     show: false,
     width: 1000,
     height: 750,
-    webPreferences: { contextIsolation: false, nodeIntegration: false, sandbox: true },
+    webPreferences: { contextIsolation: false, nodeIntegration: false, sandbox: true, partition: `font-test-${process.pid}` },
   });
   try {
     await window.loadFile(indexFile);
@@ -63,6 +67,25 @@ async function run() {
     const editSource = async (text) => evaluate(window, `(() => { const source = document.querySelector('#markdownSource'); source.value = ${JSON.stringify(text)}; source.dispatchEvent(new Event('input', { bubbles: true })); })()`);
 
     assert.equal(await calls('getInitialDocument'), 1, 'startup UI path requests its initial document');
+    assert.equal(await evaluate(window, 'document.querySelector("#fontInput").value'), 'Libertinus Serif');
+    assert.equal(await evaluate(window, 'document.querySelector("#monoFontInput").value'), 'Libertinus Mono');
+    assert.equal(await evaluate(window, `Promise.all([
+      document.fonts.load('400 18px "Libertinus Serif"'),
+      document.fonts.load('italic 700 18px "Libertinus Serif"'),
+      document.fonts.load('400 18px "Libertinus Mono"')
+    ]).then(faces => faces.every(group => group.length && group.every(face => face.status === 'loaded')))`), true,
+    'bundled fonts and bold italic face load successfully');
+    await evaluate(window, `Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.__copiedCode = text; } } }); window.markdownVisionReader.showDocument('~~~js\\nconst value = "hello";\\n~~~\\n\\n    indented <text>\\n', 'copy.md');`);
+    assert.equal(await evaluate(window, 'document.querySelectorAll("#markdownOutput pre .code-copy-button").length'), 2, 'fenced and indented blocks have copy buttons');
+    await click('#markdownOutput pre:first-of-type .code-copy-button');
+    await waitFor(window, 'window.__copiedCode === \'const value = "hello";\'', 'copying fenced code');
+    await evaluate(window, 'document.querySelectorAll("#markdownOutput pre .code-copy-button")[1].click()');
+    await waitFor(window, 'window.__copiedCode === "indented <text>\\n"', 'copying indented code exactly');
+    await evaluate(window, `window.__originalExecCommand = document.execCommand.bind(document); document.execCommand = command => { if (command !== 'copy') return false; window.__fallbackCopy = document.activeElement.value; return true; }; navigator.clipboard.writeText = async () => { throw Error('Clipboard API unavailable'); }; void 0;`);
+    await click('#markdownOutput pre:first-of-type .code-copy-button');
+    await waitFor(window, 'window.__fallbackCopy === \'const value = "hello";\'', 'clipboard fallback');
+    await evaluate(window, `document.execCommand = window.__originalExecCommand; navigator.clipboard.writeText = async text => { window.__copiedCode = text; }; void 0;`);
+    assert.equal(await evaluate(window, 'document.querySelectorAll("#printDocument .code-copy-button").length'), 0, 'print output has no copy controls');
     await click('#themeButton');
     await evaluate(window, `window.__desktopFixture.resolvePreferences({ theme: 'dark', font: 'Georgia', monoFont: 'Consolas', size: '20', line: '1.8', width: '800' })`);
     await waitFor(window, 'document.documentElement.dataset.theme === "light" && document.querySelector("#fontSize").value === "20" && document.querySelector("#lineHeight").value === "1.8" && document.querySelector("#readingWidth").value === "800"', 'late native preference restore without overwriting a newer theme change');
@@ -89,6 +112,12 @@ async function run() {
     await evaluate(window, 'window.__desktopFixture.setScenario("default")');
     await click('#editorToggle');
     await waitFor(window, '!document.querySelector("#editorWorkspace").hidden', 'editor toolbar');
+    await click('.editor-views [data-view="split"]');
+    await editSource('```\nvisual code\n```\n');
+    await waitFor(window, 'document.querySelector("#editorPreview pre .code-copy-button")', 'copy button in visual editor');
+    await click('#editorPreview pre .code-copy-button');
+    await waitFor(window, 'window.__copiedCode === "visual code"', 'copying editable code');
+    assert.equal(await evaluate(window, 'document.querySelector("#markdownSource").value'), '```\nvisual code\n```\n', 'copy does not modify Markdown source');
     await editSource('# Unsaved draft\n');
     await click('#editorSaveAs');
     await waitFor(window, 'window.__desktopFixture.calls.some(([name, id, text, saveAs]) => name === "saveMarkdownFile" && saveAs === true && text.includes("Unsaved draft"))', 'Save As toolbar');
@@ -146,11 +175,11 @@ async function run() {
     await evaluate(window, 'window.__rejectReleaseCheck(new Error("Offline fixture"))');
     await waitFor(window, 'document.querySelector("#retryUpdateCheck").hidden === false', 'About offline state');
     assert.match(await evaluate(window, 'document.querySelector("#latestVersion").textContent'), /Unable to check/);
-    await evaluate(window, `window.fetch = async () => ({ ok: true, json: async () => ({ tag_name: "v${installedVersion}", assets: [] }) }); document.querySelector(".about-menu").open = false; document.querySelector(".about-menu").open = true`);
-    await waitFor(window, `document.querySelector("#latestVersion").textContent === "Latest version: ${installedVersion}"`, 'About current-version state');
+    await evaluate(window, `window.desktop.getPlatformInfo = async () => ({ platform: 'linux', architecture: 'x86_64', distribution: 'ubuntu' }); window.fetch = async () => ({ ok: true, json: async () => [{ tag_name: "v${installedVersion}", assets: [] }] }); document.querySelector(".about-menu").open = false; document.querySelector(".about-menu").open = true`);
+    await waitFor(window, `document.querySelector("#latestVersion").textContent === "Latest compatible version: ${installedVersion}"`, 'About current-version state');
     assert.equal(await evaluate(window, 'document.querySelector("#updateLink").hidden'), true);
-    await evaluate(window, `window.fetch = async () => ({ ok: true, json: async () => ({ tag_name: "v${newerVersion}", assets: [] }) }); document.querySelector(".about-menu").open = false; document.querySelector(".about-menu").open = true`);
-    await waitFor(window, `document.querySelector("#latestVersion").textContent === "Latest version: ${newerVersion}"`, 'About newer-version state');
+    await evaluate(window, `window.fetch = async () => ({ ok: true, json: async () => [{ tag_name: "v${newerVersion}", assets: [{name: 'Markdown-Vision-${newerVersion}-ubuntu-x86_64.deb', browser_download_url: 'https://example.com/update.deb'}] }] }); document.querySelector(".about-menu").open = false; document.querySelector(".about-menu").open = true`);
+    await waitFor(window, `document.querySelector("#latestVersion").textContent === "Latest compatible version: ${newerVersion}"`, 'About newer-version state');
     assert.equal(await evaluate(window, 'document.querySelector("#updateLink").hidden'), false, 'manual release link appears without auto-updater capability');
 
     await editSource('# Quit handling draft\n');

@@ -50,11 +50,10 @@ const legacyFonts = {
   mono: 'Consolas',
   humanist: 'Segoe UI'
 };
-const usesSystemFontDefaults = /Mac|Linux/i.test(`${navigator.platform} ${navigator.userAgent}`);
 const defaults = {
   theme: 'dark',
-  font: usesSystemFontDefaults ? 'system-ui' : 'Georgia',
-  monoFont: usesSystemFontDefaults ? 'monospace' : 'Consolas',
+  font: 'Libertinus Serif',
+  monoFont: 'Libertinus Mono',
   size: '18',
   line: '1.75',
   width: '720'
@@ -195,9 +194,10 @@ function normalizeFontName(value) {
 function getFontSuggestions(picker, query) {
   const normalizedQuery = normalizeFontName(query);
   const expectedWidthKind = picker.key === 'mono' ? 'Fixed-width' : 'Variable-width';
-  const defaultFont = picker.key === 'mono' ? 'monospace' : 'system-ui';
-  const availableFonts = [defaultFont, ...installedFonts.filter((font) =>
-    font !== defaultFont && getFontWidthKind(font) === expectedWidthKind)];
+  const bundledFont = picker.key === 'mono' ? 'Libertinus Mono' : 'Libertinus Serif';
+  const genericFont = picker.key === 'mono' ? 'monospace' : 'system-ui';
+  const availableFonts = [bundledFont, genericFont, ...installedFonts.filter((font) =>
+    font !== bundledFont && font !== genericFont && getFontWidthKind(font) === expectedWidthKind)];
   if (!availableFonts.length) return [];
   if (!normalizedQuery) return availableFonts.slice(0, 200);
 
@@ -865,11 +865,83 @@ function containWideTables(container) {
   }
 }
 
+function addCodeCopyButtons(container) {
+  container.querySelectorAll('pre').forEach((pre) => {
+    if (pre.querySelector(':scope > .code-copy-button')) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'code-copy-button';
+    button.contentEditable = 'false';
+    button.setAttribute('aria-label', 'Copy code');
+    button.title = 'Copy code';
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    const back = document.createElementNS(svg.namespaceURI, 'path');
+    back.setAttribute('d', 'M8 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2');
+    const front = document.createElementNS(svg.namespaceURI, 'rect');
+    for (const [name, value] of Object.entries({ x: '4', y: '7', width: '12', height: '14', rx: '2' })) front.setAttribute(name, value);
+    svg.append(back, front);
+    button.append(svg);
+    pre.prepend(button);
+  });
+}
+
+async function copyCodeText(text) {
+  if (navigator.clipboard?.writeText) {
+    try { await navigator.clipboard.writeText(text); return; } catch {}
+  }
+  const selection = window.getSelection();
+  const ranges = selection ? Array.from({ length: selection.rangeCount }, (_, index) => selection.getRangeAt(index).cloneRange()) : [];
+  const previousFocus = document.activeElement;
+  const field = document.createElement('textarea');
+  field.value = text;
+  field.setAttribute('readonly', '');
+  field.style.cssText = 'position:fixed;left:-10000px;top:0;opacity:0';
+  document.body.append(field);
+  field.select();
+  let copied = false;
+  try { copied = document.execCommand('copy'); } finally {
+    field.remove();
+    previousFocus?.focus?.({ preventScroll: true });
+    if (selection) { selection.removeAllRanges(); ranges.forEach((range) => selection.addRange(range)); }
+  }
+  if (!copied) throw new Error('Clipboard unavailable');
+}
+
+let codeCopyStatusTimer;
+document.addEventListener('click', async (event) => {
+  if (!(event.target instanceof Element)) return;
+  const button = event.target.closest('.code-copy-button');
+  if (!button) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const pre = button.parentElement;
+  const editor = pre.querySelector(':scope > .visual-code-editor');
+  const clone = pre.cloneNode(true);
+  clone.querySelector(':scope > .code-copy-button')?.remove();
+  const text = editor ? editor.value : (clone.textContent || '');
+  let status = document.getElementById('codeCopyStatus');
+  if (!status) {
+    status = document.createElement('div');
+    status.id = 'codeCopyStatus';
+    status.className = 'code-copy-status';
+    status.setAttribute('role', 'status');
+    document.body.append(status);
+  }
+  try { await copyCodeText(text); status.textContent = 'Code copied'; }
+  catch { status.textContent = 'Could not copy code'; }
+  status.hidden = false;
+  clearTimeout(codeCopyStatusTimer);
+  codeCopyStatusTimer = setTimeout(() => { status.hidden = true; }, 2500);
+}, true);
+
 function showDocument(markdown, name = 'Untitled.md', documentId = null, imageBase = '') {
   currentDocument = { content: markdown, name, documentId, imageBase };
   renderedForPrint = null;
   clearSearchHighlights();
   elements.markdownOutput.innerHTML = parseMarkdown(markdown);
+  addCodeCopyButtons(elements.markdownOutput);
   containWideTables(elements.markdownOutput);
   syncPictureSourcesToTheme();
   elements.fileName.textContent = name;
@@ -958,6 +1030,7 @@ window.markdownVisionReader = {
   },
   syncPictureSourcesToTheme,
   containWideTables,
+  addCodeCopyButtons,
   showDocument
 };
 

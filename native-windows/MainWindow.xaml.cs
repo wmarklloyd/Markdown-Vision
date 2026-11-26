@@ -167,7 +167,8 @@ public partial class MainWindow : Window
         var defaults = new Dictionary<string, string>
         {
             ["theme"] = "light",
-            ["font"] = "Georgia",
+            ["font"] = "Libertinus Serif",
+            ["monoFont"] = "Libertinus Mono",
             ["size"] = "18",
             ["line"] = "1.75",
             ["width"] = "720"

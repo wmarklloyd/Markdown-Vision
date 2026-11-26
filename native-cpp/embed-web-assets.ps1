@@ -11,7 +11,15 @@ $assets = @(
     @{ RelativePath = 'app.js'; SourcePath = Join-Path (Join-Path $rootPath 'src/web') 'app.js' },
     @{ RelativePath = 'editor-ui.js'; SourcePath = Join-Path (Join-Path $rootPath 'src/web') 'editor-ui.js' },
     @{ RelativePath = 'vendor/markdown-it.js'; SourcePath = Join-Path (Join-Path $rootPath 'src/web') 'vendor/markdown-it.js' },
-    @{ RelativePath = 'vendor/markdown-it-footnote.js'; SourcePath = Join-Path (Join-Path $rootPath 'src/web') 'vendor/markdown-it-footnote.js' }
+    @{ RelativePath = 'vendor/markdown-it-footnote.js'; SourcePath = Join-Path (Join-Path $rootPath 'src/web') 'vendor/markdown-it-footnote.js' },
+    @{ RelativePath = 'fonts/libertinus/LibertinusSerif-Regular.woff2'; SourcePath = Join-Path $rootPath 'src/web/fonts/libertinus/LibertinusSerif-Regular.woff2' },
+    @{ RelativePath = 'fonts/libertinus/LibertinusSerif-Italic.woff2'; SourcePath = Join-Path $rootPath 'src/web/fonts/libertinus/LibertinusSerif-Italic.woff2' },
+    @{ RelativePath = 'fonts/libertinus/LibertinusSerif-Semibold.woff2'; SourcePath = Join-Path $rootPath 'src/web/fonts/libertinus/LibertinusSerif-Semibold.woff2' },
+    @{ RelativePath = 'fonts/libertinus/LibertinusSerif-SemiboldItalic.woff2'; SourcePath = Join-Path $rootPath 'src/web/fonts/libertinus/LibertinusSerif-SemiboldItalic.woff2' },
+    @{ RelativePath = 'fonts/libertinus/LibertinusSerif-Bold.woff2'; SourcePath = Join-Path $rootPath 'src/web/fonts/libertinus/LibertinusSerif-Bold.woff2' },
+    @{ RelativePath = 'fonts/libertinus/LibertinusSerif-BoldItalic.woff2'; SourcePath = Join-Path $rootPath 'src/web/fonts/libertinus/LibertinusSerif-BoldItalic.woff2' },
+    @{ RelativePath = 'fonts/libertinus/LibertinusMono-Regular.woff2'; SourcePath = Join-Path $rootPath 'src/web/fonts/libertinus/LibertinusMono-Regular.woff2' },
+    @{ RelativePath = 'fonts/libertinus/OFL.txt'; SourcePath = Join-Path $rootPath 'src/web/fonts/libertinus/OFL.txt' }
 )
 
 $builder = [System.Text.StringBuilder]::new()

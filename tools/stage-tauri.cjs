@@ -20,6 +20,14 @@ const files = [
   'vendor/markdown-it-footnote.js',
   'vendor/markdown-it.LICENSE.txt',
   'vendor/markdown-it-footnote.LICENSE.txt',
+  'fonts/libertinus/LibertinusSerif-Regular.woff2',
+  'fonts/libertinus/LibertinusSerif-Italic.woff2',
+  'fonts/libertinus/LibertinusSerif-Semibold.woff2',
+  'fonts/libertinus/LibertinusSerif-SemiboldItalic.woff2',
+  'fonts/libertinus/LibertinusSerif-Bold.woff2',
+  'fonts/libertinus/LibertinusSerif-BoldItalic.woff2',
+  'fonts/libertinus/LibertinusMono-Regular.woff2',
+  'fonts/libertinus/OFL.txt',
 ];
 
 const supportedLocalAsset = (url) => {

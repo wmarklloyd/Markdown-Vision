@@ -480,6 +480,7 @@
     }
     window.markdownVisionReader.syncPictureSourcesToTheme(preview);
     window.markdownVisionReader.containWideTables(preview);
+    window.markdownVisionReader.addCodeCopyButtons(preview);
     for (const block of visualBlocks.values()) block.html = block.node.outerHTML;
     preview.contentEditable = 'true';
     preview.tabIndex = 0;

@@ -4,7 +4,7 @@ Unicode True
 !include "nsDialogs.nsh"
 
 !define APP_NAME "Markdown Vision"
-!define APP_VERSION "2.8.16"
+!define APP_VERSION "2.8.21"
 !define APP_ID "8d1dd6d6-9e38-5fc2-8139-94aece1f4a40"
 !ifdef ARM64
 !define SOURCE_DIR "..\dist\MarkdownVision-Native-Editor-${APP_VERSION}-arm64"
@@ -162,6 +162,7 @@ Section "Markdown Vision" SEC_APP
   File "${SOURCE_DIR}\web\app.js"
   File "${SOURCE_DIR}\web\editor-ui.js"
   File /r "${SOURCE_DIR}\web\vendor"
+  File /r "${SOURCE_DIR}\web\fonts"
 
   IfFileExists "$INSTDIR\${APP_EXE}" native_executable_ready
   MessageBox MB_ICONSTOP "Markdown Vision Native could not be installed. Setup will stop without registering an incomplete installation."

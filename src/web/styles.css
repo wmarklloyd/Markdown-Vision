@@ -1,3 +1,11 @@
+@font-face { font-family: 'Libertinus Serif'; src: url('fonts/libertinus/LibertinusSerif-Regular.woff2') format('woff2'); font-style: normal; font-weight: 400; }
+@font-face { font-family: 'Libertinus Serif'; src: url('fonts/libertinus/LibertinusSerif-Italic.woff2') format('woff2'); font-style: italic; font-weight: 400; }
+@font-face { font-family: 'Libertinus Serif'; src: url('fonts/libertinus/LibertinusSerif-Semibold.woff2') format('woff2'); font-style: normal; font-weight: 600; }
+@font-face { font-family: 'Libertinus Serif'; src: url('fonts/libertinus/LibertinusSerif-SemiboldItalic.woff2') format('woff2'); font-style: italic; font-weight: 600; }
+@font-face { font-family: 'Libertinus Serif'; src: url('fonts/libertinus/LibertinusSerif-Bold.woff2') format('woff2'); font-style: normal; font-weight: 700; }
+@font-face { font-family: 'Libertinus Serif'; src: url('fonts/libertinus/LibertinusSerif-BoldItalic.woff2') format('woff2'); font-style: italic; font-weight: 700; }
+@font-face { font-family: 'Libertinus Mono'; src: url('fonts/libertinus/LibertinusMono-Regular.woff2') format('woff2'); font-style: normal; font-weight: 400; }
+
 :root {
   color-scheme: dark;
   --bg: #202124;
@@ -9,7 +17,8 @@
   --accent-hover: #e58b6d;
   --code-bg: #34363a;
   --shadow: 0 18px 50px rgba(0, 0, 0, .35);
-  --reader-font: Georgia, 'Times New Roman', serif;
+  --reader-font: 'Libertinus Serif', serif;
+  --reader-mono-font: 'Libertinus Mono', monospace;
   --reader-size: 18px;
   --reader-line: 1.75;
   --reader-width: 720px;
@@ -373,6 +382,17 @@ kbd { background: var(--surface); border: 1px solid var(--faint); border-radius:
 .markdown-body code { font-family: var(--reader-mono-font, ui-monospace, SFMono-Regular, Consolas, monospace); font-size: .82em; padding: .14em .35em; border-radius: 4px; background: var(--code-bg); }
 .markdown-body pre { padding: 1.15em; background: var(--code-bg); border-radius: 7px; overflow-x: auto; line-height: 1.55; font-family: var(--reader-mono-font, ui-monospace, SFMono-Regular, Consolas, monospace); }
 .markdown-body pre code { padding: 0; background: none; }
+.markdown-body pre .code-copy-button {
+  position: sticky; top: 0; right: 0; float: right; z-index: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; margin: -4px -4px 0 -32px; padding: 6px;
+  border: 1px solid var(--faint); border-radius: 5px; background: var(--surface);
+  color: var(--text); cursor: pointer;
+}
+.code-copy-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.code-copy-button:hover, .code-copy-button:focus-visible { color: var(--accent); border-color: var(--accent); }
+.code-copy-status { position: fixed; z-index: 30; right: 20px; bottom: 20px; padding: 8px 12px; border: 1px solid var(--faint); border-radius: 6px; background: var(--surface); color: var(--text); font: 13px system-ui, sans-serif; box-shadow: var(--shadow); }
+.code-copy-status[hidden] { display: none; }
 .markdown-body picture { display: inline-block; max-width: 100%; line-height: 0; vertical-align: middle; }
 .markdown-body picture img { display: block; max-width: 100%; }
 .markdown-body img { max-width: 100%; border-radius: 5px; }
