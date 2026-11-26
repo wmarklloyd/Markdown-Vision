@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use tauri::Manager;
+mod updater;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 
 fn main() {
@@ -120,7 +121,7 @@ fn main() {
                 None => tauri::http::Response::builder().status(404).body(Vec::new()).unwrap(),
             }
         })
-        .invoke_handler(tauri::generate_handler![platform_info, list_system_fonts, document::initial_document, document::open_document, document::save_document, document::has_pending_document, document::pending_document, preferences::get_preferences, preferences::save_preferences, confirm_discard, show_open_error, print_document, close_window, quit_application])
+        .invoke_handler(tauri::generate_handler![platform_info, list_system_fonts, updater::install_linux_update, document::initial_document, document::open_document, document::save_document, document::has_pending_document, document::pending_document, preferences::get_preferences, preferences::save_preferences, confirm_discard, show_open_error, print_document, close_window, quit_application])
         .build(tauri::generate_context!())
         .expect("failed to build Markdown Vision")
         .run(|_app, _event| {

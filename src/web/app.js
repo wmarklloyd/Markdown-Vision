@@ -1184,10 +1184,24 @@ applyPreferences();
 void loadPreferences();
 
 let availableUpdate = null;
+let linuxUpdate = null;
+let linuxUpdateInProgress = false;
 
 function versionParts(value) {
   const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(value);
   return match ? match.slice(1).map(Number) : null;
+}
+
+function findLinuxUpdateAsset(assets, architecture, isFedora) {
+  const compatible = (assets || []).filter((item) => {
+    const name = item.name.toLowerCase();
+    return name.includes(`-${architecture}.`) && (isFedora
+      ? name.includes('fedora') || !name.includes('ubuntu')
+      : !name.includes('fedora'));
+  });
+  if (isFedora) return compatible.find((item) => /\.rpm$/i.test(item.name));
+  return compatible.find((item) => /\.deb$/i.test(item.name))
+    || (architecture === 'x86_64' ? compatible.find((item) => /\.appimage$/i.test(item.name)) : undefined);
 }
 
 async function checkForUpdates() {
@@ -1199,6 +1213,7 @@ async function checkForUpdates() {
   retryButton.hidden = true;
   updateLink.hidden = true;
   availableUpdate = null;
+  linuxUpdate = null;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {
@@ -1243,15 +1258,7 @@ async function checkForUpdates() {
       version: versionParts(release.tag_name || ''),
       asset: platform.platform === 'macos'
         ? release.assets?.find((item) => /\.dmg$/i.test(item.name))
-        : release.assets?.find((item) => {
-          const name = item.name.toLowerCase();
-          const matchesArch = name.includes(`-${architecture}.`);
-          const matchesFormat = isFedora ? name.endsWith('.rpm')
-            : name.endsWith('.deb') || (architecture === 'x86_64' && name.endsWith('.appimage'));
-          const matchesDistro = isFedora ? name.includes('fedora') || !name.includes('ubuntu')
-            : !name.includes('fedora');
-          return matchesArch && matchesFormat && matchesDistro;
-        }),
+        : findLinuxUpdateAsset(release.assets, architecture, isFedora),
     })).filter(({ version, asset, release }) => {
       if (!version || !asset || release.draft || release.prerelease) return false;
       const difference = version.findIndex((part, index) => part !== installed[index]);
@@ -1270,7 +1277,13 @@ async function checkForUpdates() {
     }
     latestLabel.textContent = `Latest compatible version: ${candidate.version.join('.')}`;
     updateLink.href = candidate.asset.browser_download_url;
-    updateLink.textContent = platform.platform === 'macos' ? 'Download macOS update' : 'Download Linux update';
+    const digest = /^sha256:([0-9a-f]{64})$/i.exec(candidate.asset.digest || '');
+    if (platform.platform === 'linux' && !isFedora && /\.deb$/i.test(candidate.asset.name)
+        && digest && window.desktop?.installLinuxUpdate) {
+      linuxUpdate = { version: candidate.version.join('.'), digest: digest[1] };
+    }
+    updateLink.textContent = linuxUpdate ? 'Upgrade Markdown Vision'
+      : platform.platform === 'macos' ? 'Download macOS update' : 'Download Linux update';
     updateLink.hidden = false;
   } catch {
     latestLabel.textContent = 'Unable to check for updates. Check your internet connection and try again.';
@@ -1286,6 +1299,27 @@ document.querySelector('.about-menu').addEventListener('toggle', (event) => {
   if (event.currentTarget.open) setTimeout(() => void checkForUpdates(), 0);
 });
 document.getElementById('updateLink').addEventListener('click', async (event) => {
+  if (linuxUpdate) {
+    event.preventDefault();
+    if (linuxUpdateInProgress || window.markdownVisionReader.isSaving?.()) return;
+    linuxUpdateInProgress = true;
+    const link = event.currentTarget;
+    const status = document.getElementById('latestVersion');
+    const update = linuxUpdate;
+    link.hidden = true;
+    status.textContent = 'Downloading and verifying the update. You may be asked to authenticate.';
+    try {
+      await window.desktop.installLinuxUpdate(update.version, update.digest);
+      linuxUpdate = null;
+      status.textContent = 'Update installed. Restart Markdown Vision to use the new version.';
+    } catch (error) {
+      status.textContent = `Update failed: ${String(error)}`;
+      link.hidden = false;
+    } finally {
+      linuxUpdateInProgress = false;
+    }
+    return;
+  }
   if (!window.desktop?.installUpdate) return;
   event.preventDefault();
   if (!availableUpdate || window.markdownVisionReader.isSaving?.()) return;

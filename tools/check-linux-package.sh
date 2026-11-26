@@ -14,7 +14,7 @@ test "$(field Version)" = "$expected_version"
 test "$(field Architecture)" = "$expected_arch"
 
 dependencies=$(field Depends)
-for required in libwebkit2gtk-4.1-0 libgtk-3-0 zenity xdg-utils fontconfig; do
+for required in libwebkit2gtk-4.1-0 libgtk-3-0 zenity xdg-utils fontconfig curl policykit-1; do
   case " $dependencies " in
     *"$required"*) ;;
     *) echo "Required runtime dependency missing from package: $required" >&2; exit 1 ;;
