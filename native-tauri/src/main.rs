@@ -120,7 +120,7 @@ fn main() {
                 None => tauri::http::Response::builder().status(404).body(Vec::new()).unwrap(),
             }
         })
-        .invoke_handler(tauri::generate_handler![platform_info, document::initial_document, document::open_document, document::save_document, document::has_pending_document, document::pending_document, preferences::get_preferences, preferences::save_preferences, confirm_discard, show_open_error, print_document, close_window, quit_application])
+        .invoke_handler(tauri::generate_handler![platform_info, list_system_fonts, document::initial_document, document::open_document, document::save_document, document::has_pending_document, document::pending_document, preferences::get_preferences, preferences::save_preferences, confirm_discard, show_open_error, print_document, close_window, quit_application])
         .build(tauri::generate_context!())
         .expect("failed to build Markdown Vision")
         .run(|_app, _event| {
@@ -139,6 +139,78 @@ fn main() {
                 }
             }
         });
+}
+
+#[tauri::command]
+fn list_system_fonts() -> Result<Vec<String>, String> {
+    #[cfg(target_os = "linux")]
+    {
+        let output = std::process::Command::new("fc-list")
+            .args(["--format", "%{family}\n"])
+            .output().map_err(|error| error.to_string())?;
+        if !output.status.success() {
+            return Err("Could not enumerate system fonts".into());
+        }
+        let text = String::from_utf8_lossy(&output.stdout);
+        let mut fonts: Vec<String> = text.lines().flat_map(|line| line.split(','))
+            .map(str::trim).filter(|name| !name.is_empty())
+            .map(str::to_owned).collect();
+        fonts.sort();
+        fonts.dedup();
+        Ok(fonts)
+    }
+    #[cfg(target_os = "macos")]
+    return macos_fonts::list();
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    Ok(Vec::new())
+}
+
+// Core Text returns the font families currently available to this process,
+// including enabled user fonts, without depending on a shell utility.
+#[cfg(target_os = "macos")]
+mod macos_fonts {
+    use std::ffi::{c_char, c_void, CStr};
+
+    type CFRef = *const c_void;
+    #[link(name = "CoreText", kind = "framework")]
+    extern "C" {
+        fn CTFontManagerCopyAvailableFontFamilyNames() -> CFRef;
+    }
+    #[link(name = "CoreFoundation", kind = "framework")]
+    extern "C" {
+        fn CFArrayGetCount(array: CFRef) -> isize;
+        fn CFArrayGetValueAtIndex(array: CFRef, index: isize) -> CFRef;
+        fn CFStringGetLength(string: CFRef) -> isize;
+        fn CFStringGetMaximumSizeForEncoding(length: isize, encoding: u32) -> isize;
+        fn CFStringGetCString(string: CFRef, buffer: *mut c_char, size: isize, encoding: u32) -> u8;
+        fn CFRelease(value: CFRef);
+    }
+    const UTF8: u32 = 0x0800_0100;
+
+    pub fn list() -> Result<Vec<String>, String> {
+        unsafe {
+            let array = CTFontManagerCopyAvailableFontFamilyNames();
+            if array.is_null() { return Err("Could not enumerate system fonts".into()); }
+            let mut fonts = Vec::new();
+            for index in 0..CFArrayGetCount(array) {
+                let name = CFArrayGetValueAtIndex(array, index);
+                if name.is_null() { continue; }
+                let max = CFStringGetMaximumSizeForEncoding(CFStringGetLength(name), UTF8);
+                let Some(size) = max.checked_add(1).and_then(|n| usize::try_from(n).ok()) else { continue; };
+                let mut buffer = vec![0u8; size];
+                if CFStringGetCString(name, buffer.as_mut_ptr().cast(), size as isize, UTF8) != 0 {
+                    if let Ok(value) = CStr::from_ptr(buffer.as_ptr().cast()).to_str() {
+                        let value = value.trim();
+                        if !value.is_empty() { fonts.push(value.to_owned()); }
+                    }
+                }
+            }
+            CFRelease(array);
+            fonts.sort();
+            fonts.dedup();
+            if fonts.is_empty() { Err("No system fonts found".into()) } else { Ok(fonts) }
+        }
+    }
 }
 
 #[tauri::command]

@@ -1,6 +1,6 @@
 {
   "name": "markdown-vision",
-  "version": "2.8.16",
+  "version": "2.8.17",
   "description": "Markdown Vision",
   "main": "src/electron/main.cjs",
   "author": "Markdown Vision",

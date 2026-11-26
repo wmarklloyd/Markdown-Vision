@@ -57,6 +57,7 @@
   window.desktop = {
     getPreferences: () => invoke('get_preferences'),
     getPlatformInfo: () => invoke('platform_info'),
+    listSystemFonts: () => invoke('list_system_fonts'),
     savePreferences: (preferences) => invoke('save_preferences', { preferences }),
     printMarkdown: () => invoke('print_document'),
     confirmDiscard: (action) => invoke('confirm_discard', { action }),

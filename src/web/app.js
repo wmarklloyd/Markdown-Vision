@@ -72,6 +72,7 @@ const preferenceEdits = new Set();
 let preferenceWrite = Promise.resolve();
 let fontLoadPromise = null;
 let installedFonts = [];
+let fontLoadFailed = false;
 const fontPickers = [
   { key: 'system', input: elements.fontInput, suggestions: elements.fontSuggestions, status: elements.fontStatus, preference: 'font' },
   { key: 'mono', input: elements.monoFontInput, suggestions: elements.monoFontSuggestions, status: elements.monoFontStatus, preference: 'monoFont' }
@@ -194,7 +195,9 @@ function normalizeFontName(value) {
 function getFontSuggestions(picker, query) {
   const normalizedQuery = normalizeFontName(query);
   const expectedWidthKind = picker.key === 'mono' ? 'Fixed-width' : 'Variable-width';
-  const availableFonts = installedFonts.filter((font) => getFontWidthKind(font) === expectedWidthKind);
+  const defaultFont = picker.key === 'mono' ? 'monospace' : 'system-ui';
+  const availableFonts = [defaultFont, ...installedFonts.filter((font) =>
+    font !== defaultFont && getFontWidthKind(font) === expectedWidthKind)];
   if (!availableFonts.length) return [];
   if (!normalizedQuery) return availableFonts.slice(0, 200);
 
@@ -292,7 +295,7 @@ function updateFontSuggestions(picker, query = picker.input.value) {
   const suggestions = getFontSuggestions(picker, query);
   renderFontSuggestions(picker, suggestions);
   if (!installedFonts.length) {
-    picker.status.textContent = 'Loading installed fonts...';
+    picker.status.textContent = fontLoadFailed ? 'Enter the name of any installed font.' : 'Loading installed fonts...';
     return;
   }
   if (!normalizeFontName(query)) {
@@ -1081,7 +1084,10 @@ function bindFontPicker(picker) {
     savePreferences();
   });
   picker.input.addEventListener('focus', () => {
-    void loadSystemFonts().then(() => updateFontSuggestions(picker));
+    const initialValue = picker.input.value;
+    void loadSystemFonts().then(() => {
+      if (document.activeElement === picker.input && picker.input.value === initialValue) updateFontSuggestions(picker, '');
+    });
   });
   picker.input.addEventListener('keydown', (event) => {
     const state = fontSuggestionStates.get(picker.key);
@@ -1146,16 +1152,18 @@ async function loadSystemFonts() {
     try {
       const fonts = await window.desktop.listSystemFonts();
       if (!Array.isArray(fonts) || fonts.length === 0) {
-        installedFonts = [];
-        elements.fontStatus.textContent = 'Enter the name of any installed font.';
+        fontLoadFailed = !installedFonts.length;
+        if (!installedFonts.length) fontPickers.forEach((picker) => { picker.status.textContent = 'Enter the name of any installed font.'; });
         return null;
       }
       installedFonts = [...new Set(fonts)].sort((a, b) => a.localeCompare(b));
+      fontLoadFailed = false;
       updateAllFontSuggestions();
       writeCachedFonts(fonts);
       return fonts;
     } catch {
-      elements.fontStatus.textContent = 'Enter the name of any installed font.';
+      fontLoadFailed = !installedFonts.length;
+      fontPickers.forEach((picker) => { picker.status.textContent = 'Enter the name of any installed font.'; });
       return null;
     }
   })();
