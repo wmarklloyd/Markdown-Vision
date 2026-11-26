@@ -136,6 +136,13 @@ jobs:
           sudo apt-get install -y "./$package"
           installed=$(dpkg-query --show --showformat='${Status} ${Version} ${Architecture}' markdown-vision)
           test "$installed" = "install ok installed $expected_version $EXPECTED_DEB_ARCH"
+      - name: Verify package dependencies on Ubuntu 26.10
+        if: matrix.architecture == 'x86_64'
+        run: |
+          set -eu
+          package=$(find native-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)
+          docker run --rm -v "$GITHUB_WORKSPACE/$package:/tmp/markdown-vision.deb:ro" ubuntu:26.10 sh -c \
+            'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y /tmp/markdown-vision.deb && dpkg-query -W markdown-vision'
       - name: Exercise installed application in a virtual desktop
         run: |
           set -eu
