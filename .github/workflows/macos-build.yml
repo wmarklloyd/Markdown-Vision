@@ -75,7 +75,12 @@ jobs:
       - name: Verify localized document type resources
         run: |
           set -eu
-          app=$(find native-tauri/target/universal-apple-darwin/release/bundle/macos -maxdepth 1 -name '*.app' -type d -print -quit)
+          dmg=$(find native-tauri/target/universal-apple-darwin/release/bundle/dmg -maxdepth 1 -name '*.dmg' -print -quit)
+          test -n "$dmg"
+          mount=$(mktemp -d "$RUNNER_TEMP/markdown-vision-dmg.XXXXXX")
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$dmg"
+          trap 'hdiutil detach "$mount"' EXIT
+          app=$(find "$mount" -maxdepth 1 -name '*.app' -type d -print -quit)
           test -n "$app"
           for source in native-tauri/macos-localizations/*.lproj/InfoPlist.strings; do
             locale=$(basename "$(dirname "$source")")
