@@ -3,6 +3,7 @@
 use tauri::Manager;
 mod updater;
 mod associations;
+#[cfg(not(target_os = "linux"))]
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 
 fn main() {
@@ -25,8 +26,9 @@ fn main() {
             let config = &app.config().app.windows[0];
             let language = std::env::var("MARKDOWN_VISION_LANGUAGE").unwrap_or_default();
             let language_script = format!(
-                "window.__markdownVisionLanguageOverride = {};",
-                serde_json::json!(language)
+                "window.__markdownVisionLanguageOverride = {}; window.__markdownVisionUsesNativeMenu = {};",
+                serde_json::json!(language),
+                !cfg!(target_os = "linux")
             );
             let window = tauri::WebviewWindowBuilder::from_config(app, config)?
                 .initialization_script(language_script)
@@ -56,63 +58,8 @@ fn main() {
                 }
             });
 
-            // Route native menu commands back through the same renderer
-            // handlers used by the toolbar and keyboard shortcuts. In
-            // particular, Close and Quit must pass through the unsaved-change
-            // prompt instead of letting the native menu destroy the window.
-            let open = MenuItemBuilder::with_id("file-open", "Open…")
-                .accelerator("CmdOrCtrl+O").build(app)?;
-            let new = MenuItemBuilder::with_id("file-new", "New")
-                .accelerator("CmdOrCtrl+N").build(app)?;
-            let save = MenuItemBuilder::with_id("file-save", "Save")
-                .accelerator("CmdOrCtrl+S").build(app)?;
-            let save_as = MenuItemBuilder::with_id("file-save-as", "Save As…")
-                .accelerator("CmdOrCtrl+Shift+S").build(app)?;
-            let print = MenuItemBuilder::with_id("file-print", "Print…")
-                .accelerator("CmdOrCtrl+P").build(app)?;
-            let close = MenuItemBuilder::with_id("file-close", "Close")
-                .accelerator("CmdOrCtrl+W").build(app)?;
-            let file_menu = SubmenuBuilder::with_id(app, "file-menu", "File")
-                .item(&new).item(&open).separator().item(&save).item(&save_as)
-                .separator().item(&print).separator().item(&close).build()?;
-
-            #[cfg(target_os = "macos")]
-            let menu = {
-                let about = MenuItemBuilder::with_id("app-about", "About Markdown Vision…").build(app)?;
-                let quit = MenuItemBuilder::with_id("app-quit", "Quit Markdown Vision")
-                    .accelerator("CmdOrCtrl+Q").build(app)?;
-                let app_menu = SubmenuBuilder::with_id(app, "app-menu", "Markdown Vision")
-                    .item(&about).separator().item(&quit).build()?;
-                MenuBuilder::new(app).items(&[&app_menu, &file_menu]).build()?
-            };
-            #[cfg(not(target_os = "macos"))]
-            let menu = {
-                let about = MenuItemBuilder::with_id("app-about", "About Markdown Vision").build(app)?;
-                let quit = MenuItemBuilder::with_id("app-quit", "Quit")
-                    .accelerator("Ctrl+Q").build(app)?;
-                let help_menu = SubmenuBuilder::with_id(app, "help-menu", "Help")
-                    .item(&about).separator().item(&quit).build()?;
-                MenuBuilder::new(app).items(&[&file_menu, &help_menu]).build()?
-            };
-            app.set_menu(menu)?;
-            app.on_menu_event(|app, event| {
-                let action = match event.id().as_ref() {
-                    "file-new" => "new",
-                    "file-open" => "open",
-                    "file-save" => "save",
-                    "file-save-as" => "saveAs",
-                    "file-print" => "print",
-                    "file-close" => "close",
-                    "app-quit" => "quit",
-                    "app-about" => "about",
-                    _ => return,
-                };
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.eval(&format!(
-                        "window.__markdownVisionDispatchMenuCommand?.({action:?})"
-                    ));
-                }
-            });
+            #[cfg(not(target_os = "linux"))]
+            install_native_menu(app)?;
             Ok(())
         })
         .manage(std::sync::Mutex::new(document::Documents::default()))
@@ -147,6 +94,68 @@ fn main() {
                 }
             }
         });
+}
+
+#[cfg(not(target_os = "linux"))]
+fn install_native_menu(app: &mut tauri::App) -> tauri::Result<()> {
+    // Route native menu commands back through the same renderer
+    // handlers used by the toolbar and keyboard shortcuts. In
+    // particular, Close and Quit must pass through the unsaved-change
+    // prompt instead of letting the native menu destroy the window.
+    let open = MenuItemBuilder::with_id("file-open", "Open…")
+        .accelerator("CmdOrCtrl+O").build(app)?;
+    let new = MenuItemBuilder::with_id("file-new", "New")
+        .accelerator("CmdOrCtrl+N").build(app)?;
+    let save = MenuItemBuilder::with_id("file-save", "Save")
+        .accelerator("CmdOrCtrl+S").build(app)?;
+    let save_as = MenuItemBuilder::with_id("file-save-as", "Save As…")
+        .accelerator("CmdOrCtrl+Shift+S").build(app)?;
+    let print = MenuItemBuilder::with_id("file-print", "Print…")
+        .accelerator("CmdOrCtrl+P").build(app)?;
+    let close = MenuItemBuilder::with_id("file-close", "Close")
+        .accelerator("CmdOrCtrl+W").build(app)?;
+    let file_menu = SubmenuBuilder::with_id(app, "file-menu", "File")
+        .item(&new).item(&open).separator().item(&save).item(&save_as)
+        .separator().item(&print).separator().item(&close).build()?;
+
+    #[cfg(target_os = "macos")]
+    let menu = {
+        let about = MenuItemBuilder::with_id("app-about", "About Markdown Vision…").build(app)?;
+        let quit = MenuItemBuilder::with_id("app-quit", "Quit Markdown Vision")
+            .accelerator("CmdOrCtrl+Q").build(app)?;
+        let app_menu = SubmenuBuilder::with_id(app, "app-menu", "Markdown Vision")
+            .item(&about).separator().item(&quit).build()?;
+        MenuBuilder::new(app).items(&[&app_menu, &file_menu]).build()?
+    };
+    #[cfg(not(target_os = "macos"))]
+    let menu = {
+        let about = MenuItemBuilder::with_id("app-about", "About Markdown Vision").build(app)?;
+        let quit = MenuItemBuilder::with_id("app-quit", "Quit")
+            .accelerator("Ctrl+Q").build(app)?;
+        let help_menu = SubmenuBuilder::with_id(app, "help-menu", "Help")
+            .item(&about).separator().item(&quit).build()?;
+        MenuBuilder::new(app).items(&[&file_menu, &help_menu]).build()?
+    };
+    app.set_menu(menu)?;
+    app.on_menu_event(|app, event| {
+        let action = match event.id().as_ref() {
+            "file-new" => "new",
+            "file-open" => "open",
+            "file-save" => "save",
+            "file-save-as" => "saveAs",
+            "file-print" => "print",
+            "file-close" => "close",
+            "app-quit" => "quit",
+            "app-about" => "about",
+            _ => return,
+        };
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.eval(&format!(
+                "window.__markdownVisionDispatchMenuCommand?.({action:?})"
+            ));
+        }
+    });
+    Ok(())
 }
 
 #[tauri::command]

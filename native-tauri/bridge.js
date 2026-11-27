@@ -85,8 +85,18 @@
       closing = false;
     }
   };
+  const usesNativeMenu = window.__markdownVisionUsesNativeMenu !== false;
+  if (!usesNativeMenu) {
+    document.addEventListener('keydown', (event) => {
+      if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.isComposing) return;
+      const key = event.key.toLowerCase();
+      if (key !== 'w' && key !== 'q') return;
+      event.preventDefault();
+      if (!event.repeat) void window.__markdownVisionRequestClose(key === 'q');
+    });
+  }
   window.desktop = {
-    setNativeMenuLabels: (labels) => invoke('update_menu_labels', { labels }),
+    ...(usesNativeMenu ? { setNativeMenuLabels: (labels) => invoke('update_menu_labels', { labels }) } : {}),
     getPreferences: () => invoke('get_preferences'),
     getPlatformInfo: () => invoke('platform_info'),
     listSystemFonts: () => invoke('list_system_fonts'),
