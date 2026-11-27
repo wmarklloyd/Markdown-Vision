@@ -103,7 +103,7 @@ wait_for_clipboard() {
 }
 wait_for_app_window
 # Decline the first-run default-app prompt in this isolated test profile.
-xdotool windowfocus --sync "$window"
+sleep 1
 xdotool key --clearmodifiers Escape
 sleep 1
 xdotool windowfocus --sync "$window" key ctrl+p
