@@ -157,7 +157,7 @@ baseline_windows=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | tr '\n
 stage='opening the print dialog'
 window_width=$(xdotool getwindowgeometry --shell "$window" | sed -n 's/^WIDTH=//p')
 test -n "$window_width"
-print_button_x=$((window_width - 202))
+print_button_x=$((window_width - 220))
 xdotool windowfocus --sync "$window"
 xdotool mousemove --window "$window" "$print_button_x" 30 click 1
 stage='waiting for the print dialog'
