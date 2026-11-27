@@ -382,6 +382,7 @@ const fontSuggestionStates = new Map(fontPickers.map((picker) => [picker.key, { 
 let searchMatchCount = 0;
 let activeSearchMatchIndex = -1;
 let currentDocument = null;
+let preparedDocumentMarkdown = null;
 let printPreparing = false;
 let printSnapshot = null;
 let renderedForPrint = null;
@@ -678,6 +679,7 @@ const allowedStyleProperties = new Set([
   'justify-content', 'margin', 'margin-bottom', 'margin-left', 'margin-right', 'margin-top', 'max-width', 'padding',
   'padding-bottom', 'padding-left', 'padding-right', 'padding-top', 'text-align', 'text-decoration', 'width'
 ]);
+const autoDirectionTags = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'th', 'td']);
 function isSafeUrl(value) {
   const url = String(value || '').trim();
   if (!url || /[\x00-\x1f\\]/.test(url) || url.startsWith('//')) return false;
@@ -724,22 +726,15 @@ function sanitizeStyle(value) {
 function sanitizeHtml(rawHtml) {
   const template = document.createElement('template');
   template.innerHTML = rawHtml;
-  const automaticDirections = new WeakSet();
-
-  const cleanNode = (node) => {
-    if (node.nodeType === Node.COMMENT_NODE) {
-      node.remove();
-      return;
-    }
-    if (node.nodeType !== Node.ELEMENT_NODE) return;
-
+  const cleanElement = (node, inheritedDirection) => {
     const tagName = node.tagName.toLowerCase();
     if (!allowedHtmlTags.has(tagName)) {
       node.replaceWith(document.createTextNode(node.textContent || ''));
-      return;
+      return null;
     }
 
-    for (const attribute of [...node.attributes]) {
+    for (let i = node.attributes.length - 1; i >= 0; i -= 1) {
+      const attribute = node.attributes[i];
       const name = attribute.name.toLowerCase();
       let value = attribute.value;
       if (name.startsWith('on') || !allowedHtmlAttributes.has(name)) {
@@ -773,30 +768,49 @@ function sanitizeHtml(rawHtml) {
 
     // Markdown does not carry paragraph direction. Determine it from each
     // text block unless the document author supplied an explicit direction.
-    if (/^(p|h[1-6]|li|th|td)$/.test(tagName) && !node.hasAttribute('dir')) {
-      let ancestor = node.parentElement?.closest('[dir]');
-      while (ancestor && automaticDirections.has(ancestor)) ancestor = ancestor.parentElement?.closest('[dir]');
-      if (!ancestor) {
-        node.setAttribute('dir', 'auto');
-        automaticDirections.add(node);
-      }
+    const explicitDirection = inheritedDirection || node.hasAttribute('dir');
+    if (!explicitDirection && autoDirectionTags.has(tagName)) {
+      node.setAttribute('dir', 'auto');
     }
 
     if (tagName === 'input') {
-      if (node.getAttribute('type') !== 'checkbox') node.remove();
-      else node.disabled = true;
+      if (node.getAttribute('type') !== 'checkbox') {
+        node.remove();
+        return null;
+      }
+      node.disabled = true;
     }
     if (tagName === 'a' && !node.getAttribute('href')?.startsWith('#')) {
       node.setAttribute('target', '_blank');
       node.setAttribute('rel', 'noopener noreferrer');
     }
+    return explicitDirection;
   };
 
-  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_COMMENT);
-  const nodes = [];
-  while (walker.nextNode()) nodes.push(walker.currentNode);
-  nodes.forEach(cleanNode);
-  return template.innerHTML;
+  // Walk the inert tree once, carrying authored direction to descendants.
+  // Removed elements do not need their detached children sanitized.
+  let node = template.content.firstChild;
+  let inheritedDirection = false;
+  const pending = [];
+  while (node) {
+    const next = node.nextSibling;
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const childDirection = cleanElement(node, inheritedDirection);
+      if (childDirection !== null && node.firstChild) {
+        if (next) pending.push({ node: next, inheritedDirection });
+        node = node.firstChild;
+        inheritedDirection = childDirection;
+        continue;
+      }
+    } else if (node.nodeType === Node.COMMENT_NODE) node.remove();
+    if (next) node = next;
+    else {
+      const sibling = pending.pop();
+      node = sibling?.node;
+      inheritedDirection = sibling?.inheritedDirection;
+    }
+  }
+  return template.innerHTML.trim();
 }
 
 const inlineCodePattern = /(?<![\\\x60])(\x60+)(?!\x60)([^\n]*?)(?<!\x60)\1(?!\x60)/g;
@@ -931,13 +945,24 @@ function decorateMarkdown(tokens, lines) {
   }
 }
 
-function parseMarkdown(markdown, describeBlocks = false) {
-  const source = markdown.replace(/\r\n?/g, '\n');
-  const lines = source.split('\n');
-  const env = {};
-  const tokens = markdownParser.parse(source, env);
-  decorateMarkdown(tokens, lines);
-  const render = (group) => sanitizeHtml(markdownParser.renderer.render(group, markdownParser.options, env)).trim();
+function parseMarkdown(markdown, describeBlocks = false, renderStarts = null) {
+  const isCurrentDocument = markdown === currentDocument?.content;
+  let prepared = isCurrentDocument ? preparedDocumentMarkdown : null;
+  if (!prepared) {
+    const source = markdown.replace(/\r\n?/g, '\n');
+    const lines = source.split('\n');
+    const env = {};
+    const tokens = markdownParser.parse(source, env);
+    decorateMarkdown(tokens, lines);
+    prepared = { source, lines, env, tokens };
+    // The reader and Visual editor use the same token stream. Limit what
+    // stays in memory once rendering is done, especially for large inputs.
+    if (isCurrentDocument && source.length <= 512 * 1024 && tokens.length <= 30000) {
+      preparedDocumentMarkdown = prepared;
+    }
+  }
+  const { source, lines, env, tokens } = prepared;
+  const render = (group) => sanitizeHtml(markdownParser.renderer.render(group, markdownParser.options, env));
   if (!describeBlocks) return render(tokens);
 
   let offset = 0;
@@ -948,14 +973,16 @@ function parseMarkdown(markdown, describeBlocks = false) {
   });
   const blocks = [];
   let nextLine = 0;
-  const add = (startLine, endLine, kind, html) => {
+  const add = (startLine, endLine, kind, group) => {
     const start = offsets[startLine] ?? source.length;
     const end = Math.max(start, (offsets[endLine] ?? offset) - 1);
-    blocks.push({ kind, start, end, source: source.slice(start, end), html });
+    const block = { kind, start, end, source: source.slice(start, end) };
+    if (!renderStarts || renderStarts.has(start)) block.html = group ? render(group) : '<div hidden></div>';
+    blocks.push(block);
   };
   const addDefinitions = (endLine) => {
     if (lines.slice(nextLine, endLine).some((line) => line.trim())) {
-      add(nextLine, endLine, 'definitions', '<div hidden></div>');
+      add(nextLine, endLine, 'definitions', null);
     }
   };
   for (let first = 0; first < tokens.length;) {
@@ -966,7 +993,7 @@ function parseMarkdown(markdown, describeBlocks = false) {
       while (nesting && last < tokens.length) nesting += tokens[last++].nesting;
     }
     if (token.type === 'footnote_block_open') {
-      add(nextLine, lines.length, 'footnotes', render(tokens.slice(first, last)));
+      add(nextLine, lines.length, 'footnotes', tokens.slice(first, last));
       const edits = [];
       let footnoteIndex = -1;
       let label = null;
@@ -1025,7 +1052,7 @@ function parseMarkdown(markdown, describeBlocks = false) {
       } else if (token.markup === '=' || token.markup === '-'
           || (token.type === 'blockquote_open' && tokens.slice(first + 1, last - 1).some((entry) => entry.block &&
             !['paragraph_open', 'paragraph_close', 'inline'].includes(entry.type)))) kind = 'complex';
-      add(start, end, kind, render(tokens.slice(first, last)));
+      add(start, end, kind, tokens.slice(first, last));
       if (kind === 'complex') {
         blocks.at(-1).tableRanges = tokens.slice(first, last)
           .filter((entry) => entry.type === 'table_open' && entry.map)
@@ -1084,10 +1111,15 @@ function editorSearch() {
 }
 
 function clearSearchHighlights() {
-  elements.markdownOutput.querySelectorAll('mark.search-highlight').forEach((highlight) => {
+  const highlights = elements.markdownOutput.querySelectorAll('mark.search-highlight');
+  highlights.forEach((highlight) => {
     highlight.replaceWith(document.createTextNode(highlight.textContent || ''));
   });
-  elements.markdownOutput.normalize();
+  if (highlights.length) elements.markdownOutput.normalize();
+  resetSearchPosition();
+}
+
+function resetSearchPosition() {
   searchMatchCount = 0;
   activeSearchMatchIndex = -1;
 }
@@ -1383,9 +1415,10 @@ document.addEventListener('click', async (event) => {
 }, true);
 
 function showDocument(markdown, name = interfaceText('Untitled.md'), documentId = null, imageBase = '') {
+  if (markdown !== currentDocument?.content) preparedDocumentMarkdown = null;
   currentDocument = { content: markdown, name, documentId, imageBase };
   renderedForPrint = null;
-  clearSearchHighlights();
+  resetSearchPosition();
   elements.markdownOutput.innerHTML = parseMarkdown(markdown);
   addCodeCopyButtons(elements.markdownOutput);
   containWideTables(elements.markdownOutput);
@@ -1472,7 +1505,7 @@ window.markdownVisionReader = {
   saveStatusLabel: (status) => counterText(status),
   getDocument: () => currentDocument ? { ...currentDocument } : null,
   render: (markdown) => parseMarkdown(markdown),
-  renderBlocks: (markdown) => parseMarkdown(markdown, true),
+  renderBlocks: (markdown, renderStarts) => parseMarkdown(markdown, true, renderStarts),
   readCodeFence,
   readListItem,
   tableCellRanges,

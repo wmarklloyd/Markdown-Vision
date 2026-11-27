@@ -17,8 +17,8 @@ node "%ROOT%\tools\export-localization.cjs" --sync-installer
 if errorlevel 1 exit /b %errorlevel%
 node "%ROOT%\tools\check-installer-associations.cjs"
 if errorlevel 1 exit /b %errorlevel%
-set "APP_OUT_NAME=MarkdownVision-Native-Editor-2.8.29"
-if /I "%ARCH%"=="arm64" set "APP_OUT_NAME=MarkdownVision-Native-Editor-2.8.29-arm64"
+set "APP_OUT_NAME=MarkdownVision-Native-Editor-2.8.30"
+if /I "%ARCH%"=="arm64" set "APP_OUT_NAME=MarkdownVision-Native-Editor-2.8.30-arm64"
 call "%~dp0build.bat" "%APP_OUT_NAME%" "%ARCH%"
 if errorlevel 1 exit /b %errorlevel%
 
@@ -38,7 +38,7 @@ popd
 if not "%RESULT%"=="0" exit /b %RESULT%
 
 if /I "%ARCH%"=="arm64" (
-  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.29-Windows-ARM64.exe
+  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.30-Windows-ARM64.exe
 ) else (
-  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.29-Intel-AMD-x64.exe
+  echo %ROOT%\dist\Markdown-Vision-Native-Setup-2.8.30-Intel-AMD-x64.exe
 )

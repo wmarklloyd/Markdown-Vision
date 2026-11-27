@@ -28,14 +28,32 @@ fn read_document(path: PathBuf) -> Result<(OpenDocument, String), String> {
     let bytes = fs::read(&path).map_err(|_| "Markdown Vision could not read this file.")?;
     let bom = bytes.starts_with(&[0xef, 0xbb, 0xbf]);
     let body = if bom { &bytes[3..] } else { &bytes[..] };
-    let text = String::from_utf8_lossy(body);
-    let valid = std::str::from_utf8(body).is_ok();
-    let crlf = text.matches("\r\n").count();
-    let cr = text.matches('\r').count() - crlf;
-    let lf = text.matches('\n').count() - crlf;
-    let mixed = [crlf > 0, cr > 0, lf > 0].into_iter().filter(|v| *v).count() > 1;
-    let ending = if crlf > 0 { "\r\n" } else if cr > 0 { "\r" } else { "\n" };
-    let content = text.replace("\r\n", "\n").replace('\r', "\n");
+    let (text, valid) = match std::str::from_utf8(body) {
+        Ok(text) => (std::borrow::Cow::Borrowed(text), true),
+        Err(_) => (String::from_utf8_lossy(body), false),
+    };
+    let (content, ending, mixed) = if text.contains('\r') {
+        let mut normalized = String::with_capacity(text.len());
+        let mut start = 0;
+        let (mut crlf, mut cr, mut lf) = (false, false, false);
+        for (index, newline) in text.match_indices(['\r', '\n']) {
+            if index < start { continue; }
+            if newline == "\n" {
+                lf = true;
+                continue;
+            }
+            normalized.push_str(&text[start..index]);
+            normalized.push('\n');
+            let paired = text.as_bytes().get(index + 1) == Some(&b'\n');
+            crlf |= paired;
+            cr |= !paired;
+            start = index + if paired { 2 } else { 1 };
+        }
+        normalized.push_str(&text[start..]);
+        (normalized, if crlf { "\r\n" } else { "\r" }, (crlf && (cr || lf)) || (cr && lf))
+    } else {
+        (text.into_owned(), "\n", false)
+    };
     Ok((OpenDocument { id: String::new(), path, bytes, bom, ending, editable: valid && !mixed }, content))
 }
 

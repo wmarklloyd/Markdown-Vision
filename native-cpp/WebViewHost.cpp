@@ -204,8 +204,8 @@ LineEnding DetectLineEnding(const std::string& bytes) {
             if (i + 1 < bytes.size() && bytes[i + 1] == '\n') { crlf = true; ++i; }
             else cr = true;
         } else if (bytes[i] == '\n') lf = true;
+        if ((crlf && (cr || lf)) || (cr && lf)) return LineEnding::mixed;
     }
-    if (static_cast<int>(crlf) + static_cast<int>(cr) + static_cast<int>(lf) > 1) return LineEnding::mixed;
     return crlf ? LineEnding::crlf : cr ? LineEnding::cr : LineEnding::lf;
 }
 
@@ -224,8 +224,8 @@ std::wstring DecodeText(OpenDocument& document) {
     return result;
 }
 
-std::wstring JsonString(const std::wstring& value) {
-    std::wstring output = L"\"";
+void AppendJsonString(std::wstring& output, const std::wstring& value) {
+    output.push_back(L'"');
     for (wchar_t ch : value) {
         switch (ch) {
         case L'\\': output += L"\\\\"; break;
@@ -241,7 +241,14 @@ std::wstring JsonString(const std::wstring& value) {
             } else output += ch;
         }
     }
-    return output + L"\"";
+    output.push_back(L'"');
+}
+
+std::wstring JsonString(const std::wstring& value) {
+    std::wstring output;
+    output.reserve(value.size() + 2);
+    AppendJsonString(output, value);
+    return output;
 }
 
 std::wstring DocumentJson(const std::wstring& path) {
@@ -256,9 +263,12 @@ std::wstring DocumentJson(const std::wstring& path) {
     document.id = std::to_wstring(++g_documentSequence);
     document.path = path;
     const auto text = DecodeText(document);
-    const auto json = L"{\"name\":" + JsonString(std::filesystem::path(path).filename().wstring()) +
+    auto json = L"{\"name\":" + JsonString(std::filesystem::path(path).filename().wstring()) +
         L",\"documentId\":" + JsonString(document.id) + L",\"imageBase\":" +
-        JsonString(MapDocumentImages(document)) + L",\"content\":" + JsonString(text) + L"}";
+        JsonString(MapDocumentImages(document)) + L",\"content\":";
+    json.reserve(json.size() + text.size() + 3);
+    AppendJsonString(json, text);
+    json.push_back(L'}');
     g_document = std::move(document);
     return json;
 }
@@ -498,8 +508,11 @@ std::wstring FontJson() {
 
 void Resolve(const std::wstring& id, const std::wstring& result) {
     if (!g_webView) return;
-    const std::wstring script = L"window.__markdownVisionResolve(" + JsonString(id) + L"," + result + L");";
-    g_webView->ExecuteScript(script.c_str(), nullptr);
+    auto message = L"{\"id\":" + JsonString(id) + L",\"result\":";
+    message.reserve(message.size() + result.size() + 1);
+    message.append(result);
+    message.push_back(L'}');
+    g_webView->PostWebMessageAsJson(message.c_str());
 }
 
 struct UpdateResult {
@@ -744,10 +757,12 @@ void InitializeWebView() {
 (() => {
   let nextId = 1;
   const pending = new Map();
-  window.__markdownVisionResolve = (id, result) => {
+  chrome.webview.addEventListener('message', ({ data }) => {
+    if (!data) return;
+    const { id, result } = data;
     const resolve = pending.get(id);
     if (resolve) { pending.delete(id); resolve(result); }
-  };
+  });
   const request = (method, payload = '') => new Promise((resolve) => {
     const id = String(nextId++);
     pending.set(id, resolve);

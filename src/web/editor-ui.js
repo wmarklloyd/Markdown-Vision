@@ -326,7 +326,7 @@
     dirtyLabel.textContent = status ? window.markdownVisionReader.saveStatusLabel(status) : '';
     saveButton.disabled = saving || (!dirty && !!documentId);
     saveAsButton.disabled = saving;
-    updateWordCount();
+    if (active) updateWordCount();
     window.markdownVisionReader.updatePrintButton();
     if (searchQuery && source.value !== searchDraft) {
       clearTimeout(searchRefreshTimer);
@@ -1038,6 +1038,13 @@
       const { block, rendered, candidates } = entry;
       entry.markedStart = block.start + inserted;
       candidates.sort((left, right) => left.start - right.start);
+      const offsets = new Map();
+      const walker = document.createTreeWalker(rendered, NodeFilter.SHOW_TEXT);
+      let textOffset = 0;
+      while (walker.nextNode()) {
+        offsets.set(walker.currentNode, textOffset);
+        textOffset += walker.currentNode.length;
+      }
       entry.expectedOffsets = candidates.map((candidate, index) => {
         const width = candidate.traceWidth ?? (candidate.text.codePointAt(0) > 0xffff ? 2 : 1);
         const at = block.start + (candidate.traceAt ?? candidate.start + width);
@@ -1045,20 +1052,19 @@
         markedSource += documentSource.slice(previous, at) + token;
         inserted += token.length;
         previous = at;
-        const prefix = document.createRange();
-        prefix.selectNodeContents(rendered);
-        prefix.setEnd(candidate.node, candidate.offset + width);
-        return prefix.toString().length;
+        return offsets.get(candidate.node) + candidate.offset + width;
       });
     }
     markedSource += documentSource.slice(previous);
-    const tracedBlocks = new Map(window.markdownVisionReader.renderBlocks(markedSource).map((block) => [block.start, block]));
+    const starts = new Set(mappedBlocks.map((entry) => entry.markedStart));
+    const tracedBlocks = new Map(window.markdownVisionReader.renderBlocks(markedSource, starts)
+      .filter((block) => block.html !== undefined).map((block) => [block.start, block.html]));
     const template = document.createElement('template');
     const pattern = new RegExp(marker + '(\\d+)\uE001', 'g');
     for (const { block, rendered, candidates, markedStart, expectedOffsets } of mappedBlocks) {
-      const tracedBlock = tracedBlocks.get(markedStart);
-      if (!tracedBlock) continue;
-      template.innerHTML = tracedBlock.html;
+      const tracedHtml = tracedBlocks.get(markedStart);
+      if (tracedHtml === undefined) continue;
+      template.innerHTML = tracedHtml;
       const traced = template.content.firstElementChild?.textContent || '';
       const confirmed = new Set();
       let removed = 0;
@@ -1077,8 +1083,9 @@
     const existing = block.editableLinkLabels || [];
     const firstIndex = existing.reduce((next, label) => Math.max(next, label.index + 1), 0);
     block.editableLinkLabels = existing.concat(safe.map(({ node, offset, ...label }, index) => ({ ...label, index: firstIndex + index })));
-    for (const candidate of [...safe].sort((left, right) => right.offset - left.offset)) {
-      const index = firstIndex + safe.indexOf(candidate);
+    const descending = safe.map((candidate, index) => ({ candidate, index: firstIndex + index }))
+      .sort((left, right) => right.candidate.offset - left.candidate.offset);
+    for (const { candidate, index } of descending) {
       const cell = candidate.tableText ? candidate.node.parentElement.closest('td,th') : null;
       const content = candidate.node.splitText(candidate.offset);
       content.splitText(candidate.text.length);
@@ -2363,6 +2370,7 @@
     document.body.classList.toggle('is-editing', value);
     if (value) {
       tools.scrollLeft = 0;
+      updateWordCount();
       selectView(newDocument ? 'visual' : panes.dataset.view);
       if (!newDocument) restoreReaderPosition(position);
       if ((newDocument || !position) && window.matchMedia('(max-width: 235px)').matches) {
