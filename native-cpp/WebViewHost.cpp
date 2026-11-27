@@ -628,9 +628,15 @@ void HandleMessage(ICoreWebView2WebMessageReceivedEventArgs* args) {
         std::thread(DownloadUpdate, id, version, digest, architecture, g_window).detach();
     } else if (method == L"document.print") {
         ComPtr<ICoreWebView2_16> printView;
-        const bool opened = !g_saving && IsLocalAppMessage(args)
-            && SUCCEEDED(g_webView.As(&printView)) && printView
-            && SUCCEEDED(printView->ShowPrintUI(COREWEBVIEW2_PRINT_DIALOG_KIND_SYSTEM));
+        bool opened = false;
+        if (!g_saving && IsLocalAppMessage(args)
+            && SUCCEEDED(g_webView.As(&printView)) && printView) {
+            HRESULT printResult = printView->ShowPrintUI(COREWEBVIEW2_PRINT_DIALOG_KIND_BROWSER);
+            if (FAILED(printResult)) {
+                printResult = printView->ShowPrintUI(COREWEBVIEW2_PRINT_DIALOG_KIND_SYSTEM);
+            }
+            opened = SUCCEEDED(printResult);
+        }
         Resolve(id, opened ? L"true" : L"false");
     } else if (method == L"fonts.list") Resolve(id, FontJson());
     else Resolve(id, L"null");

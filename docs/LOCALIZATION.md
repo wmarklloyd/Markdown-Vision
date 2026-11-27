@@ -281,6 +281,8 @@ Each JSON array contains the language name, the language label, the restart noti
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | Downloading and verifying the update. You may be asked to authenticate. | `src/web/app.js:1410` | Progress status. An operating system prompt may ask for authentication. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Update installed. Restart to use the new version. | `src/web/app.js:1415` | Status after an update has been installed. The new version takes effect only after restarting the app. |
 | `update_failed_error_e4f7dc` | Update failed: {error} | `src/web/app.js:1418` | Error status when downloading or installing the Linux update fails. Preserve the appended error-detail placeholder. |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Would you like Markdown Vision to open Markdown files by default? | `src/web/app.js:1977` | First-launch setup prompt on Linux and macOS. It appears only when Markdown Vision is not already the default handler. |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Could not set Markdown Vision as the default Markdown app. | `src/web/app.js:1983` | Feedback when the user opts in but the operating system cannot change the file association. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Download and run the Markdown Vision installer? Save any open documents first. Setup may ask to close Markdown Vision. | `src/web/app.js:1428` | Installer confirmation shown before download and launch. |
 | `downloading_and_verifying_update_02b3ba` | Downloading and verifying update… | `src/web/app.js:1432` | Progress status while the update package is downloaded and its integrity is checked. |
 | `installer_started_865e10` | Installer started. | `src/web/app.js:1434` | Status confirming that the downloaded platform installer has launched. |
@@ -611,6 +613,8 @@ Arabic
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | جارٍ تنزيل التحديث والتحقق منه. قد يُطلب منك تأكيد هويتك. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | تم تثبيت التحديث. أعد التشغيل لاستخدام الإصدار الجديد. |
 | `update_failed_error_e4f7dc` | فشل التحديث: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | هل تريد أن يفتح Markdown Vision ملفات Markdown افتراضيًا؟ |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | تعذر تعيين Markdown Vision كتطبيق Markdown الافتراضي. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | هل تريد تنزيل برنامج التثبيت Markdown Vision وتشغيله؟ احفظ أي مستندات مفتوحة أولاً. قد يطلب برنامج الإعداد إغلاق Markdown Vision. |
 | `downloading_and_verifying_update_02b3ba` | جارٍ التنزيل والتحقق من التحديث… |
 | `installer_started_865e10` | بدأ برنامج التثبيت. |
@@ -941,6 +945,8 @@ Chinese (Simplified)
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | 正在下载并验证更新。可能会要求您进行身份验证。 |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | 已安装更新。重新启动即可使用新版本。 |
 | `update_failed_error_e4f7dc` | 更新失败：{error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | 要将 Markdown Vision 设为默认的 Markdown 文件打开应用吗？ |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | 无法将 Markdown Vision 设为默认的 Markdown 应用。 |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | 下载并运行 Markdown Vision 安装程序？首先保存所有打开的文档。安装程序可能会要求关闭 Markdown Vision。 |
 | `downloading_and_verifying_update_02b3ba` | 正在下载并验证更新… |
 | `installer_started_865e10` | 安装程序开始。 |
@@ -1271,6 +1277,8 @@ Chinese (Traditional)
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | 正在下載並驗證更新。系統可能會要求您驗證身分。 |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | 已安裝更新。重新啟動即可使用新版本。 |
 | `update_failed_error_e4f7dc` | 更新失敗：{error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | 要將 Markdown Vision 設為預設的 Markdown 檔案開啟應用程式嗎？ |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | 無法將 Markdown Vision 設為預設的 Markdown 應用程式。 |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | 下載並執行 Markdown Vision 安裝程式？首先儲存所有開啟的檔案。安裝程式可能會要求關閉 Markdown Vision。 |
 | `downloading_and_verifying_update_02b3ba` | 正在下載並驗證更新… |
 | `installer_started_865e10` | 安裝程式開始。 |
@@ -1601,6 +1609,8 @@ Czech
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | Probíhá stahování a ověřování aktualizace. Můžete být požádáni o ověření totožnosti. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Aktualizace nainstalována. Chcete-li používat novou verzi, restartujte. |
 | `update_failed_error_e4f7dc` | Aktualizace se nezdařila: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Chcete nastavit Markdown Vision jako výchozí aplikaci pro otevírání souborů Markdown? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Markdown Vision se nepodařilo nastavit jako výchozí aplikaci pro Markdown. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Stáhnout a spustit instalační program Markdown Vision? Všechny otevřené dokumenty nejprve uložte. Instalační program může požádat o ukončení Markdown Vision. |
 | `downloading_and_verifying_update_02b3ba` | Stahování a ověřování aktualizace… |
 | `installer_started_865e10` | Instalační program byl spuštěn. |
@@ -1931,6 +1941,8 @@ Dutch
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | De update wordt gedownload en gecontroleerd. Mogelijk wordt u gevraagd uw identiteit te bevestigen. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Update geïnstalleerd. Start opnieuw op om de nieuwe versie te gebruiken. |
 | `update_failed_error_e4f7dc` | Update mislukt: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Wilt u Markdown Vision instellen als standaardapp voor het openen van Markdown-bestanden? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Markdown Vision kan niet worden ingesteld als de standaardapp voor Markdown. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Wilt u het Markdown Vision-installatieprogramma downloaden en uitvoeren? Sla eventuele geopende documenten eerst op. Het installatieprogramma vraagt mogelijk om Markdown Vision te sluiten. |
 | `downloading_and_verifying_update_02b3ba` | Update downloaden en verifiëren… |
 | `installer_started_865e10` | Het installatieprogramma is gestart. |
@@ -2261,6 +2273,8 @@ French
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | Téléchargement et vérification de la mise à jour. Il vous sera peut-être demandé de vous authentifier. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Mise à jour installée. Redémarrez pour utiliser la nouvelle version. |
 | `update_failed_error_e4f7dc` | Échec de la mise à jour : {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Voulez-vous définir Markdown Vision comme application par défaut pour ouvrir les fichiers Markdown ? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Impossible de définir Markdown Vision comme application Markdown par défaut. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Télécharger et exécuter le programme d’installation de Markdown Vision ? Enregistrez d’abord tous les documents ouverts. Le programme d’installation peut demander de fermer Markdown Vision. |
 | `downloading_and_verifying_update_02b3ba` | Téléchargement et vérification de la mise à jour… |
 | `installer_started_865e10` | Le programme d’installation a démarré. |
@@ -2591,6 +2605,8 @@ German
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | Herunterladen und Überprüfen des Updates. Möglicherweise werden Sie zur Authentifizierung aufgefordert. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Update installiert. Starten Sie neu, um die neue Version zu verwenden. |
 | `update_failed_error_e4f7dc` | Aktualisierung fehlgeschlagen: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Möchten Sie Markdown Vision als Standard-App zum Öffnen von Markdown-Dateien festlegen? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Markdown Vision konnte nicht als Standard-App für Markdown festgelegt werden. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Das Markdown Vision-Installationsprogramm herunterladen und ausführen? Speichern Sie zunächst alle geöffneten Dokumente. Das Installationsprogramm fordert möglicherweise dazu auf, Markdown Vision zu schließen. |
 | `downloading_and_verifying_update_02b3ba` | Update wird heruntergeladen und überprüft… |
 | `installer_started_865e10` | Das Installationsprogramm wurde gestartet. |
@@ -2921,6 +2937,8 @@ Hindi
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | अपडेट डाउनलोड और सत्यापित किया जा रहा है। आपसे अपनी पहचान की पुष्टि करने के लिए कहा जा सकता है। |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | अद्यतन स्थापित किया गया. नए संस्करण का उपयोग करने के लिए पुनः प्रारंभ करें. |
 | `update_failed_error_e4f7dc` | अद्यतन विफल: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | क्या आप Markdown फ़ाइलें खोलने के लिए Markdown Vision को डिफ़ॉल्ट ऐप बनाना चाहते हैं? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Markdown Vision को डिफ़ॉल्ट Markdown ऐप के रूप में सेट नहीं किया जा सका। |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Markdown Vision इंस्टॉलर डाउनलोड करें और चलाएं? किसी भी खुले दस्तावेज़ को पहले सहेजें। सेटअप Markdown Vision को बंद करने के लिए कह सकता है। |
 | `downloading_and_verifying_update_02b3ba` | अपडेट डाउनलोड और सत्यापित किया जा रहा है… |
 | `installer_started_865e10` | इंस्टॉलर प्रारंभ हुआ. |
@@ -3251,6 +3269,8 @@ Indonesian
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | Mengunduh dan memverifikasi pembaruan. Anda mungkin diminta untuk mengautentikasi. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Pembaruan diinstal. Mulai ulang untuk menggunakan versi baru. |
 | `update_failed_error_e4f7dc` | Pembaruan gagal: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Jadikan Markdown Vision aplikasi default untuk membuka file Markdown? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Markdown Vision tidak dapat dijadikan aplikasi default untuk Markdown. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Unduh dan jalankan penginstal Markdown Vision? Simpan semua dokumen yang terbuka terlebih dahulu. Penyiapan mungkin meminta untuk menutup Markdown Vision. |
 | `downloading_and_verifying_update_02b3ba` | Mengunduh dan memverifikasi pembaruan… |
 | `installer_started_865e10` | Penginstal dimulai. |
@@ -3581,6 +3601,8 @@ Italian
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | Download e verifica dell'aggiornamento. Potrebbe esserti chiesto di autenticarti. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Aggiornamento installato. Riavvia per utilizzare la nuova versione. |
 | `update_failed_error_e4f7dc` | Aggiornamento non riuscito: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Vuoi impostare Markdown Vision come app predefinita per aprire i file Markdown? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Impossibile impostare Markdown Vision come app predefinita per Markdown. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Scaricare ed eseguire il programma di installazione Markdown Vision? Salvare prima tutti i documenti aperti. Il programma di installazione potrebbe chiedere di chiudere Markdown Vision. |
 | `downloading_and_verifying_update_02b3ba` | Download e verifica dell'aggiornamento… |
 | `installer_started_865e10` | Avviato il programma di installazione. |
@@ -3911,6 +3933,8 @@ Japanese
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | アップデートをダウンロードして確認しています。認証を求められる場合があります。 |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | アップデートがインストールされました。新しいバージョンを使用するには再起動してください。 |
 | `update_failed_error_e4f7dc` | アップデートに失敗しました: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Markdown ファイルを開くデフォルトのアプリとして Markdown Vision を設定しますか？ |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Markdown Vision を Markdown のデフォルトアプリとして設定できませんでした。 |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Markdown Vision インストーラーをダウンロードして実行しますか？先に開いているドキュメントを保存してください。セットアップ中に Markdown Vision を閉じるよう求められる場合があります。 |
 | `downloading_and_verifying_update_02b3ba` | アップデートをダウンロードして確認しています… |
 | `installer_started_865e10` | インストーラーが起動しました。 |
@@ -4241,6 +4265,8 @@ Korean
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | 업데이트를 다운로드하고 확인하는 중입니다. 인증하라는 메시지가 표시될 수 있습니다. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | 업데이트가 설치되었습니다. 새 버전을 사용하려면 다시 시작하세요. |
 | `update_failed_error_e4f7dc` | 업데이트 실패: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Markdown 파일을 여는 기본 앱으로 Markdown Vision을 설정할까요? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Markdown Vision을 Markdown 기본 앱으로 설정하지 못했습니다. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Markdown Vision 설치 프로그램을 다운로드하고 실행하시겠습니까? 열려 있는 문서를 먼저 저장하세요. 설치 프로그램에서 Markdown Vision을 닫도록 요청할 수 있습니다. |
 | `downloading_and_verifying_update_02b3ba` | 업데이트 다운로드 및 확인 중… |
 | `installer_started_865e10` | 설치 프로그램이 시작되었습니다. |
@@ -4571,6 +4597,8 @@ Polish
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | Pobieranie i weryfikacja aktualizacji. Możesz zostać poproszony o uwierzytelnienie. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Aktualizacja zainstalowana. Uruchom ponownie, aby korzystać z nowej wersji. |
 | `update_failed_error_e4f7dc` | Aktualizacja nie powiodła się: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Czy ustawić Markdown Vision jako domyślną aplikację do otwierania plików Markdown? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Nie udało się ustawić Markdown Vision jako domyślnej aplikacji Markdown. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Pobrać i uruchomić instalator Markdown Vision? Najpierw zapisz wszystkie otwarte dokumenty. Instalator może poprosić o zamknięcie Markdown Vision. |
 | `downloading_and_verifying_update_02b3ba` | Pobieram i weryfikuję aktualizację… |
 | `installer_started_865e10` | Instalator został uruchomiony. |
@@ -4901,6 +4929,8 @@ Portuguese (Brazil)
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | Baixando e verificando a atualização. Você pode ser solicitado a se autenticar. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Atualização instalada. Reinicie para usar a nova versão. |
 | `update_failed_error_e4f7dc` | Falha na atualização: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Deseja definir o Markdown Vision como aplicativo padrão para abrir arquivos Markdown? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Não foi possível definir o Markdown Vision como aplicativo padrão para Markdown. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Baixar e executar o instalador do Markdown Vision? Salve os documentos abertos primeiro. O instalador pode pedir para fechar o Markdown Vision. |
 | `downloading_and_verifying_update_02b3ba` | Baixando e verificando a atualização… |
 | `installer_started_865e10` | O instalador foi iniciado. |
@@ -5231,6 +5261,8 @@ Russian
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | Загрузка и проверка обновления. Вас могут попросить пройти аутентификацию. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Обновление установлено. Перезапустите приложение, чтобы использовать новую версию. |
 | `update_failed_error_e4f7dc` | Обновление не выполнено: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Назначить Markdown Vision приложением по умолчанию для открытия файлов Markdown? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Не удалось назначить Markdown Vision приложением по умолчанию для Markdown. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Скачать и запустить установщик Markdown Vision? Сначала сохраните все открытые документы. Программа установки может попросить закрыть Markdown Vision. |
 | `downloading_and_verifying_update_02b3ba` | Загрузка и проверка обновления… |
 | `installer_started_865e10` | Установщик запустился. |
@@ -5561,6 +5593,8 @@ Spanish
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | Descargando y verificando la actualización. Es posible que se le solicite que se autentique. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Actualización instalada. Reinicie para usar la nueva versión. |
 | `update_failed_error_e4f7dc` | Error en la actualización: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | ¿Quieres establecer Markdown Vision como aplicación predeterminada para abrir archivos Markdown? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | No se pudo establecer Markdown Vision como la aplicación predeterminada para Markdown. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | ¿Descargar y ejecutar el instalador de Markdown Vision? Guarde primero los documentos abiertos. Es posible que el instalador le pida cerrar Markdown Vision. |
 | `downloading_and_verifying_update_02b3ba` | Descargando y verificando la actualización… |
 | `installer_started_865e10` | Se inició el instalador. |
@@ -5891,6 +5925,8 @@ Swedish
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | Laddar ner och verifierar uppdateringen. Du kan bli ombedd att autentisera. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Uppdatering installerad. Starta om för att använda den nya versionen. |
 | `update_failed_error_e4f7dc` | Uppdatering misslyckades: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Vill du ange Markdown Vision som standardapp för att öppna Markdown-filer? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Det gick inte att ange Markdown Vision som standardapp för Markdown. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Ladda ner och kör Markdown Vision installationsprogrammet? Spara alla öppna dokument först. Installationen kan begära att stänga Markdown Vision. |
 | `downloading_and_verifying_update_02b3ba` | Laddar ned och verifierar uppdatering… |
 | `installer_started_865e10` | Installationsprogrammet har startat. |
@@ -6221,6 +6257,8 @@ Thai
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | กำลังดาวน์โหลดและตรวจสอบการอัปเดต คุณอาจถูกขอให้ตรวจสอบสิทธิ์ |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | ติดตั้งการอัปเดตแล้ว รีสตาร์ทเพื่อใช้เวอร์ชันใหม่ |
 | `update_failed_error_e4f7dc` | การอัปเดตล้มเหลว: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | ตั้ง Markdown Vision เป็นแอปเริ่มต้นสำหรับเปิดไฟล์ Markdown หรือไม่ |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | ตั้ง Markdown Vision เป็นแอปเริ่มต้นสำหรับ Markdown ไม่สำเร็จ |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | ดาวน์โหลดและรันโปรแกรมติดตั้ง Markdown Vision หรือไม่ บันทึกเอกสารที่เปิดอยู่ก่อน โปรแกรมติดตั้งอาจขอให้ปิด Markdown Vision |
 | `downloading_and_verifying_update_02b3ba` | กำลังดาวน์โหลดและยืนยันการอัปเดต… |
 | `installer_started_865e10` | ตัวติดตั้งเริ่มต้นขึ้น |
@@ -6551,6 +6589,8 @@ Turkish
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | Güncelleme indiriliyor ve doğrulanıyor. Kimliğinizi doğrulamanız istenebilir. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Güncelleme yüklendi. Yeni sürümü kullanmak için yeniden başlatın. |
 | `update_failed_error_e4f7dc` | Güncelleme başarısız oldu: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Markdown dosyalarını açmak için Markdown Vision varsayılan uygulama olarak ayarlansın mı? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Markdown Vision, Markdown için varsayılan uygulama olarak ayarlanamadı. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Markdown Vision yükleyicisi indirilsin ve çalıştırılsın mı? Önce açık belgeleri kaydedin. Yükleyici, Markdown Vision uygulamasını kapatmanızı isteyebilir. |
 | `downloading_and_verifying_update_02b3ba` | Güncelleme indiriliyor ve doğrulanıyor… |
 | `installer_started_865e10` | Yükleyici başlatıldı. |
@@ -6881,6 +6921,8 @@ Ukrainian
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | Завантаження та перевірка оновлення. Вас можуть попросити пройти автентифікацію. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Оновлення встановлено. Перезапустіть, щоб використовувати нову версію. |
 | `update_failed_error_e4f7dc` | Помилка оновлення: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Зробити Markdown Vision типовою програмою для відкриття файлів Markdown? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Не вдалося зробити Markdown Vision типовою програмою для Markdown. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Завантажити та запустити програму встановлення Markdown Vision? Спершу збережіть усі відкриті документи. Інсталятор може попросити закрити Markdown Vision. |
 | `downloading_and_verifying_update_02b3ba` | Завантаження та перевірка оновлення… |
 | `installer_started_865e10` | Інсталятор запущено. |
@@ -7211,6 +7253,8 @@ Vietnamese
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | Đang tải xuống và xác minh bản cập nhật. Bạn có thể được yêu cầu xác thực. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Đã cài đặt bản cập nhật. Khởi động lại để sử dụng phiên bản mới. |
 | `update_failed_error_e4f7dc` | Cập nhật không thành công: {error} |
+| `would_you_like_markdown_vision_to_open_markdown_files_by_default_bbb9b1` | Đặt Markdown Vision làm ứng dụng mặc định để mở tệp Markdown? |
+| `could_not_set_markdown_vision_as_the_default_markdown_app_e69d50` | Không thể đặt Markdown Vision làm ứng dụng Markdown mặc định. |
 | `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Tải xuống và chạy trình cài đặt Markdown Vision? Lưu mọi tài liệu đang mở trước tiên. Thiết lập có thể yêu cầu đóng Markdown Vision. |
 | `downloading_and_verifying_update_02b3ba` | Đang tải xuống và xác minh bản cập nhật… |
 | `installer_started_865e10` | Trình cài đặt đã bắt đầu. |

@@ -85,6 +85,8 @@ const previewInterfaceSources = [
   'Unable to check for updates. Check your internet connection and try again.',
   'Downloading and verifying the update. You may be asked to authenticate.',
   'Update installed. Restart to use the new version.', 'Update failed: {error}',
+  'Would you like Markdown Vision to open Markdown files by default?',
+  'Could not set Markdown Vision as the default Markdown app.',
   'Download and run the Markdown Vision installer? Save any open documents first. Setup may ask to close Markdown Vision.',
   'Downloading and verifying update…', 'Installer started.',
   'Could not download, verify, or start the installer. Please try again.',

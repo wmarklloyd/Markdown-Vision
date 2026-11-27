@@ -5,7 +5,7 @@ Unicode True
 !include "installer-localization.nsh"
 
 !define APP_NAME "Markdown Vision"
-!define APP_VERSION "2.8.27"
+!define APP_VERSION "2.8.28"
 !define APP_ID "8d1dd6d6-9e38-5fc2-8139-94aece1f4a40"
 !ifndef SOURCE_DIR
 !ifdef ARM64
@@ -52,6 +52,7 @@ UninstPage instfiles
 
 Var DefaultMarkdownCheckbox
 Var SetAsDefaultMarkdown
+Var MarkdownIsDefault
 Var LaunchAfterInstallCheckbox
 
 ; NSIS falls back by primary language when no exact locale is available.
@@ -81,6 +82,21 @@ Function .onInit
 !endif
   SetRegView 64
   ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_ID}" "InstallLocation"
+  StrCpy $MarkdownIsDefault "0"
+  ReadRegStr $1 HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\UserChoice" "ProgId"
+  ${If} $1 != ""
+    ${If} $1 == "${APP_PROGID}"
+      StrCpy $MarkdownIsDefault "1"
+    ${EndIf}
+  ${Else}
+    ReadRegStr $1 HKCU "Software\Classes\.md" ""
+    ${If} $1 == ""
+      ReadRegStr $1 HKLM "Software\Classes\.md" ""
+    ${EndIf}
+    ${If} $1 == "${APP_PROGID}"
+      StrCpy $MarkdownIsDefault "1"
+    ${EndIf}
+  ${EndIf}
   ${If} $0 != ""
     ; Preferences belong to the WebView profile for the installed app page.
     ; Keep custom installation paths as the default for upgrades.
@@ -142,6 +158,9 @@ no_previous_install:
 FunctionEnd
 
 Function DefaultMarkdownPage
+  ${If} $MarkdownIsDefault == "1"
+    Abort
+  ${EndIf}
   nsDialogs::Create 1018
   Pop $0
   ${If} $0 == error
@@ -192,6 +211,7 @@ Function FinishPageLeave
     Exec '"$WINDIR\explorer.exe" "$INSTDIR\${APP_EXE}"'
   ${EndIf}
   ${If} $SetAsDefaultMarkdown == "1"
+  ${AndIf} $MarkdownIsDefault != "1"
     Exec '"$WINDIR\explorer.exe" "ms-settings:defaultapps"'
   ${EndIf}
 FunctionEnd

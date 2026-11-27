@@ -1,6 +1,6 @@
 [package]
 name = "markdown-vision"
-version = "2.8.27"
+version = "2.8.28"
 edition = "2021"
 
 [workspace]
@@ -20,6 +20,13 @@ open = "5"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 tauri-plugin-single-instance = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = { version = "0.6.2", default-features = false, features = ["std"] }
+objc2 = { version = "0.6.5", default-features = false, features = ["std"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["block2", "NSWorkspace", "objc2-uniform-type-identifiers"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["NSBundle", "NSError", "NSObject", "NSURL", "NSString"] }
+objc2-uniform-type-identifiers = { version = "0.3.2", default-features = false, features = ["UTType"] }
 
 [profile.release]
 strip = true
