@@ -194,21 +194,24 @@ wait_for_file "$pdf"
 file "$pdf" | grep -q 'PDF document'
 cp "$pdf" "$evidence/linux-print.pdf"
 stage='editing a new document'
-xdotool windowfocus --sync "$app_window" key ctrl+n
+xdotool windowfocus --sync "$app_window" key --clearmodifiers ctrl+n
+require_window '^Untitled\.md$'
+stage='pasting and copying UTF-8 text'
 printf '\303\251' | xclip -selection clipboard -i
-xdotool key ctrl+v
-xdotool key ctrl+a ctrl+c
+xdotool key --delay 120 ctrl+v ctrl+a ctrl+c
 wait_for_clipboard "$(printf '\303\251')" "$evidence/composition.txt"
 grep -q 'é' "$evidence/composition.txt"
+stage='copying text from the editor'
 xdotool key BackSpace
 xdotool type --clearmodifiers 'Unsaved Linux test'
 xdotool key ctrl+a ctrl+c
 wait_for_clipboard 'Unsaved Linux test' "$evidence/clipboard.txt"
 grep -q 'Unsaved Linux test' "$evidence/clipboard.txt"
-xdotool key End ctrl+v ctrl+z ctrl+shift+z
-xdotool key ctrl+a ctrl+c
+stage='undoing and redoing a paste'
+xdotool key --delay 120 End ctrl+v ctrl+z ctrl+shift+z ctrl+a ctrl+c
 wait_for_clipboard 'Unsaved Linux test' "$evidence/clipboard-after-redo.txt"
 test "$(grep -o 'Unsaved Linux test' "$evidence/clipboard-after-redo.txt" | wc -l)" -eq 2
+stage='searching the editor'
 xdotool key ctrl+f
 xdotool type --clearmodifiers 'Linux'
 attempt=0
