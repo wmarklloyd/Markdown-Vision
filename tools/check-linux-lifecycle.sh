@@ -9,6 +9,14 @@ mkdir -p "$evidence"
 case "$app" in /*) ;; *) app="$(cd "$(dirname "$app")" && pwd)/$(basename "$app")" ;; esac
 case "$fixture" in /*) ;; *) fixture="$(cd "$(dirname "$fixture")" && pwd)/$(basename "$fixture")" ;; esac
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/markdown-vision-lifecycle.XXXXXX")
+# Keep the opt-in setup prompt out of this GUI lifecycle run; its association
+# choice is already covered by the native service checks.
+desktop_entry=$(find /usr/share/applications -maxdepth 1 -type f -name '*.desktop' \
+  -exec grep -lE '^Exec=.*markdown-vision([[:space:]]|$)' {} + | head -n 1)
+test -n "$desktop_entry"
+desktop_id=$(basename "$desktop_entry")
+xdg-mime default "$desktop_id" text/markdown
+test "$(xdg-mime query default text/markdown)" = "$desktop_id"
 wait_for_window() {
   title=$1
   attempt=0
@@ -63,33 +71,15 @@ wait_for_app_window() {
   echo "::error title=Linux application window timeout::No visible window for process $pid. Visible windows: ${window_titles:-none}. App log: ${app_log:-empty}."
   return 1
 }
-wait_for_no_auxiliary_window() {
-  main_window=$1
-  attempt=0
-  while [ "$attempt" -lt 20 ]; do
-    auxiliary=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | while read -r candidate; do
-      [ "$candidate" = "$main_window" ] || printf '%s\n' "$candidate"
-    done)
-    if [ -z "$auxiliary" ]; then return 0; fi
-    printf '%s\n' "$auxiliary" | while read -r candidate; do
-      xdotool windowfocus --sync "$candidate"
-      xdotool key --clearmodifiers --window "$candidate" Escape
-    done
-    attempt=$((attempt + 1))
-    sleep 0.25
-  done
-  auxiliary_info=$(printf '%s\n' "$auxiliary" | while read -r candidate; do
-    printf '%s[name=%s,pid=%s] ' "$candidate" "$(xdotool getwindowname "$candidate" 2>/dev/null || true)" "$(xdotool getwindowpid "$candidate" 2>/dev/null || true)"
-  done)
-  echo "::error title=Linux setup prompt did not close::Auxiliary window(s) remained: $auxiliary_info"
-  return 1
-}
 wait_for_new_window() {
-  main_window=$1
+  baseline_windows=$1
   attempt=0
   while [ "$attempt" -lt 60 ]; do
     window=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | while read -r candidate; do
-      [ "$candidate" = "$main_window" ] || printf '%s\n' "$candidate"
+      case " $baseline_windows " in
+        *" $candidate "*) ;;
+        *) printf '%s\n' "$candidate" ;;
+      esac
     done | head -n 1)
     if [ -n "$window" ]; then return 0; fi
     attempt=$((attempt + 1))
@@ -138,12 +128,9 @@ wait_for_clipboard() {
   return 1
 }
 wait_for_app_window
-# Decline the first-run default-app prompt in this isolated test profile.
-sleep 1
-xdotool key --clearmodifiers Escape
-wait_for_no_auxiliary_window "$window"
+baseline_windows=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | tr '\n' ' ')
 xdotool windowfocus --sync "$window" key ctrl+p
-wait_for_new_window "$window"
+wait_for_new_window "$baseline_windows"
 print_dialog=$window
 import -window root "$evidence/linux-print.png"
 xdotool mousemove --window "$print_dialog" 85 85 click 1
