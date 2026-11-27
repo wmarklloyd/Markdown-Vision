@@ -1,6 +1,8 @@
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = Split-Path $PSScriptRoot -Parent
+& node (Join-Path $repositoryRoot 'tools\export-localization.cjs') --check-generated
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $localDotnet = Join-Path $repositoryRoot '.tmp\dotnet\dotnet.exe'
 $dotnet = if (Test-Path $localDotnet) { $localDotnet } else { 'dotnet' }
 $project = Join-Path $PSScriptRoot 'MarkdownVision.Native.csproj'

@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "EmbeddedWebAssets.h"
+#include "StartupTranslations.h"
 
 using Microsoft::WRL::Callback;
 using Microsoft::WRL::ComPtr;
@@ -41,6 +42,17 @@ bool g_initialTaken = false;
 bool g_saving = false;
 unsigned long long g_documentSequence = 0;
 std::wstring g_webContentDirectory;
+struct FileDialogLabels {
+    std::wstring open = L"Open Markdown file";
+    std::wstring save = L"Save Markdown file";
+    std::wstring markdown = L"Markdown files";
+    std::wstring text = L"Text files";
+    std::wstring all = L"All files";
+    std::wstring readError = L"Markdown Vision could not read this file.";
+    std::wstring untitled = L"Untitled.md";
+    bool rightToLeft = false;
+};
+FileDialogLabels g_fileDialogLabels;
 
 enum class LineEnding { lf, crlf, cr, mixed };
 
@@ -171,6 +183,10 @@ bool PrepareEmbeddedWebAssets() {
         return true;
     }
 
+#ifdef MARKDOWN_VISION_ISOLATED_TEST
+    // An isolated test build must never fall back to the installed app cache.
+    return false;
+#else
     PWSTR localAppData = nullptr;
     if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &localAppData)) || !localAppData) return false;
     const auto cacheDirectory = std::filesystem::path(localAppData) / L"Markdown Vision Native" / L"web";
@@ -178,6 +194,7 @@ bool PrepareEmbeddedWebAssets() {
     if (!WriteEmbeddedWebAssets(cacheDirectory)) return false;
     g_webContentDirectory = cacheDirectory.wstring();
     return true;
+#endif
 }
 
 LineEnding DetectLineEnding(const std::string& bytes) {
@@ -232,7 +249,8 @@ std::wstring DocumentJson(const std::wstring& path) {
     OpenDocument document;
     if (!ReadFileBytes(path, document.bytes) ||
         document.bytes.size() > static_cast<size_t>((std::numeric_limits<int>::max)())) {
-        MessageBoxW(g_window, L"Markdown Vision could not read this file.", kAppName, MB_OK | MB_ICONERROR);
+        MessageBoxW(g_window, g_fileDialogLabels.readError.c_str(), kAppName, MB_OK | MB_ICONERROR |
+            (g_fileDialogLabels.rightToLeft ? MB_RTLREADING | MB_RIGHT : 0));
         return L"null";
     }
     document.id = std::to_wstring(++g_documentSequence);
@@ -258,26 +276,53 @@ std::wstring PickDocument() {
     dialog.hwndOwner = g_window;
     dialog.lpstrFile = path;
     dialog.nMaxFile = static_cast<DWORD>(std::size(path));
-    dialog.lpstrFilter =
-        L"Markdown files (*.md;*.markdown;*.mdown;*.mkd)\0*.md;*.markdown;*.mdown;*.mkd\0"
-        L"Text files (*.txt)\0*.txt\0\0";
-    dialog.lpstrTitle = L"Open Markdown file";
+    std::wstring filter;
+    const auto addFilter = [&](const std::wstring& label, const wchar_t* extensions) {
+        filter += label + L" (";
+        if (g_fileDialogLabels.rightToLeft) filter.push_back(L'\x2066');
+        filter += extensions;
+        if (g_fileDialogLabels.rightToLeft) filter.push_back(L'\x2069');
+        filter += L")";
+        filter.push_back(L'\0');
+        filter += extensions;
+        filter.push_back(L'\0');
+    };
+    addFilter(g_fileDialogLabels.markdown, L"*.md;*.markdown;*.mdown;*.mkd");
+    addFilter(g_fileDialogLabels.text, L"*.txt");
+    filter.push_back(L'\0');
+    dialog.lpstrFilter = filter.c_str();
+    dialog.lpstrTitle = g_fileDialogLabels.open.c_str();
     dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
     if (!GetOpenFileNameW(&dialog)) return {};
     return path;
 }
 
 std::wstring PickSavePath(const OpenDocument* document) {
-    wchar_t path[32768] = L"Untitled.md";
+    wchar_t path[32768]{};
+    wcsncpy_s(path, g_fileDialogLabels.untitled.c_str(), _TRUNCATE);
     const std::wstring directory = document ? std::filesystem::path(document->path).parent_path().wstring() : L"";
     if (document) wcsncpy_s(path, document->path.c_str(), _TRUNCATE);
     OPENFILENAMEW dialog{sizeof(dialog)};
     dialog.hwndOwner = g_window;
     dialog.lpstrFile = path;
     dialog.nMaxFile = static_cast<DWORD>(std::size(path));
-    dialog.lpstrFilter = L"Markdown files (*.md;*.markdown;*.mdown;*.mkd)\0*.md;*.markdown;*.mdown;*.mkd\0"
-        L"Text files (*.txt)\0*.txt\0All files\0*.*\0\0";
-    dialog.lpstrTitle = L"Save Markdown file";
+    std::wstring filter;
+    const auto addFilter = [&](const std::wstring& label, const wchar_t* extensions) {
+        filter += label + L" (";
+        if (g_fileDialogLabels.rightToLeft) filter.push_back(L'\x2066');
+        filter += extensions;
+        if (g_fileDialogLabels.rightToLeft) filter.push_back(L'\x2069');
+        filter += L")";
+        filter.push_back(L'\0');
+        filter += extensions;
+        filter.push_back(L'\0');
+    };
+    addFilter(g_fileDialogLabels.markdown, L"*.md;*.markdown;*.mdown;*.mkd");
+    addFilter(g_fileDialogLabels.text, L"*.txt");
+    addFilter(g_fileDialogLabels.all, L"*.*");
+    filter.push_back(L'\0');
+    dialog.lpstrFilter = filter.c_str();
+    dialog.lpstrTitle = g_fileDialogLabels.save.c_str();
     dialog.lpstrInitialDir = directory.empty() ? nullptr : directory.c_str();
     dialog.lpstrDefExt = L"md";
     dialog.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
@@ -538,6 +583,24 @@ void HandleMessage(ICoreWebView2WebMessageReceivedEventArgs* args) {
     if (method == L"document.initial") {
         Resolve(id, g_initialTaken ? L"null" : DocumentJson(g_startupPath));
         g_initialTaken = true;
+    } else if (method == L"document.labels") {
+        if (argument == std::wstring::npos || !IsLocalAppMessage(args)) { Resolve(id, L"false"); return; }
+        std::vector<std::wstring> labels;
+        size_t start = argument + 1;
+        while (start <= message.size()) {
+            const auto end = message.find(L'|', start);
+            labels.push_back(message.substr(start, end == std::wstring::npos ? end : end - start));
+            if (end == std::wstring::npos) break;
+            start = end + 1;
+        }
+        const bool valid = labels.size() == 8 && (labels[7] == L"rtl" || labels[7] == L"ltr") &&
+            std::all_of(labels.begin(), labels.end(), [](const std::wstring& label) {
+            return !label.empty() && label.size() <= 256
+                && std::none_of(label.begin(), label.end(), [](wchar_t ch) { return ch < 32 || (ch >= 127 && ch <= 159); });
+        }) && labels[6].size() > 3 && labels[6].substr(labels[6].size() - 3) == L".md"
+            && labels[6].front() != L'.' && labels[6].find_first_of(L"<>:\"/\\|?*") == std::wstring::npos;
+        if (valid) g_fileDialogLabels = { labels[0], labels[1], labels[2], labels[3], labels[4], labels[5], labels[6], labels[7] == L"rtl" };
+        Resolve(id, valid ? L"true" : L"false");
     } else if (method == L"document.open") Resolve(id, g_saving ? L"null" : DocumentJson(PickDocument()));
     else if (method == L"document.save" || method == L"document.saveAs") {
         const size_t body = argument == std::wstring::npos ? argument : message.find(L'|', argument + 1);
@@ -618,21 +681,28 @@ void ResizeWebView() {
 }
 
 void InitializeWebView() {
+    const auto startupErrors = StartupErrorsForLanguage(GetUserDefaultUILanguage());
+    const UINT errorFlags = MB_OK | MB_ICONERROR | (startupErrors.rtl ? MB_RTLREADING | MB_RIGHT : 0);
     if (!PrepareEmbeddedWebAssets()) {
-        MessageBoxW(g_window, L"Markdown Vision could not prepare its application files in your local app data folder.",
-            kAppName, MB_OK | MB_ICONERROR);
+        MessageBoxW(g_window, startupErrors.assets, kAppName, errorFlags);
         return;
     }
+#ifdef MARKDOWN_VISION_ISOLATED_TEST
+    const auto userData = std::filesystem::path(ModuleDirectory()) / L"test-profile";
+#else
     PWSTR localAppData = nullptr;
     SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &localAppData);
     const auto userData = std::filesystem::path(localAppData) / L"Markdown Vision Native" / L"WebView2";
     CoTaskMemFree(localAppData);
+#endif
 
     CreateCoreWebView2EnvironmentWithOptions(nullptr, userData.c_str(), nullptr,
         Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
             [](HRESULT result, ICoreWebView2Environment* environment) -> HRESULT {
                 if (FAILED(result) || !environment) {
-                    MessageBoxW(g_window, L"Microsoft Edge WebView2 Runtime is required.", kAppName, MB_OK | MB_ICONERROR);
+                    const auto errors = StartupErrorsForLanguage(GetUserDefaultUILanguage());
+                    MessageBoxW(g_window, errors.webview, kAppName,
+                        MB_OK | MB_ICONERROR | (errors.rtl ? MB_RTLREADING | MB_RIGHT : 0));
                     return result;
                 }
                 g_environment = environment;
@@ -677,11 +747,30 @@ void InitializeWebView() {
     pending.set(id, resolve);
     chrome.webview.postMessage(id + '|' + method + payload);
   });
+  const updateFileDialogLabels = () => {
+    const translate = window.markdownVisionReader?.interfaceText;
+    if (!translate) return Promise.resolve();
+    const values = ['Open Markdown file', 'Save Markdown file', 'Markdown files', 'Text files', 'All files',
+      'Markdown Vision could not read this file.', 'Untitled.md']
+      .map((source) => translate(source));
+    if (values.some((value) => !value || value.length > 256 || /[|\x00-\x1f\x7f-\x9f]/.test(value))) return Promise.resolve();
+    values.push(window.markdownVisionReader.interfaceDirection === 'rtl' ? 'rtl' : 'ltr');
+    return request('document.labels', '|' + values.join('|'));
+  };
   window.desktop = {
-    getInitialDocument: () => request('document.initial'),
-    openMarkdownFile: () => request('document.open'),
-    saveMarkdownFile: (documentId, content, saveAs) => request(saveAs ? 'document.saveAs' : 'document.save',
-      '|' + (documentId || '') + '|' + content.replaceAll('%', '%25').replaceAll('\0', '%00')),
+    getInitialDocument: async () => {
+      await updateFileDialogLabels();
+      return request('document.initial');
+    },
+    openMarkdownFile: async () => {
+      await updateFileDialogLabels();
+      return request('document.open');
+    },
+    saveMarkdownFile: async (documentId, content, saveAs) => {
+      await updateFileDialogLabels();
+      return request(saveAs ? 'document.saveAs' : 'document.save',
+        '|' + (documentId || '') + '|' + content.replaceAll('%', '%25').replaceAll('\0', '%00'));
+    },
     installUpdate: (version, digest) => request('update.install', '|' + version + '|' + digest),
     updateArchitecture: () => request('update.architecture'),
     printMarkdown: () => request('document.print'),

@@ -15,8 +15,18 @@ on:
       - 'tests/fixtures/**'
       - 'native-tauri/**'
       - 'tools/stage-tauri.cjs'
+      - 'tools/export-localization.cjs'
+      - 'tools/test-localization-generation.cjs'
+      - 'tools/check-native-error-localization.cjs'
+      - 'docs/LOCALIZATION.md'
+      - 'native-cpp/installer-localization.nsh'
+      - 'native-cpp/StartupTranslations.h'
+      - 'native-windows/StartupTranslations.cs'
       - 'docs/linux-release-targets.json'
       - 'tools/check-linux-lifecycle.sh'
+      - 'tools/check-linux-desktop.sh'
+      - 'tools/check-linux-desktop-duplicates.cjs'
+      - 'tools/test-linux-desktop-duplicates.cjs'
       - 'tools/check-linux-release-map.cjs'
       - 'tools/check-cross-platform-metadata.cjs'
       - 'tools/test-tauri-open-queue.cjs'
@@ -63,9 +73,27 @@ jobs:
           test "$actual" = "$EXPECTED_ARCH"
       - name: Install Tauri CLI
         run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.6
+      - name: Require reviewed translations before attaching release assets
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != '' || github.ref == 'refs/heads/codex/linux-matrix-build'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -eu
+          if [[ "$GITHUB_REF" == refs/heads/* ]] && [[ -z "$RELEASE_TAG" ]]; then
+            release_tag="v$(node -p "require('./native-tauri/tauri.conf.json').version")"
+            if ! gh release view "$release_tag" >/dev/null 2>&1; then
+              echo "No release $release_tag exists; skipping the release-readiness gate for this build artifact."
+              exit 0
+            fi
+          fi
+          node tools/export-localization.cjs --check-release-ready
       - name: Test native services
         run: |
           node tools/stage-tauri.cjs
+          node tools/test-localization-generation.cjs
+          node tools/test-linux-desktop-duplicates.cjs
+          node tools/check-native-error-localization.cjs
           cargo test --locked --manifest-path native-tauri/Cargo.toml
           node tools/test-tauri-open-queue.cjs
           node tools/check-cross-platform-metadata.cjs
@@ -125,6 +153,9 @@ jobs:
           expected_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' native-tauri/Cargo.toml | head -n 1)
           installed=$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}' markdown-vision)
           test "$installed" = "markdown-vision $expected_version ${{ matrix.rpm_architecture }}"
+          desktop_file=$(rpm -ql markdown-vision | grep -E '^/usr/share/applications/.*\.desktop$' | head -n 1)
+          test -n "$desktop_file"
+          sh tools/check-linux-desktop.sh "$desktop_file"
           useradd --create-home --shell /bin/bash markdowntest
           evidence="$GITHUB_WORKSPACE/.tmp/fedora-linux-evidence"
           runtime_dir=/tmp/markdown-vision-xdg-runtime

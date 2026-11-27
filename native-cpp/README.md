@@ -38,3 +38,14 @@ edition instead of installing side by side.
 The standalone ZIP is `dist\MarkdownVision-Native-Editor-2.8.16-win-x64.zip`. It contains only `Markdown-Vision.exe`. The executable embeds its web assets and uses them from `%LOCALAPPDATA%\Markdown Vision Native\web` when no adjacent `web` directory is available. The ARM64 ZIP follows the same single-executable layout. Both editions require the Microsoft Edge WebView2 Runtime.
 The Intel/AMD x64 installer is `dist\Markdown-Vision-Native-Setup-2.8.16-Intel-AMD-x64.exe`.
 The native application bundles the shared reader and editor assets from the repository root.
+
+For an isolated x64 test build, give the build a separate output name:
+
+```powershell
+.\native-cpp\build.bat codex-native-isolated x64 isolated-test
+```
+
+This test-only executable uses the adjacent `web` directory and stores its
+WebView profile under its own output directory. It does not fall back to the
+installed app's asset cache or WebView profile. Keep this build separate from
+release artifacts; a normal executable does not include this test mode.

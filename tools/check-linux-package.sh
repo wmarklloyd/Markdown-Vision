@@ -29,7 +29,7 @@ test -x "$root/usr/bin/markdown-vision"
 desktop_dir="$root/usr/share/applications"
 desktop_file=$(find "$desktop_dir" -maxdepth 1 -type f -name '*.desktop' -print -quit)
 test -n "$desktop_file"
-grep -Eq '^MimeType=.*text/markdown(;|$)' "$desktop_file"
+sh tools/check-linux-desktop.sh "$desktop_file"
 
 printf 'Linux DEB metadata passed: %s %s %s; runtime dependencies and Markdown desktop association are present.\n' \
   "$(field Package)" "$(field Version)" "$(field Architecture)"

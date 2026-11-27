@@ -65,7 +65,7 @@ fn main() {
                 .accelerator("CmdOrCtrl+P").build(app)?;
             let close = MenuItemBuilder::with_id("file-close", "Close")
                 .accelerator("CmdOrCtrl+W").build(app)?;
-            let file_menu = SubmenuBuilder::new(app, "File")
+            let file_menu = SubmenuBuilder::with_id(app, "file-menu", "File")
                 .item(&new).item(&open).separator().item(&save).item(&save_as)
                 .separator().item(&print).separator().item(&close).build()?;
 
@@ -74,7 +74,7 @@ fn main() {
                 let about = MenuItemBuilder::with_id("app-about", "About Markdown Vision…").build(app)?;
                 let quit = MenuItemBuilder::with_id("app-quit", "Quit Markdown Vision")
                     .accelerator("CmdOrCtrl+Q").build(app)?;
-                let app_menu = SubmenuBuilder::new(app, "Markdown Vision")
+                let app_menu = SubmenuBuilder::with_id(app, "app-menu", "Markdown Vision")
                     .item(&about).separator().item(&quit).build()?;
                 MenuBuilder::new(app).items(&[&app_menu, &file_menu]).build()?
             };
@@ -83,7 +83,7 @@ fn main() {
                 let about = MenuItemBuilder::with_id("app-about", "About Markdown Vision").build(app)?;
                 let quit = MenuItemBuilder::with_id("app-quit", "Quit")
                     .accelerator("Ctrl+Q").build(app)?;
-                let help_menu = SubmenuBuilder::new(app, "Help")
+                let help_menu = SubmenuBuilder::with_id(app, "help-menu", "Help")
                     .item(&about).separator().item(&quit).build()?;
                 MenuBuilder::new(app).items(&[&file_menu, &help_menu]).build()?
             };
@@ -121,7 +121,7 @@ fn main() {
                 None => tauri::http::Response::builder().status(404).body(Vec::new()).unwrap(),
             }
         })
-        .invoke_handler(tauri::generate_handler![platform_info, list_system_fonts, updater::install_linux_update, updater::restart_after_update, document::initial_document, document::open_document, document::save_document, document::has_pending_document, document::pending_document, preferences::get_preferences, preferences::save_preferences, confirm_discard, show_open_error, print_document, close_window, quit_application])
+        .invoke_handler(tauri::generate_handler![platform_info, list_system_fonts, update_menu_labels, updater::install_linux_update, updater::restart_after_update, document::initial_document, document::open_document, document::save_document, document::has_pending_document, document::pending_document, preferences::get_preferences, preferences::save_preferences, confirm_discard, show_open_error, print_document, close_window, quit_application])
         .build(tauri::generate_context!())
         .expect("failed to build Markdown Vision")
         .run(|_app, _event| {
@@ -245,40 +245,185 @@ fn platform_info() -> serde_json::Value {
 }
 
 #[tauri::command]
-fn show_open_error(window: tauri::WebviewWindow, message: &str) {
+fn update_menu_labels(app: tauri::AppHandle, labels: std::collections::HashMap<String, String>) -> Result<(), String> {
+    let menu = app.menu().ok_or("Application menu unavailable")?;
+    for (submenu_id, keys) in [
+        ("file-menu", &["file-new", "file-open", "file-save", "file-save-as", "file-print", "file-close"][..]),
+        ("app-menu", &["app-about", "app-quit"][..]),
+        ("help-menu", &["app-about", "app-quit"][..]),
+    ] {
+        let Some(item) = menu.get(submenu_id) else {
+            if submenu_id == "file-menu" {
+                return Err("Application File menu unavailable".into());
+            }
+            continue;
+        };
+        let submenu = item.as_submenu().ok_or_else(|| format!("Invalid native menu: {submenu_id}"))?;
+        let text = required_native_menu_label(&labels, submenu_id)?;
+        submenu.set_text(text).map_err(|error| error.to_string())?;
+        for key in keys {
+            let text = required_native_menu_label(&labels, key)?;
+            let item = submenu.get(*key).ok_or_else(|| format!("Native menu item unavailable: {key}"))?;
+            let item = item.as_menuitem().ok_or_else(|| format!("Invalid native menu item: {key}"))?;
+            item.set_text(text).map_err(|error| error.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+fn required_native_menu_label<'a>(labels: &'a std::collections::HashMap<String, String>, key: &str) -> Result<&'a str, String> {
+    labels.get(key).map(String::as_str).filter(|text| valid_native_label(text))
+        .ok_or_else(|| format!("Missing or invalid native menu label: {key}"))
+}
+
+#[tauri::command]
+fn show_open_error(window: tauri::WebviewWindow, title: String, description: String, close: String) -> Result<(), String> {
+    if !valid_native_label(&title) || !valid_native_message(&description) || !valid_native_label(&close) {
+        return Err("Invalid native open-error dialog text".into());
+    }
     let dialog = rfd::MessageDialog::new()
-        .set_title("Could not open document")
-        .set_description(format!("The document could not be opened. Your current changes are still available.\n\n{message}"))
+        .set_title(title)
+        .set_description(description)
         .set_level(rfd::MessageLevel::Error)
-        .set_buttons(rfd::MessageButtons::Ok);
+        .set_buttons(rfd::MessageButtons::OkCustom(close));
     #[cfg(target_os = "macos")]
     let dialog = dialog.set_parent(&window);
     #[cfg(not(target_os = "macos"))]
     let _ = window;
     dialog.show();
+    Ok(())
+}
+
+struct DiscardLabels {
+    title: String,
+    message: String,
+    keep: String,
+    cancel: String,
+    discard: String,
+}
+
+fn read_discard_labels(value: serde_json::Value) -> Result<DiscardLabels, String> {
+    let read = |key| {
+        value.get(key).and_then(|entry| entry.as_str())
+            .filter(|text| valid_native_label(text))
+            .map(str::to_owned)
+            .ok_or_else(|| "Invalid native confirmation labels".to_owned())
+    };
+    Ok(DiscardLabels {
+        title: read("title")?,
+        message: read("message")?,
+        keep: read("keep")?,
+        cancel: read("cancel")?,
+        discard: read("discard")?,
+    })
+}
+
+fn valid_native_label(text: &str) -> bool {
+    !text.trim().is_empty() && text.chars().count() <= 256
+        && !text.chars().any(char::is_control)
+}
+
+fn valid_native_message(text: &str) -> bool {
+    !text.trim().is_empty() && text.chars().count() <= 16_384
+        && !text.chars().any(|ch| ch.is_control() && !matches!(ch, '\n' | '\r' | '\t'))
+}
+
+fn distinct_discard_label(keep: &str, cancel: &str, discard: &str) -> String {
+    let mut label = discard.to_owned();
+    while label == keep || label == cancel {
+        label.push_str(" …");
+    }
+    label
+}
+
+#[cfg(test)]
+mod dialog_label_tests {
+    use super::{distinct_discard_label, read_discard_labels, required_native_menu_label, valid_native_label, valid_native_message};
+    use serde_json::json;
+    use std::collections::HashMap;
+
+    #[test]
+    fn native_menu_labels_must_be_present_and_nonempty() {
+        let labels = HashMap::from([
+            ("file-menu".to_owned(), "Archivo".to_owned()),
+            ("file-open".to_owned(), "Abrir…".to_owned()),
+            ("file-save".to_owned(), "Guardar".to_owned()),
+            ("file-close".to_owned(), "Cerrar".to_owned()),
+        ]);
+        assert_eq!(required_native_menu_label(&labels, "file-menu").unwrap(), "Archivo");
+        assert_eq!(required_native_menu_label(&labels, "file-open").unwrap(), "Abrir…");
+        assert!(required_native_menu_label(&labels, "file-print").is_err());
+        assert!(required_native_menu_label(&HashMap::from([("file-menu".to_owned(), " ".to_owned())]), "file-menu").is_err());
+    }
+
+    #[test]
+    fn native_confirmation_requires_complete_localized_labels() {
+        assert!(read_discard_labels(json!({
+            "title": "Unsaved changes",
+            "message": "Discard these changes?",
+            "keep": "Keep editing",
+            "cancel": "Cancel",
+            "discard": "Discard"
+        })).is_ok());
+        assert!(read_discard_labels(json!({ "title": "Unsaved changes" })).is_err());
+        assert!(read_discard_labels(json!({
+            "title": "Unsaved changes",
+            "message": "Discard these changes?",
+            "keep": "Keep editing",
+            "cancel": "Cancel",
+            "discard": "  "
+        })).is_err());
+        assert!(read_discard_labels(json!({
+            "title": "Unsaved changes",
+            "message": "Discard these changes?",
+            "keep": "Keep editing",
+            "cancel": "Cancel",
+            "discard": "Discard\nnow"
+        })).is_err());
+    }
+
+    #[test]
+    fn native_error_dialog_text_rejects_invalid_labels_but_allows_multiline_details() {
+        assert!(valid_native_label("Open document"));
+        assert!(!valid_native_label(" \n "));
+        assert!(!valid_native_label(&"x".repeat(257)));
+        assert!(valid_native_message("The document could not be opened.\n\nPermission denied."));
+        assert!(!valid_native_message("The document could not be opened.\u{0007}"));
+        assert!(!valid_native_message(&"x".repeat(16_385)));
+    }
+
+    #[test]
+    fn discard_remains_distinct_even_if_a_suffixed_label_is_already_used() {
+        assert_eq!(distinct_discard_label("Keep", "Cancel", "Discard"), "Discard");
+        assert_eq!(distinct_discard_label("Discard", "Cancel", "Discard"), "Discard …");
+        assert_eq!(distinct_discard_label("Discard", "Discard …", "Discard"), "Discard … …");
+        assert_eq!(distinct_discard_label("إلغاء", "إلغاء …", "إلغاء"), "إلغاء … …");
+    }
 }
 
 #[tauri::command]
-fn confirm_discard(window: tauri::WebviewWindow, action: &str) -> Result<bool, String> {
-    let message = match action {
-        "open" => "Discard your unsaved changes and open another document?",
-        "close" => "Discard your unsaved changes and close Markdown Vision?",
-        "quit" => "Discard your unsaved changes and quit Markdown Vision?",
+fn confirm_discard(window: tauri::WebviewWindow, action: &str, labels: serde_json::Value) -> Result<bool, String> {
+    match action {
+        "open" | "close" | "quit" => {},
         _ => return Err("Unknown confirmation request".into()),
-    };
+    }
+    let labels = read_discard_labels(labels)?;
+    // rfd reports a custom button by its displayed label. Keep the destructive
+    // choice distinct even when a translation uses the same word for cancel.
+    let discard = distinct_discard_label(&labels.keep, &labels.cancel, &labels.discard);
     // macOS assigns Escape to the second button. Zenity treats the cancel
     // button and window dismissal alike, so Discard must be its extra button.
     #[cfg(target_os = "macos")]
     let buttons = rfd::MessageButtons::YesNoCancelCustom(
-        "Keep Editing".into(), "Cancel".into(), "Discard".into(),
+        labels.keep.clone(), labels.cancel.clone(), discard.clone(),
     );
     #[cfg(not(target_os = "macos"))]
     let buttons = rfd::MessageButtons::YesNoCancelCustom(
-        "Keep Editing".into(), "Discard".into(), "Cancel".into(),
+        labels.keep.clone(), discard.clone(), labels.cancel.clone(),
     );
     let dialog = rfd::MessageDialog::new()
-        .set_title("Unsaved changes")
-        .set_description(message)
+        .set_title(labels.title)
+        .set_description(labels.message)
         .set_level(rfd::MessageLevel::Warning)
         .set_buttons(buttons);
     #[cfg(target_os = "macos")]
@@ -286,7 +431,7 @@ fn confirm_discard(window: tauri::WebviewWindow, action: &str) -> Result<bool, S
     #[cfg(not(target_os = "macos"))]
     let _ = window;
     let result = dialog.show();
-    Ok(result == rfd::MessageDialogResult::Custom("Discard".into()))
+    Ok(result == rfd::MessageDialogResult::Custom(discard))
 }
 
 #[tauri::command]

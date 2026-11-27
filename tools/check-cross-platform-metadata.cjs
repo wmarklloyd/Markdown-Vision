@@ -24,6 +24,11 @@ assert.deepEqual(associations[0].ext, expectedExtensions);
 assert.equal(associations[0].mimeType, 'text/markdown');
 assert.equal(tauri.identifier, 'com.markdownvision.desktop');
 assert.equal(tauri.productName, 'Markdown Vision');
+assert.equal(tauri.bundle.macOS.files.Resources, 'macos-localizations', 'macOS localized resources are not bundled');
+assert.equal(associations[0].name, 'Markdown document', 'macOS document type must match InfoPlist.strings');
+for (const packageType of ['deb', 'rpm']) {
+  assert.equal(tauri.bundle.linux[packageType].desktopTemplate, 'launcher.desktop');
+}
 assert.ok(tauri.bundle.linux.deb.depends.includes('zenity'), 'Linux confirmation dialog dependency is missing');
 assert.ok(tauri.bundle.linux.deb.depends.includes('xdg-utils'), 'Linux default-browser integration dependency is missing');
 for (const required of ['webkit2gtk4.1', 'gtk3', 'zenity', 'xdg-utils', 'fontconfig', 'curl', 'polkit', 'dnf']) {

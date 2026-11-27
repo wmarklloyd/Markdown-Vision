@@ -2,15 +2,21 @@ Unicode True
 
 !include "LogicLib.nsh"
 !include "nsDialogs.nsh"
+!include "installer-localization.nsh"
 
 !define APP_NAME "Markdown Vision"
 !define APP_VERSION "2.8.25"
 !define APP_ID "8d1dd6d6-9e38-5fc2-8139-94aece1f4a40"
+!ifndef SOURCE_DIR
 !ifdef ARM64
 !define SOURCE_DIR "..\dist\MarkdownVision-Native-Editor-${APP_VERSION}-arm64"
-!define SETUP_SUFFIX "-Windows-ARM64"
 !else
 !define SOURCE_DIR "..\dist\MarkdownVision-Native-Editor-${APP_VERSION}"
+!endif
+!endif
+!ifdef ARM64
+!define SETUP_SUFFIX "-Windows-ARM64"
+!else
 !define SETUP_SUFFIX "-Intel-AMD-x64"
 !endif
 !define APP_EXE "Markdown-Vision.exe"
@@ -20,7 +26,11 @@ Unicode True
 !define APP_CAPABILITIES "Software\Classes\Applications\${APP_EXE}\Capabilities"
 
 Name "${APP_NAME} ${APP_VERSION} (Native)"
-OutFile "..\dist\Markdown-Vision-Native-Setup-${APP_VERSION}${SETUP_SUFFIX}.exe"
+Caption "$(MVSetupCaption)"
+!ifndef OUTPUT_FILE
+!define OUTPUT_FILE "..\dist\Markdown-Vision-Native-Setup-${APP_VERSION}${SETUP_SUFFIX}.exe"
+!endif
+OutFile "${OUTPUT_FILE}"
 VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey "FileDescription" "Markdown Vision Native Setup"
 VIAddVersionKey "FileVersion" "${APP_VERSION}"
@@ -44,13 +54,27 @@ Var DefaultMarkdownCheckbox
 Var SetAsDefaultMarkdown
 Var LaunchAfterInstallCheckbox
 
+; NSIS falls back by primary language when no exact locale is available.
+; Hong Kong and Macau need Traditional Chinese, even though only the Taiwan
+; Traditional language file is bundled. The neutral Traditional LANGID is
+; included for systems that report a script rather than a region.
+!macro SelectChineseInstallerLanguage
+  System::Call 'kernel32::GetUserDefaultUILanguage() i .r0'
+  ${If} $0 == 3076
+  ${OrIf} $0 == 5124
+  ${OrIf} $0 == 31748
+    StrCpy $LANGUAGE 1028
+  ${EndIf}
+!macroend
+
 Function .onInit
+  !insertmacro SelectChineseInstallerLanguage
 !ifdef ARM64
   System::Call 'kernel32::IsWow64Process2(p -1, *i .r0, *i .r1) i.r2'
   IntOp $1 $1 & 0xffff
   ${If} $2 == 0
   ${OrIf} $1 != 43620
-    MessageBox MB_ICONSTOP "This installer requires Windows on ARM64."
+    MessageBox MB_ICONSTOP "$(MVRequiresArm64)"
     SetErrorLevel 1
     Abort
   ${EndIf}
@@ -63,12 +87,11 @@ Function .onInit
     ${If} $INSTDIR == "$PROGRAMFILES64\MarkdownVision"
       StrCpy $INSTDIR $0
     ${EndIf}
-    ReadRegStr $1 HKLM "Software\Classes\.md" ""
-    StrCpy $SetAsDefaultMarkdown "0"
-    ${If} $1 == "${APP_PROGID}"
-      StrCpy $SetAsDefaultMarkdown "1"
-    ${EndIf}
   ${EndIf}
+FunctionEnd
+
+Function un.onInit
+  !insertmacro SelectChineseInstallerLanguage
 FunctionEnd
 
 Function CloseRunningApp
@@ -82,7 +105,7 @@ check_running:
   Abort
 running:
   IfSilent silent_running
-  MessageBox MB_YESNO|MB_ICONQUESTION "Markdown Vision is running. Save any unsaved documents before continuing. Close Markdown Vision and continue setup?" IDYES close_app
+  MessageBox MB_YESNO|MB_ICONQUESTION "$(MVAppRunning)" IDYES close_app
   SetErrorLevel 1
   Abort
 close_app:
@@ -90,7 +113,7 @@ close_app:
   Pop $0
   Pop $1
   StrCmp $0 "0" check_after_close
-  MessageBox MB_ICONSTOP "Setup could not close Markdown Vision. Close it manually and run setup again."
+  MessageBox MB_ICONSTOP "$(MVCloseFailed)"
   SetErrorLevel 1
   Abort
 check_after_close:
@@ -98,7 +121,7 @@ check_after_close:
   Pop $0
   Pop $1
   StrCmp $0 "0" done
-  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Markdown Vision is still running. Close it and select Retry, or cancel setup." IDRETRY check_running
+  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(MVStillRunning)" IDRETRY check_running
 silent_running:
   SetErrorLevel 1
   Abort
@@ -110,10 +133,10 @@ Function RemovePreviousInstall
   ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_ID}" "UninstallString"
   ReadRegStr $2 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_ID}" "InstallLocation"
   StrCmp $0 "" no_previous_install
-  DetailPrint "Removing the currently installed Markdown Vision edition..."
+  DetailPrint "$(MVRemoving)"
   ExecWait '$0 /S _?=$2' $1
   StrCmp $1 "0" no_previous_install
-  MessageBox MB_ICONSTOP "The existing Markdown Vision installation could not be removed. Setup will stop without installing the native edition."
+  MessageBox MB_ICONSTOP "$(MVRemoveFailed)"
   Abort
 no_previous_install:
 FunctionEnd
@@ -124,16 +147,16 @@ Function DefaultMarkdownPage
   ${If} $0 == error
     Abort
   ${EndIf}
-
-  ${NSD_CreateLabel} 0 0 100% 24u "Markdown Vision can register itself as a viewer for markdown files."
-  Pop $0
-  ${NSD_CreateCheckbox} 0 28u 100% 12u "Set Markdown Vision as the default application for markdown files"
-  Pop $DefaultMarkdownCheckbox
-  ${If} $SetAsDefaultMarkdown == ""
-    ${NSD_SetState} $DefaultMarkdownCheckbox ${BST_CHECKED}
-  ${Else}
-    ${NSD_SetState} $DefaultMarkdownCheckbox $SetAsDefaultMarkdown
+  ${If} $LANGUAGE == 1025
+    nsDialogs::SetRTL 1
   ${EndIf}
+
+  ; Allow translated text to wrap without colliding with the checkbox.
+  ${NSD_CreateLabel} 0 0 100% 44u "$(MVRegisterViewer)"
+  Pop $0
+  ${NSD_CreateCheckbox} 0 48u 100% 44u "$(MVDefaultApp)"
+  Pop $DefaultMarkdownCheckbox
+  ${NSD_SetState} $DefaultMarkdownCheckbox ${BST_UNCHECKED}
   nsDialogs::Show
 FunctionEnd
 
@@ -152,9 +175,12 @@ Function FinishPage
   ${If} $0 == error
     Abort
   ${EndIf}
-  ${NSD_CreateLabel} 0 0 100% 28u "Markdown Vision has been installed."
+  ${If} $LANGUAGE == 1025
+    nsDialogs::SetRTL 1
+  ${EndIf}
+  ${NSD_CreateLabel} 0 0 100% 28u "$(MVInstalled)"
   Pop $0
-  ${NSD_CreateCheckbox} 0 32u 100% 12u "Open Markdown Vision when setup closes"
+  ${NSD_CreateCheckbox} 0 32u 100% 40u "$(MVLaunch)"
   Pop $LaunchAfterInstallCheckbox
   ${NSD_SetState} $LaunchAfterInstallCheckbox ${BST_CHECKED}
   nsDialogs::Show
@@ -164,6 +190,9 @@ Function FinishPageLeave
   ${NSD_GetState} $LaunchAfterInstallCheckbox $0
   ${If} $0 = ${BST_CHECKED}
     Exec '"$WINDIR\explorer.exe" "$INSTDIR\${APP_EXE}"'
+  ${EndIf}
+  ${If} $SetAsDefaultMarkdown == "1"
+    Exec '"$WINDIR\explorer.exe" "ms-settings:defaultapps"'
   ${EndIf}
 FunctionEnd
 
@@ -188,14 +217,14 @@ Section "Markdown Vision" SEC_APP
   File /r "${SOURCE_DIR}\web\fonts"
 
   IfFileExists "$INSTDIR\${APP_EXE}" native_executable_ready
-  MessageBox MB_ICONSTOP "Markdown Vision Native could not be installed. Setup will stop without registering an incomplete installation."
+  MessageBox MB_ICONSTOP "$(MVInstallFailed)"
   Abort
 native_executable_ready:
   WriteUninstaller "$INSTDIR\UninstallMarkdownVision.exe"
 
   CreateDirectory "$SMPROGRAMS\Markdown Vision"
   CreateShortcut "$SMPROGRAMS\Markdown Vision\Markdown Vision.lnk" "$INSTDIR\${APP_EXE}"
-  CreateShortcut "$SMPROGRAMS\Markdown Vision\Uninstall Markdown Vision.lnk" "$INSTDIR\UninstallMarkdownVision.exe"
+  CreateShortcut "$SMPROGRAMS\Markdown Vision\$(MVUninstall) - Markdown Vision.lnk" "$INSTDIR\UninstallMarkdownVision.exe"
   CreateShortcut "$DESKTOP\Markdown Vision.lnk" "$INSTDIR\${APP_EXE}"
 
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_ID}" "DisplayName" "${APP_NAME} ${APP_VERSION} (Native)"
@@ -208,18 +237,18 @@ native_executable_ready:
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_ID}" "NoModify" 1
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_ID}" "NoRepair" 1
 
-  WriteRegStr HKLM "Software\Classes\${APP_PROGID}" "" "Markdown document"
+  WriteRegStr HKLM "Software\Classes\${APP_PROGID}" "" "$(MVDocument)"
   WriteRegStr HKLM "Software\Classes\${APP_PROGID}\DefaultIcon" "" "$INSTDIR\${APP_EXE},0"
   WriteRegStr HKLM "Software\Classes\${APP_PROGID}\shell\open\command" "" '"$INSTDIR\${APP_EXE}" "%1"'
 
   WriteRegStr HKLM "Software\Classes\Applications\${APP_EXE}" "" "Markdown Vision"
   WriteRegStr HKLM "Software\Classes\Applications\${APP_EXE}\DefaultIcon" "" "$INSTDIR\${APP_EXE},0"
   WriteRegStr HKLM "Software\Classes\Applications\${APP_EXE}\shell\open\command" "" '"$INSTDIR\${APP_EXE}" "%1"'
-  WriteRegStr HKLM "Software\Classes\CLSID\${PREVIEW_HANDLER_CLSID}" "" "Markdown Vision Preview Handler"
+  WriteRegStr HKLM "Software\Classes\CLSID\${PREVIEW_HANDLER_CLSID}" "" "$(MVPreviewHandler)"
   WriteRegStr HKLM "Software\Classes\CLSID\${PREVIEW_HANDLER_CLSID}\InprocServer32" "" "$INSTDIR\MarkdownVisionPreviewHandler.dll"
   WriteRegStr HKLM "Software\Classes\CLSID\${PREVIEW_HANDLER_CLSID}\InprocServer32" "ThreadingModel" "Apartment"
   WriteRegStr HKLM "${APP_CAPABILITIES}" "ApplicationName" "${APP_NAME}"
-  WriteRegStr HKLM "${APP_CAPABILITIES}" "ApplicationDescription" "Markdown file viewer"
+  WriteRegStr HKLM "${APP_CAPABILITIES}" "ApplicationDescription" "$(MVViewer)"
   WriteRegStr HKLM "${APP_CAPABILITIES}\FileAssociations" ".md" "${APP_PROGID}"
   WriteRegStr HKLM "${APP_CAPABILITIES}\FileAssociations" ".markdown" "${APP_PROGID}"
   WriteRegStr HKLM "${APP_CAPABILITIES}\FileAssociations" ".mdown" "${APP_PROGID}"
@@ -233,21 +262,10 @@ native_executable_ready:
   WriteRegStr HKLM "Software\Classes\SystemFileAssociations\.markdown\shellex\${PREVIEW_HANDLER_KEY}" "" "${PREVIEW_HANDLER_CLSID}"
   WriteRegStr HKLM "Software\Classes\SystemFileAssociations\.mdown\shellex\${PREVIEW_HANDLER_KEY}" "" "${PREVIEW_HANDLER_CLSID}"
   WriteRegStr HKLM "Software\Classes\SystemFileAssociations\.mkd\shellex\${PREVIEW_HANDLER_KEY}" "" "${PREVIEW_HANDLER_CLSID}"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\PreviewHandlers" "${PREVIEW_HANDLER_CLSID}" "Markdown Vision Preview Handler"
-  ${If} $SetAsDefaultMarkdown == "1"
-    WriteRegStr HKLM "Software\Classes\.md" "" "${APP_PROGID}"
-  ${ElseIf} $SetAsDefaultMarkdown == "0"
-    ReadRegStr $0 HKLM "Software\Classes\.md" ""
-    ${If} $0 == "${APP_PROGID}"
-      DeleteRegValue HKLM "Software\Classes\.md" ""
-    ${EndIf}
-  ${EndIf}
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\PreviewHandlers" "${PREVIEW_HANDLER_CLSID}" "$(MVPreviewHandler)"
   WriteRegStr HKLM "Software\Classes\.md\OpenWithProgids" "${APP_PROGID}" ""
-  WriteRegStr HKLM "Software\Classes\.markdown" "" "${APP_PROGID}"
   WriteRegStr HKLM "Software\Classes\.markdown\OpenWithProgids" "${APP_PROGID}" ""
-  WriteRegStr HKLM "Software\Classes\.mdown" "" "${APP_PROGID}"
   WriteRegStr HKLM "Software\Classes\.mdown\OpenWithProgids" "${APP_PROGID}" ""
-  WriteRegStr HKLM "Software\Classes\.mkd" "" "${APP_PROGID}"
   WriteRegStr HKLM "Software\Classes\.mkd\OpenWithProgids" "${APP_PROGID}" ""
   WriteRegStr HKLM "Software\RegisteredApplications" "${APP_NAME}" "${APP_CAPABILITIES}"
 

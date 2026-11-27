@@ -6,6 +6,8 @@
   "author": "Markdown Vision",
   "license": "GPL-3.0-only",
   "scripts": {
+    "predist": "node tools/export-localization.cjs --check-generated",
+    "preinstaller": "node tools/export-localization.cjs --check-generated",
     "start": "electron .",
     "dist": "electron-builder --win",
     "installer": "electron-builder --win nsis",

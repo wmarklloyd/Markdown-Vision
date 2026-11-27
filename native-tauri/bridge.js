@@ -5,6 +5,37 @@
   let processing = false;
   let retryOpenQueue = false;
   let startupPending = true;
+  const translate = (text, values = {}) => window.markdownVisionReader?.interfaceText?.(text, values)
+    ?? text.replace(/\{(\w+)\}/g, (placeholder, key) => values[key] ?? placeholder);
+  const discardLabels = (action) => {
+    const messages = {
+      open: 'Discard your unsaved changes and open another document?',
+      close: 'Discard your unsaved changes and close Markdown Vision?',
+      quit: 'Discard your unsaved changes and quit Markdown Vision?',
+    };
+    return {
+      title: translate('Unsaved changes'),
+      message: translate(messages[action]),
+      keep: translate('Keep editing'),
+      cancel: translate('Cancel'),
+      discard: translate('Discard'),
+    };
+  };
+  const confirmDiscard = (action) => invoke('confirm_discard', { action, labels: discardLabels(action) });
+  const reportOpenError = (error) => {
+    const message = window.markdownVisionReader?.localizedNativeError?.(error) ?? String(error);
+    return invoke('show_open_error', {
+      title: translate('Could not open document'),
+      description: translate('The document could not be opened. Your current changes are still available. {message}', { message }),
+      close: translate('Close'),
+    });
+  };
+  const fileDialogLabels = () => ({
+    markdown: translate('Markdown files'),
+    open: translate('Open Markdown file'),
+    save: translate('Save Markdown file'),
+    untitled: translate('Untitled.md'),
+  });
   window.__markdownVisionProcessOpenQueue = async () => {
     if (!openCallback || startupPending) return;
     if (processing) {
@@ -19,12 +50,12 @@
     try {
       while (await invoke('has_pending_document')) {
         const dirty = window.markdownVisionReader?.hasUnsavedChanges?.();
-        const accept = !dirty || await invoke('confirm_discard', { action: 'open' });
+        const accept = !dirty || await confirmDiscard('open');
         const document = await invoke('pending_document', { accept });
         if (!document) break;
         if (document.discarded) continue;
         if (document.error) {
-          await invoke('show_open_error', { message: String(document.error) });
+          await reportOpenError(document.error);
           continue;
         }
         openCallback(document);
@@ -45,7 +76,7 @@
     try {
       const action = quit ? 'quit' : 'close';
       if (window.markdownVisionReader?.hasUnsavedChanges?.()
-          && !await invoke('confirm_discard', { action })) {
+          && !await confirmDiscard(action)) {
         closing = false;
         return;
       }
@@ -55,6 +86,7 @@
     }
   };
   window.desktop = {
+    setNativeMenuLabels: (labels) => invoke('update_menu_labels', { labels }),
     getPreferences: () => invoke('get_preferences'),
     getPlatformInfo: () => invoke('platform_info'),
     listSystemFonts: () => invoke('list_system_fonts'),
@@ -62,8 +94,8 @@
     restartAfterUpdate: (documentId) => invoke('restart_after_update', { documentId }),
     savePreferences: (preferences) => invoke('save_preferences', { preferences }),
     printMarkdown: () => invoke('print_document'),
-    confirmDiscard: (action) => invoke('confirm_discard', { action }),
-    reportOpenError: (error) => invoke('show_open_error', { message: String(error) }),
+    confirmDiscard,
+    reportOpenError,
     getInitialDocument: async () => {
       try {
         return await invoke('initial_document');
@@ -72,9 +104,9 @@
         setTimeout(window.__markdownVisionProcessOpenQueue, 0);
       }
     },
-    openMarkdownFile: () => invoke('open_document'),
+    openMarkdownFile: () => invoke('open_document', { labels: fileDialogLabels() }),
     saveMarkdownFile: (documentId, content, saveAs) =>
-      invoke('save_document', { documentId, content, saveAs }),
+      invoke('save_document', { documentId, content, saveAs, labels: fileDialogLabels() }),
     onOpenDocument: (callback) => {
       openCallback = callback;
       window.addEventListener('load', () => setTimeout(window.__markdownVisionProcessOpenQueue, 0), { once: true });

@@ -13,6 +13,8 @@ _restored_asar/
 release/
 native-windows/bin/
 native-windows/obj/
+tools/managed-startup-tests/bin/
+tools/managed-startup-tests/obj/
 native-cpp/*.obj
 native-cpp/*.res
 native-cpp/Debug/

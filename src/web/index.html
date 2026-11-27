@@ -60,8 +60,6 @@
             <strong>Markdown Vision</strong>
             <span>© 2026 Mark Lloyd</span>
             <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU GPLv3 license</a>
-            <span>Libertinus fonts © The Libertinus Project Authors, licensed under the SIL Open Font License 1.1.</span>
-            <a href="https://github.com/alerque/libertinus/blob/v7.051/OFL.txt" target="_blank" rel="noopener noreferrer">Libertinus font license</a>
             <span id="installedVersion" data-version="2.8.25">Version 2.8.25</span>
             <span id="latestVersion" aria-live="polite">Latest version: checking…</span>
             <a id="updateLink" class="update-link" href="https://github.com/wmarklloyd/Markdown-Vision/releases/latest" target="_blank" rel="noopener noreferrer" hidden>Update</a>
@@ -91,6 +89,10 @@
           <strong>Settings</strong>
           <button class="close-button" id="closeSettings" type="button" aria-label="Close settings">x</button>
         </div>
+        <label for="languageSelect" id="languageLabel">Language</label>
+        <select id="languageSelect" aria-describedby="languageStatus"></select>
+        <div id="languageStatus" class="font-status" role="status" hidden></div>
+        <label for="fontInput" id="fontInputLabel">Variable-width font</label>
         <div class="font-picker">
           <input
             id="fontInput"
@@ -101,10 +103,12 @@
             aria-autocomplete="list"
             aria-expanded="false"
             aria-controls="fontSuggestions"
+            aria-describedby="fontStatus"
           />
           <div class="font-suggestions" id="fontSuggestions" role="listbox" hidden></div>
         </div>
-        <div class="font-status" id="fontStatus">Type a font name or choose an installed font.</div>
+        <div class="font-status" id="fontStatus" role="status" aria-live="polite">Type a font name or choose an installed font.</div>
+        <label for="monoFontInput" id="monoFontInputLabel">Fixed-width font</label>
         <div class="font-picker">
           <input
             id="monoFontInput"
@@ -115,10 +119,11 @@
             aria-autocomplete="list"
             aria-expanded="false"
             aria-controls="monoFontSuggestions"
+            aria-describedby="monoFontStatus"
           />
           <div class="font-suggestions" id="monoFontSuggestions" role="listbox" hidden></div>
         </div>
-        <div class="font-status" id="monoFontStatus">Used for code and other monospaced text.</div>
+        <div class="font-status" id="monoFontStatus" role="status" aria-live="polite">Used for code and other monospaced text.</div>
         <label for="fontSize">Text size <output id="fontSizeOutput" for="fontSize autoFontSize"></output></label>
         <label class="automatic-setting"><input id="autoFontSize" type="checkbox" aria-label="Automatic text size" /> Automatic</label>
         <input id="fontSize" type="range" min="14" max="26" step="1" value="18" />
@@ -149,13 +154,13 @@
         <div class="editor-panes" id="editorPanes" data-view="visual">
           <section class="editor-pane source-pane" id="editorSourcePane" aria-label="Markdown source">
             <h2>Markdown source</h2>
-            <textarea id="markdownSource" spellcheck="false" aria-label="Markdown source" autocapitalize="off"></textarea>
+            <textarea id="markdownSource" lang="" spellcheck="false" aria-label="Markdown source" autocapitalize="off"></textarea>
           </section>
           <div class="editor-divider" id="editorDivider" role="separator" tabindex="0"
                aria-label="Markdown pane width" aria-controls="editorSourcePane" aria-orientation="vertical"
                aria-valuemin="20" aria-valuemax="80" aria-valuenow="50" aria-valuetext="50% Markdown"></div>
           <section class="editor-pane preview-pane" aria-label="Visual editor">
-            <article class="markdown-body editor-preview-content" id="editorPreview" role="textbox" aria-label="Visual editor" aria-multiline="true" contenteditable="false"></article>
+            <article class="markdown-body editor-preview-content" id="editorPreview" lang="" role="textbox" aria-label="Visual editor" aria-multiline="true" contenteditable="false"></article>
             <aside class="visual-restriction" id="visualRestriction" aria-label="Visual editing restriction" hidden>
               <p id="visualRestrictionMessage"></p>
               <div class="visual-block-actions">
@@ -170,14 +175,21 @@
       </section>
       <section class="reader-shell" id="readerShell" hidden>
         <div class="document-meta" hidden>
-          <span id="fileName">Untitled.md</span>
+          <span id="fileName" lang="" dir="auto">Untitled.md</span>
         </div>
-        <article class="markdown-body" id="markdownOutput"></article>
+        <article class="markdown-body" id="markdownOutput" lang=""></article>
       </section>
     </main>
-    <article class="markdown-body print-document" id="printDocument"></article>
+    <article class="markdown-body print-document" id="printDocument" lang=""></article>
     <div class="editor-search-overlay" id="editorSearchOverlay" aria-hidden="true"></div>
 
+    <dialog class="visual-edit-dialog" id="openErrorDialog" role="alertdialog" aria-labelledby="openErrorTitle" aria-describedby="openErrorMessage">
+      <h2 id="openErrorTitle">Could not open document</h2>
+      <p id="openErrorMessage"></p>
+      <form method="dialog" class="visual-edit-actions">
+        <button type="submit" id="openErrorClose">Close</button>
+      </form>
+    </dialog>
     <dialog class="visual-edit-dialog" id="newFileDialog" aria-labelledby="newFileDialogTitle">
       <form method="dialog">
         <h2 id="newFileDialogTitle">Save your changes?</h2>

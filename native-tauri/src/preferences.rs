@@ -6,10 +6,17 @@ fn path(app: &AppHandle) -> Result<PathBuf, String> {
     app.path().app_config_dir().map(|dir| dir.join("preferences.json")).map_err(|e| e.to_string())
 }
 
+fn is_supported_language(text: &str) -> bool {
+    matches!(text,
+        "system" | "en" | "ar" | "zh-hans" | "zh-hant" | "cs" | "nl" | "fr" | "de" |
+        "hi" | "id" | "it" | "ja" | "ko" | "pl" | "pt-br" | "ru" | "es" | "sv" |
+        "th" | "tr" | "uk" | "vi")
+}
+
 fn validate(value: &Value) -> Result<Value, String> {
     let object = value.as_object().ok_or("Invalid preferences")?;
     let mut result = Map::new();
-    for key in ["theme", "font", "monoFont", "size", "line", "width"] {
+    for key in ["theme", "font", "monoFont", "size", "line", "width", "language"] {
         let Some(item) = object.get(key) else { continue };
         let text = item.as_str().ok_or_else(|| format!("Invalid {key}"))?;
         let valid = match key {
@@ -18,6 +25,7 @@ fn validate(value: &Value) -> Result<Value, String> {
             "size" => text == "auto" || text.parse::<f64>().is_ok_and(|n| (14.0..=26.0).contains(&n)),
             "line" => text.parse::<f64>().is_ok_and(|n| (1.35..=2.1).contains(&n)),
             "width" => text == "auto" || text.parse::<f64>().is_ok_and(|n| (540.0..=920.0).contains(&n)),
+            "language" => is_supported_language(text),
             _ => false,
         };
         if !valid { return Err(format!("Invalid {key}")); }
@@ -41,7 +49,13 @@ fn read_preferences(path: &std::path::Path) -> Result<Option<Value>, String> {
     if stored.get("version").and_then(Value::as_u64) != Some(1) {
         return Err("Unsupported preferences version".into());
     }
-    validate(stored.get("preferences").ok_or("Missing preferences")?).map(Some)
+    let mut preferences = stored.get("preferences").ok_or("Missing preferences")?.clone();
+    if let Some(object) = preferences.as_object_mut() {
+        if object.get("language").is_some_and(|language| !language.as_str().is_some_and(is_supported_language)) {
+            object.insert("language".into(), Value::String("system".into()));
+        }
+    }
+    validate(&preferences).map(Some)
 }
 
 #[tauri::command]
@@ -76,9 +90,35 @@ mod tests {
     #[test]
     fn rejects_invalid_values() {
         for value in [json!({"theme":"brown"}), json!({"size":"NaN"}),
-            json!({"width":"999999"}), json!({"font":"bad\nfont"})] {
+            json!({"width":"999999"}), json!({"font":"bad\nfont"}), json!({"language":"invalid"})] {
             assert!(validate(&value).is_err());
         }
+    }
+
+    #[test]
+    fn preserves_supported_language_preferences() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("preferences.json");
+        for language in ["system", "en", "ar", "zh-hans", "zh-hant", "cs", "nl", "fr", "de",
+            "hi", "id", "it", "ja", "ko", "pl", "pt-br", "ru", "es", "sv", "th", "tr", "uk", "vi"] {
+            let value = json!({"language": language});
+            assert_eq!(validate(&value).unwrap(), value);
+            write_preferences(&path, &value).unwrap();
+            assert_eq!(read_preferences(&path).unwrap(), Some(value));
+        }
+    }
+
+    #[test]
+    fn recovers_unsupported_saved_language_without_losing_other_preferences() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("preferences.json");
+        for language in [json!("unsupported"), json!(42), Value::Null] {
+            let stored = json!({"version": 1, "preferences": {"language": language, "theme": "dark", "size": "20"}});
+            fs::write(&path, serde_json::to_vec(&stored).unwrap()).unwrap();
+            let actual = read_preferences(&path).unwrap().unwrap();
+            assert_eq!(actual, json!({"language": "system", "theme": "dark", "size": "20"}));
+        }
+        assert!(validate(&json!({"language": "unsupported"})).is_err());
     }
 
     #[test]

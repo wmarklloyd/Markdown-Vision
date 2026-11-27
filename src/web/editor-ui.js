@@ -1,5 +1,9 @@
 (() => {
   const $ = (selector) => document.querySelector(selector);
+  const interfaceText = window.markdownVisionReader.interfaceText;
+  const setInterfaceLanguage = window.markdownVisionReader.setInterfaceLanguage;
+  const setLocalizedAccessibleLabel = window.markdownVisionReader.setLocalizedAccessibleLabel;
+  const setLocalizedAccessibleDescription = window.markdownVisionReader.setLocalizedAccessibleDescription;
   const toggle = $('#editorToggle');
   const newFileButton = $('#newFileButton');
   const newFileDialog = $('#newFileDialog');
@@ -15,18 +19,26 @@
   const panes = $('#editorPanes');
   const divider = $('#editorDivider');
   const editDialog = $('#visualEditDialog');
+  let stopOperationSelection = () => {};
+  editDialog.addEventListener('close', () => {
+    // A close event can be delivered after another editor dialog has opened.
+    if (editDialog.open) return;
+    stopOperationSelection();
+    stopOperationSelection = () => {};
+  });
   const searchOverlay = $('#editorSearchOverlay');
   const restriction = $('#visualRestriction');
   const restrictionSource = $('#visualRestrictionSource');
   const restrictionMessage = $('#visualRestrictionMessage');
   const restrictionAnnouncement = $('#visualRestrictionAnnouncement');
   const dirtyLabel = $('#editorDirty');
+  const editorStats = $('#editorStats');
   const saveButton = $('#editorSave');
   const saveAsButton = $('#editorSaveAs');
   const saveError = $('#editorSaveError');
   const current = window.markdownVisionReader?.getDocument();
   let original = current?.content || '';
-  let fileName = current?.name || 'Untitled.md';
+  let fileName = current?.name || interfaceText('Untitled.md');
   let documentId = current?.documentId || null;
   let imageBase = current?.imageBase || '';
   let documentGeneration = 0;
@@ -56,7 +68,7 @@
   const isSplit = (view) => view === 'split' || view === 'split-vertical';
   const minSourceShare = Number(divider.getAttribute('aria-valuemin'));
   const maxSourceShare = Number(divider.getAttribute('aria-valuemax'));
-  const listItemHint = 'Double-click or press Alt+Enter to edit this item';
+  const listItemHint = interfaceText('Double-click or press Alt+Enter to edit this item');
   let searchQuery = '';
   let searchMatches = [];
   let searchIndex = -1;
@@ -74,6 +86,11 @@
   counterpartOverlay.setAttribute('aria-hidden', 'true');
   document.body.append(counterpartOverlay);
   let counterpartFieldMark = null;
+  const wordSegmenter = typeof Intl.Segmenter === 'function'
+    ? new Intl.Segmenter(undefined, { granularity: 'word' })
+    : null;
+  const scriptWithoutWordSpaces = /[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}\p{sc=Thai}\p{sc=Lao}\p{sc=Khmer}\p{sc=Myanmar}]/u;
+  let lastCountedSource = null;
 
   function fenceCode(text) {
     const length = (text.match(/\x60+/g) || []).reduce((max, run) => Math.max(max, run.length + 1), 3);
@@ -305,16 +322,37 @@
 
   function updateDirty() {
     dirty = source.value !== original;
-    dirtyLabel.textContent = saving ? 'Saving…' : dirty ? 'Unsaved' : saved ? 'Saved' : '';
+    const status = saving ? 'saving' : dirty ? 'unsaved' : saved ? 'saved' : '';
+    dirtyLabel.textContent = status ? window.markdownVisionReader.saveStatusLabel(status) : '';
     saveButton.disabled = saving || (!dirty && !!documentId);
     saveAsButton.disabled = saving;
-    const text = source.value.trim();
-    $('#editorStats').textContent = (text ? text.split(/\s+/).length : 0) + ' words';
+    updateWordCount();
     window.markdownVisionReader.updatePrintButton();
     if (searchQuery && source.value !== searchDraft) {
       clearTimeout(searchRefreshTimer);
       searchRefreshTimer = setTimeout(() => window.markdownVisionReader.refreshEditorSearch({ preserve: true, scroll: false }), 100);
     }
+  }
+
+  function updateWordCount() {
+    const text = source.value;
+    if (text === lastCountedSource) return;
+    lastCountedSource = text;
+    let count = 0;
+    let approximate = false;
+    for (const [run] of text.matchAll(/\S+/g)) {
+      if (!wordSegmenter || !scriptWithoutWordSpaces.test(run)) {
+        if (!wordSegmenter && scriptWithoutWordSpaces.test(run)) approximate = true;
+        count += 1;
+        continue;
+      }
+      // Some writing systems put several words in one run without spaces.
+      for (const segment of wordSegmenter.segment(run)) {
+        if (segment.isWordLike) count += 1;
+      }
+    }
+    editorStats.textContent = approximate ? interfaceText('Approximate word count: {count}', { count })
+      : window.markdownVisionReader.wordCountLabel(count);
   }
 
   function showDraftInReader() {
@@ -337,7 +375,18 @@
       const result = await window.desktop.saveMarkdownFile(documentId, snapshot, saveAs);
       if (generation !== documentGeneration || result?.status === 'canceled') return;
       if (result?.status !== 'saved') {
-        saveError.textContent = result?.message || 'Could not save the draft. Your edits are still open.';
+        const explanation = interfaceText('Could not save the draft. Your edits are still open.');
+        const detail = result?.message ? window.markdownVisionReader.localizedNativeError(result.message) : '';
+        if (detail && detail === result.message) {
+          // System-provided errors may not follow the app language. Preserve the
+          // details, but lead with an explanation the user can understand.
+          const detailText = document.createElement('bdi');
+          detailText.lang = '';
+          detailText.textContent = detail;
+          saveError.replaceChildren(document.createTextNode(`${explanation}\n`), detailText);
+        } else {
+          saveError.textContent = detail || explanation;
+        }
         saveError.hidden = false;
         return;
       }
@@ -356,7 +405,7 @@
       }
     } catch {
       if (generation === documentGeneration) {
-        saveError.textContent = 'Could not save the draft. Your edits are still open.';
+        saveError.textContent = interfaceText('Could not save the draft. Your edits are still open.');
         saveError.hidden = false;
       }
     } finally {
@@ -416,7 +465,7 @@
         node.className = 'visual-protected-block';
         if (block.kind === 'definitions' || (block.kind === 'html' && /^\s*<!--[\s\S]*?-->\s*$/.test(block.source))) node.hidden = true;
         if (template.content.childNodes.length) node.append(template.content);
-        else node.textContent = 'Embedded content';
+        else node.textContent = interfaceText('Embedded content');
       }
       const id = String(index);
       node.dataset.visualBlock = id;
@@ -477,7 +526,7 @@
       if (block.node.querySelector('[data-visual-edit="table-options"]')
           && !block.node.querySelector('[data-table-structure="alignment"]')
           && !block.node.querySelector('[data-visual-edit="table-cell-source"]')) sourceAction.remove();
-      else sourceAction.textContent = 'Edit table source';
+      else sourceAction.textContent = interfaceText('Edit table source');
     }
     window.markdownVisionReader.syncPictureSourcesToTheme(preview);
     window.markdownVisionReader.containWideTables(preview);
@@ -506,7 +555,8 @@
   function visualAction(label, action, index) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = label;
+    setInterfaceLanguage(button);
+    button.textContent = interfaceText(label);
     button.dataset.visualEdit = action;
     if (index !== undefined) button.dataset.index = String(index);
     return button;
@@ -556,7 +606,8 @@
           cell.dataset.nestedTable = String(index);
           cell.dataset.tableStructure = 'true';
           cell.tabIndex = 0;
-          cell.title = 'Select a cell to edit it or change the table. Press Alt+Enter while typing.';
+          cell.title = interfaceText('Select a cell to edit it or change the table. Press Alt+Enter while typing.');
+          setLocalizedAccessibleDescription(cell, 'Select a cell to edit it or change the table. Press Alt+Enter while typing.');
         }
       }
     }
@@ -578,7 +629,7 @@
       if (code) {
         const field = document.createElement('textarea');
         field.className = 'visual-code-editor';
-        field.setAttribute('aria-label', 'Code contents');
+        setLocalizedAccessibleLabel(field, 'Code contents');
         field.spellcheck = false;
         field.autocapitalize = 'off';
         field.wrap = 'off';
@@ -628,7 +679,7 @@
         for (const label of linkLabels) {
           label.link.contentEditable = 'plaintext-only';
           label.link.dataset.editableListLink = String(label.index);
-          label.link.setAttribute('aria-label', 'Edit list item text');
+          setLocalizedAccessibleLabel(label.link, 'Edit list item text');
           label.link.setAttribute('role', 'textbox');
           label.link.spellcheck = true;
         }
@@ -643,7 +694,22 @@
         const parsed = lines[index] && window.markdownVisionReader.readListItem(lines[index].text);
         if (checkbox && parsed?.task) {
           checkbox.disabled = false;
-          checkbox.setAttribute('aria-label', item.textContent.trim() || 'Task');
+          // A parent list item can contain nested list items and editor
+          // buttons. Its checkbox should be named by its own text only.
+          const labelText = (node) => {
+            if (node.nodeType === Node.TEXT_NODE) return node.data;
+            if (node.nodeType !== Node.ELEMENT_NODE
+                || node.matches('ul,ol,button,[hidden],[aria-hidden="true"],.visual-block-actions')) return '';
+            return [...node.childNodes].map(labelText).join('');
+          };
+          const taskText = [...item.childNodes].map(labelText).join('').trim();
+          if (taskText) {
+            checkbox.setAttribute('aria-label', taskText);
+            checkbox.removeAttribute('aria-labelledby');
+            checkbox.lang = '';
+          } else {
+            setLocalizedAccessibleLabel(checkbox, 'Task');
+          }
           checkbox.dataset.visualEdit = 'task';
           checkbox.dataset.index = String(index);
         }
@@ -677,12 +743,14 @@
             cell.dataset.index = String(column);
             if (!raw.cells[column]) {
               cell.dataset.visualEdit = 'table-cell';
-              cell.title = 'Add text to this empty cell';
+              cell.title = interfaceText('Add text to this empty cell');
+              setLocalizedAccessibleDescription(cell, 'Add text to this empty cell');
               continue;
             }
             const { start, end } = raw.cells[column];
             const sourceOnly = needsMarkdown(raw.text.slice(start, end), referenceLabels, true);
-            cell.title = sourceOnly ? 'Edit this cell in Markdown' : 'Edit table cell';
+            cell.title = interfaceText(sourceOnly ? 'Edit this cell in Markdown' : 'Edit table cell');
+            setLocalizedAccessibleDescription(cell, sourceOnly ? 'Edit this cell in Markdown' : 'Edit table cell');
             cell.dataset.visualEdit = sourceOnly ? 'table-cell-source' : 'table-cell';
             if (!sourceOnly) reason = 'Select a cell to edit it. You can edit the underlying table in Markdown.';
             if (sourceOnly) {
@@ -715,9 +783,10 @@
                 cell.dataset.directTableCell = String(index);
                 cell.contentEditable = 'plaintext-only';
                 cell.setAttribute('role', 'textbox');
-                cell.setAttribute('aria-label', 'Edit table cell');
+                setLocalizedAccessibleLabel(cell, 'Edit table cell');
                 cell.setAttribute('aria-multiline', 'true');
-                cell.title = 'Type to edit this cell. Press Alt+Enter for table options.';
+                cell.title = interfaceText('Type to edit this cell. Press Alt+Enter for table options.');
+                setLocalizedAccessibleDescription(cell, 'Type to edit this cell. Press Alt+Enter for table options.');
                 reason = 'Type directly in plain cells. Use table options or edit the Markdown for more complex content.';
               }
             }
@@ -737,7 +806,7 @@
     }
     block.node.dataset.visualRestriction = reason;
     const sourceAction = visualAction('Edit in Markdown', 'source');
-    sourceAction.title = reason;
+    sourceAction.title = interfaceText(reason);
     actions.append(sourceAction);
     block.node.append(actions);
   }
@@ -784,7 +853,7 @@
         field.textContent = candidate.text;
         field.contentEditable = 'plaintext-only';
         field.dataset.editableListLink = String(nextIndex);
-        field.setAttribute('aria-label', candidate.codeSpan ? 'Edit inline code' : 'Edit list item text');
+        setLocalizedAccessibleLabel(field, candidate.codeSpan ? 'Edit inline code' : 'Edit list item text');
         field.setAttribute('role', 'textbox');
         field.spellcheck = !candidate.codeSpan;
         content.replaceWith(field);
@@ -797,7 +866,7 @@
     }
     if (labels.length) block.editableLinkLabels = labels.sort((left, right) => left.start - right.start);
     const sourceAction = block.node.querySelector('.visual-block-actions [data-visual-edit="source"]');
-    if (sourceAction && labels.length) sourceAction.textContent = 'Edit list structure in Markdown';
+    if (sourceAction && labels.length) sourceAction.textContent = interfaceText('Edit list structure in Markdown');
   }
 
   function configureComplexListText(block, rendered) {
@@ -848,7 +917,7 @@
       field.textContent = match.text;
       field.contentEditable = 'plaintext-only';
       field.dataset.editableListLink = String(index);
-      field.setAttribute('aria-label', 'Edit list item text');
+      setLocalizedAccessibleLabel(field, 'Edit list item text');
       field.setAttribute('role', 'textbox');
       field.spellcheck = true;
       content.replaceWith(field);
@@ -865,6 +934,8 @@
       if (!checkbox) continue;
       checkbox.disabled = false;
       checkbox.setAttribute('aria-label', match.text);
+      checkbox.removeAttribute('aria-labelledby');
+      checkbox.lang = '';
       checkbox.dataset.visualEdit = 'task';
       checkbox.dataset.index = String(lineIndex);
     }
@@ -1015,21 +1086,22 @@
       field.textContent = candidate.text;
       field.contentEditable = 'plaintext-only';
       field.dataset.editableListLink = String(index);
-      field.setAttribute('aria-label', candidate.fieldLabel);
+      setLocalizedAccessibleLabel(field, candidate.fieldLabel);
       field.setAttribute('role', 'textbox');
       field.spellcheck = !candidate.codeSpan;
       content.replaceWith(field);
       if (cell?.dataset.visualEdit) {
         cell.dataset.visualEdit = 'table-cell';
         delete cell.dataset.visualRestriction;
-        cell.title = 'Type in the cell text. Press Alt+Enter for cell options.';
+        cell.title = interfaceText('Type in the cell text. Press Alt+Enter for cell options.');
+        setLocalizedAccessibleDescription(cell, 'Type in the cell text. Press Alt+Enter for cell options.');
       }
     }
     block.node.dataset.visualRestriction = 'Edit the text directly. Edit the surrounding structure in Markdown.';
     const action = block.node.querySelector('.visual-block-actions [data-visual-edit="source"]');
     if (action) {
-      action.textContent = block.kind === 'table' ? 'Edit table source' : 'Edit structure in Markdown';
-      action.title = block.node.dataset.visualRestriction;
+      action.textContent = interfaceText(block.kind === 'table' ? 'Edit table source' : 'Edit structure in Markdown');
+      action.title = interfaceText(block.node.dataset.visualRestriction);
     }
   }
 
@@ -1051,7 +1123,7 @@
       field.textContent = text;
       field.contentEditable = 'plaintext-only';
       field.dataset.editableListLink = String(index);
-      field.setAttribute('aria-label', 'Edit quoted text');
+      setLocalizedAccessibleLabel(field, 'Edit quoted text');
       field.setAttribute('role', 'textbox');
       field.spellcheck = true;
       element.replaceChildren(field);
@@ -1090,7 +1162,7 @@
       field.textContent = label.text;
       field.contentEditable = 'plaintext-only';
       field.dataset.editableListLink = String(index);
-      field.setAttribute('aria-label', 'Edit heading text');
+      setLocalizedAccessibleLabel(field, 'Edit heading text');
       field.setAttribute('role', 'textbox');
       field.spellcheck = true;
       node.replaceWith(field);
@@ -1156,10 +1228,12 @@
   function showRestriction(target, focusAction = false) {
     if (restrictionAnchor !== target) {
       restrictionAnchor = target;
-      const message = target.dataset.visualRestriction;
+      const message = interfaceText(target.dataset.visualRestriction);
+      setInterfaceLanguage(restriction, true);
+      setInterfaceLanguage(restrictionAnnouncement, true);
       restrictionMessage.textContent = message;
-      restrictionSource.textContent = target.dataset.visualEdit === 'table-cell-source' ? 'Edit this cell in Markdown'
-        : target.hasAttribute('data-source-list-item') ? 'Edit this item in Markdown' : 'Edit in Markdown';
+      restrictionSource.textContent = interfaceText(target.dataset.visualEdit === 'table-cell-source' ? 'Edit this cell in Markdown'
+        : target.hasAttribute('data-source-list-item') ? 'Edit this item in Markdown' : 'Edit in Markdown');
       restriction.hidden = false;
       restrictionAnnouncement.textContent = message;
     }
@@ -1197,18 +1271,21 @@
     });
   }
 
-  function literalPattern(text) {
-    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
-  function searchPositions(text, pattern) {
-    return [...text.matchAll(new RegExp(pattern, 'giu'))].map((match) => ({
-      start: match.index, end: match.index + match[0].length
-    }));
-  }
-
   function occurrences(text, query) {
-    return searchPositions(text, literalPattern(query));
+    return window.markdownVisionReader.caseInsensitivePositions(text, query);
+  }
+
+  function formattedSearchPositions(text, query) {
+    let plain = '';
+    const indices = [];
+    for (let index = 0; index < text.length; index += 1) {
+      if (/[*_~\x60\\]/.test(text[index])) continue;
+      plain += text[index];
+      indices.push(index);
+    }
+    return occurrences(plain, query).map(({ start, end }) => ({
+      start: indices[start], end: indices[end - 1] + 1, plainLength: end - start,
+    })).filter(({ start, end, plainLength }) => end - start > plainLength);
   }
 
   function visibleSearchText(root) {
@@ -1332,8 +1409,7 @@
       if (!positions.length) continue;
       const syntax = /[*_~\x60\\]/;
       const formatted = query.length <= 80 && !syntax.test(query) && syntax.test(span.text)
-        ? searchPositions(span.text, [...query].map(literalPattern).join('[*_~\\x60\\\\]*'))
-          .filter(({ start, end }) => end - start > query.length)
+        ? formattedSearchPositions(span.text, query)
           .map(({ start, end }) => ({ source: { start: span.start + start, end: span.start + end }, order: span.start + start }))
           .filter((item) => !hits.some((hit) => hit.source.start < item.source.end && item.source.start < hit.source.end)) : [];
       const candidates = hits.concat(formatted).sort((left, right) => left.source.end - right.source.end);
@@ -1643,8 +1719,8 @@
     scope(index) {
       const match = searchMatches[index];
       if (!match || !isSplit(searchView)) return '';
-      if (!match.visual) return 'Markdown only';
-      return match.source ? '' : 'Visual only';
+      if (!match.visual) return 'sourceOnly';
+      return match.source ? '' : 'visualOnly';
     },
     clear() {
       clearTimeout(searchRefreshTimer);
@@ -1717,12 +1793,15 @@
 
   function showVisualEdit(title, fields, apply, extraActions = []) {
     hideRestriction();
+    stopOperationSelection();
+    stopOperationSelection = () => {};
     const snapshot = source.value;
     const form = editDialog.querySelector('form');
     const inputs = $('#visualEditFields');
     const footer = $('#visualEditActions');
     const error = $('#visualEditError');
-    $('#visualEditTitle').textContent = title;
+    setInterfaceLanguage(editDialog, true);
+    $('#visualEditTitle').textContent = interfaceText(title);
     error.hidden = true;
     inputs.replaceChildren();
     footer.replaceChildren();
@@ -1731,6 +1810,10 @@
       const input = document.createElement(multiline ? 'textarea' : 'input');
       input.name = name;
       input.value = value;
+      input.dir = 'auto';
+      // Values come from the document and may use a different language from
+      // the dialog's translated labels.
+      input.lang = '';
       if (multiline) {
         input.rows = Math.min(10, Math.max(3, value.split('\n').length));
         input.setSelectionRange(caret, caret);
@@ -1742,26 +1825,48 @@
           }
         });
       }
-      group.append(label, input);
+      group.append(interfaceText(label), input);
       inputs.append(group);
     }
     if (extraActions.length) {
       const label = document.createElement('label');
       const select = document.createElement('select');
       select.name = 'operation';
-      for (const [value, text] of [['save', 'Update'], ...extraActions]) {
-        select.add(new Option(text, value));
+      for (const [value, text] of [['save', fields.length ? 'Update text' : 'Keep unchanged'], ...extraActions]) {
+        select.add(new Option(interfaceText(text), value));
       }
-      label.append('Action', select);
+      const fullSelection = document.createElement('span');
+      fullSelection.className = 'visual-edit-full-selection';
+      fullSelection.setAttribute('aria-hidden', 'true');
+      fullSelection.hidden = true;
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      const updateSelection = () => {
+        const text = select.selectedOptions[0]?.textContent || '';
+        fullSelection.textContent = text;
+        if (context) context.font = getComputedStyle(select).font;
+        fullSelection.hidden = !text || (context && context.measureText(text).width <= select.clientWidth - 35);
+      };
+      select.addEventListener('change', updateSelection);
+      const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(updateSelection) : null;
+      observer?.observe(select);
+      if (!observer) window.addEventListener('resize', updateSelection);
+      stopOperationSelection = () => {
+        observer?.disconnect();
+        if (!observer) window.removeEventListener('resize', updateSelection);
+      };
+      label.append(interfaceText('Action'), select, fullSelection);
       inputs.append(label);
+      requestAnimationFrame(updateSelection);
+      document.fonts?.ready.then(() => { if (select.isConnected) updateSelection(); });
     }
     const cancel = document.createElement('button');
     cancel.type = 'button';
-    cancel.textContent = 'Cancel';
+    cancel.textContent = interfaceText('Cancel');
     cancel.addEventListener('click', () => editDialog.close());
     const confirm = document.createElement('button');
     confirm.type = 'submit';
-    confirm.textContent = 'Apply';
+    confirm.textContent = interfaceText('Apply');
     confirm.className = 'primary-button';
     footer.append(cancel, confirm);
     form.onsubmit = (event) => {
@@ -1769,7 +1874,7 @@
       const data = Object.fromEntries(new FormData(form));
       const patch = source.value === snapshot ? apply(data, data.operation || 'save') : 'The Markdown changed. Reopen this editor to try again.';
       if (typeof patch === 'string') {
-        error.textContent = patch;
+        error.textContent = interfaceText(patch);
         error.hidden = false;
         return;
       }
@@ -1802,8 +1907,8 @@
       if (action === 'add') {
         const marker = item.marker.replace(/^\d+/, (number) => String(Number(number) + 1));
         const prefix = item.prefix.replace(item.marker, marker);
-        const task = item.task ? '[ ]' + item.taskSpacing : '';
-        return [span.start + line.end, span.start + line.end, '\n' + prefix + task + 'New item'];
+        const task = item.task ? '[ ]' + (item.taskSpacing || ' ') : '';
+        return [span.start + line.end, span.start + line.end, '\n' + prefix + task + interfaceText('New item')];
       }
       if (action === 'remove') {
         const start = index === lines.length - 1 && index > 0 ? line.start - 1 : line.start;
@@ -1812,7 +1917,8 @@
       }
       if (text === itemText) return null;
       if (!text.trim()) return allowStructure ? 'Enter item text or choose Remove item.' : 'Enter item text.';
-      return [span.start + line.start + item.bodyStart, span.start + line.end - trailing.length, text.trim()];
+      return [span.start + line.start + item.bodyStart, span.start + line.end - trailing.length,
+        (item.task && !item.taskSpacing ? ' ' : '') + text.trim()];
     }, allowStructure ? [['add', 'Add item below'], ['remove', 'Remove item']] : []);
   }
 
@@ -1838,9 +1944,9 @@
       if (action === 'add') {
         const marker = item.marker.replace(/^\d+/, (number) => String(Number(number) + 1));
         const prefix = item.indent + marker + item.prefix.slice(item.indent.length + item.marker.length);
-        const task = item.task ? '[ ]' + item.taskSpacing : '';
+        const task = item.task ? '[ ]' + (item.taskSpacing || ' ') : '';
         const at = lines[subtreeEnd - 1].end;
-        return [span.start + at, span.start + at, '\n' + prefix + task + 'New item'];
+        return [span.start + at, span.start + at, '\n' + prefix + task + interfaceText('New item')];
       }
       if (action === 'remove') {
         const start = index === lines.length - 1 && index > 0 ? lines[index].start - 1 : lines[index].start;
@@ -1864,7 +1970,7 @@
   function editSetextHeadingStyle(span) {
     const lines = blockLines(span.text);
     if (lines.length !== 2 || !/^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[1].text)) return;
-    const choices = Array.from({ length: 6 }, (_, index) => ['h' + (index + 1), 'Heading ' + (index + 1)]);
+    const choices = Array.from({ length: 6 }, (_, index) => ['h' + (index + 1), interfaceText('Heading {level}', { level: index + 1 })]);
     showVisualEdit('Heading style', [], (_data, action) => {
       if (action === 'save') return null;
       const level = Number(action.slice(1));
@@ -2026,7 +2132,7 @@
       const replacement = rows.map((line, i) => {
         const part = line.cells[column];
         if (action === 'add-column') {
-          const text = i === 0 ? ' New column ' : i === 1 ? ' --- ' : '   ';
+          const text = i === 0 ? ' ' + interfaceText('New column') + ' ' : i === 1 ? ' --- ' : '   ';
           return line.text.slice(0, part.fieldEnd) + '|' + text + line.text.slice(part.fieldEnd);
         }
         if (action === 'remove-column') {
@@ -2137,7 +2243,7 @@
   function updateCursor() {
     const before = source.value.slice(0, source.selectionStart);
     const lines = before.split('\n');
-    $('#editorCursor').textContent = `Ln ${lines.length}, Col ${lines.at(-1).length + 1}`;
+    $('#editorCursor').textContent = window.markdownVisionReader.cursorLabel(lines.length, lines.at(-1).length + 1);
   }
 
   function selectView(view, surface = view === 'source' ? source : preview) {
@@ -2145,7 +2251,7 @@
     panes.dataset.view = view;
     const vertical = view === 'split-vertical';
     divider.setAttribute('aria-orientation', vertical ? 'horizontal' : 'vertical');
-    divider.setAttribute('aria-label', vertical ? 'Visual pane height' : 'Markdown pane width');
+    divider.setAttribute('aria-label', interfaceText(vertical ? 'Visual pane height' : 'Markdown pane width'));
     divider.setAttribute('aria-controls', vertical ? 'editorPreview' : 'editorSourcePane');
     resizeSplit(Number(divider.getAttribute('aria-valuenow')));
     document.querySelectorAll('[data-view]').forEach((button) => {
@@ -2165,7 +2271,8 @@
     panes.style.setProperty('--source-pane-share', String(width / 100));
     const rounded = Math.round(width);
     divider.setAttribute('aria-valuenow', String(rounded));
-    divider.setAttribute('aria-valuetext', rounded + (panes.dataset.view === 'split-vertical' ? '% Visual' : '% Markdown'));
+    const share = panes.dataset.view === 'split-vertical' ? '{percent}% Visual' : '{percent}% Markdown';
+    divider.setAttribute('aria-valuetext', interfaceText(share, { percent: rounded }));
     positionRestriction();
     scheduleSearchPaint(true);
     paintCounterpartField();
@@ -2240,13 +2347,14 @@
     const position = value && !active ? readerPosition : null;
     const newDocument = value && !window.markdownVisionReader.getDocument();
     if (newDocument) {
-      window.markdownVisionReader.showDocument('', 'Untitled.md');
+      window.markdownVisionReader.showDocument('', interfaceText('Untitled.md'));
     }
     active = value;
     if (!value) clearCounterpart();
     toggle.setAttribute('aria-pressed', String(value));
-    toggle.setAttribute('aria-label', value ? 'Return to reader' : 'Edit Markdown');
-    toggle.title = value ? 'Return to reader' : 'Edit Markdown';
+    const modeAction = interfaceText(value ? 'Return to reader' : 'Edit Markdown');
+    toggle.setAttribute('aria-label', modeAction);
+    toggle.title = modeAction;
     tools.hidden = !value;
     views.hidden = !value;
     newFileButton.hidden = !value;
@@ -2257,6 +2365,9 @@
       tools.scrollLeft = 0;
       selectView(newDocument ? 'visual' : panes.dataset.view);
       if (!newDocument) restoreReaderPosition(position);
+      if ((newDocument || !position) && window.matchMedia('(max-width: 235px)').matches) {
+        requestAnimationFrame(() => { if (active) panes.scrollIntoView({ block: 'nearest', inline: 'nearest' }); });
+      }
     } else if (dirty || (saved && (window.markdownVisionReader.getDocument()?.content !== source.value
         || window.markdownVisionReader.getDocument()?.documentId !== documentId))) {
       showDraftInReader();
@@ -2419,12 +2530,26 @@
     replaceSelection(() => ({ text, start: 0, end: text.length }));
   }
 
+  function parseTableColumnCount(value) {
+    if (typeof value !== 'string') return null;
+    const digitSets = ['0123456789', '٠١٢٣٤٥٦٧٨٩', '۰۱۲۳۴۵۶۷۸۹', '०१२३४५६७८९', '๐๑๒๓๔๕๖๗๘๙'];
+    let digits = '';
+    for (const character of value.trim().normalize('NFKC')) {
+      const set = digitSets.find((candidate) => candidate.includes(character));
+      if (!set) return null;
+      digits += String(set.indexOf(character));
+    }
+    if (!digits) return null;
+    const count = Number(digits);
+    return Number.isInteger(count) && count >= 2 && count <= 8 ? count : null;
+  }
+
   const commands = {
     table: () => {
-      const columns = Number(window.prompt('Number of columns (2–8)', '3'));
-      if (!Number.isInteger(columns) || columns < 2 || columns > 8) return;
-      const heading = Array.from({ length: columns }, (_, index) => `Header ${index + 1}`);
-      const row = Array.from({ length: columns }, () => 'Cell');
+      const columns = parseTableColumnCount(window.prompt(interfaceText('Number of columns (2–8)'), '3'));
+      if (columns === null) return;
+      const heading = Array.from({ length: columns }, (_, index) => interfaceText('Header {number}', { number: index + 1 }, false));
+      const row = Array.from({ length: columns }, () => interfaceText('Cell'));
       const value = `| ${heading.join(' | ')} |\n| ${heading.map(() => '---').join(' | ')} |\n| ${row.join(' | ')} |`;
       const end = source.selectionEnd;
       const lineEnd = source.value.indexOf('\n', end);
@@ -2451,15 +2576,16 @@
       }
       parts.push({ raw: source.value.slice(cursor, to) });
       const remove = matches.length > 0 && parts.every((part) => part.label || !part.raw.trim());
-      const url = remove ? '' : window.prompt('Link URL', 'https://')?.trim();
+      const url = remove ? '' : window.prompt(interfaceText('Link URL'), 'https://')?.trim();
       if (!remove && !/^https?:\/\/[^\s()]+$/i.test(url || '')) return;
       const wrap = (label) => '[' + label + '](' + url + ')';
-      const text = from === to ? wrap('link text') : parts.map(({ label, raw }) => {
+      const placeholder = from === to ? interfaceText('link text') : '';
+      const text = from === to ? wrap(placeholder) : parts.map(({ label, raw }) => {
         if (label) return remove ? label : raw;
         return remove ? raw : raw.replace(/\S(?:[^\n]*\S)?/g, wrap);
       }).join('');
       source.setSelectionRange(from, to, source.selectionDirection);
-      replaceSelection(() => ({ text, start: from === to ? 1 : 0, end: from === to ? 10 : text.length }));
+      replaceSelection(() => ({ text, start: from === to ? 1 : 0, end: from === to ? 1 + placeholder.length : text.length }));
     },
     undo: () => document.execCommand('undo'),
     redo: () => document.execCommand('redo')
@@ -2646,7 +2772,7 @@
     const caretMark = range.collapsed && caretContainer.closest(selector);
     const caretStart = caretMark ? textOffset(preview, caretMark, 0) : null;
     const caretEnd = caretMark ? caretStart + caretMark.textContent.length : null;
-    const url = command === 'link' && !remove ? window.prompt('Link URL', 'https://')?.trim() : null;
+    const url = command === 'link' && !remove ? window.prompt(interfaceText('Link URL'), 'https://')?.trim() : null;
     if (command === 'link' && !remove && !/^https?:\/\/[^\s()]+$/i.test(url || '')) return;
     replaceVisualSelection(range, (draft, start, end) => {
       const selected = document.createRange();
@@ -3021,7 +3147,7 @@
     startNewFile();
   });
   function startNewFile() {
-    window.markdownVisionReader.showDocument('', 'Untitled.md');
+    window.markdownVisionReader.showDocument('', interfaceText('Untitled.md'));
     reader.hidden = true;
     selectView(panes.dataset.view);
   }

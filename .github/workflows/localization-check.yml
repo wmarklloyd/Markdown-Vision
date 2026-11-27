@@ -1,0 +1,83 @@
+name: Localization checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/localization-check.yml'
+      - 'docs/LOCALIZATION.md'
+      - 'docs/LOCALIZATION-RELEASE-CHECKLIST.md'
+      - 'src/web/**'
+      - 'native-cpp/**'
+      - 'native-tauri/**'
+      - 'native-windows/**'
+      - 'tools/**'
+      - 'package.json'
+      - 'package-lock.json'
+  push:
+    branches:
+      - '**'
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  localized-renderer:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: npm ci
+      - name: Validate catalog structure and translation coverage
+        run: node tools/export-localization.cjs --check
+      - name: Verify generated translations
+        run: node tools/export-localization.cjs --check-generated
+      - name: Require reviewed translations for tagged releases
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node tools/export-localization.cjs --check-release-ready
+      - name: Test translation generation
+        run: node tools/test-localization-generation.cjs
+      - name: Verify localized native messages
+        run: node tools/check-native-error-localization.cjs
+      - name: Verify native dialog labels
+        run: node tools/check-native-dialog-labels.cjs
+      - name: Verify localized installer registration and shortcuts
+        run: node tools/check-installer-associations.cjs
+      - name: Test native Windows startup languages
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $installation = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $installation) { throw 'Visual C++ build tools were not found.' }
+          $devcmd = Join-Path $installation 'Common7\Tools\VsDevCmd.bat'
+          $testExe = Join-Path $env:RUNNER_TEMP 'startup-translations.exe'
+          $testObj = Join-Path $env:RUNNER_TEMP 'startup-translations.obj'
+          cmd /c "`"$devcmd`" -arch=x64 -host_arch=x64 && cl /nologo /std:c++17 /EHsc tools\test-startup-translations.cpp /Fe:`"$testExe`" /Fo:`"$testObj`" && `"$testExe`""
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Publish localized Windows host
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'MarkdownVision-Windows-Locale'
+          $buildRoot = Join-Path $env:RUNNER_TEMP 'MarkdownVision-Windows-Locale-Build'
+          $intermediate = Join-Path $buildRoot 'obj'
+          $buildOutput = Join-Path $buildRoot 'bin'
+          dotnet publish native-windows/MarkdownVision.Native.csproj --configuration Release --runtime win-x64 --self-contained false --output $output `
+            "-p:BaseIntermediateOutputPath=$intermediate\" "-p:MSBuildProjectExtensionsPath=$intermediate\" "-p:BaseOutputPath=$buildOutput\"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $renderer = Join-Path $output 'web/app.js'
+          if (-not (Test-Path $renderer)) { throw 'Published Windows host is missing its localized renderer.' }
+          $rendererText = Get-Content -LiteralPath $renderer -Raw
+          if (-not $rendererText.Contains('"zh-hans"') -or -not $rendererText.Contains('"pt-br"')) {
+            throw 'Published Windows host is missing generated locale data.'
+          }
+      - name: Exercise localized interface
+        run: node tools/run-renderer-ui-harness.cjs

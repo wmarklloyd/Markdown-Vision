@@ -15,10 +15,21 @@ on:
       - 'tests/fixtures/**'
       - 'native-tauri/**'
       - 'tools/stage-tauri.cjs'
+      - 'tools/export-localization.cjs'
+      - 'tools/test-localization-generation.cjs'
+      - 'tools/check-native-error-localization.cjs'
+      - 'docs/LOCALIZATION.md'
+      - 'native-cpp/installer-localization.nsh'
+      - 'native-cpp/StartupTranslations.h'
+      - 'native-windows/StartupTranslations.cs'
       - 'docs/linux-release-targets.json'
       - 'tools/check-linux-lifecycle.sh'
       - 'tools/check-linux-package.sh'
+      - 'tools/check-linux-desktop.sh'
+      - 'tools/check-linux-desktop-duplicates.cjs'
+      - 'tools/test-linux-desktop-duplicates.cjs'
       - 'tools/check-linux-appimage-launch.sh'
+      - 'tools/check-linux-appimage-metadata.sh'
       - 'tools/check-linux-release-map.cjs'
       - 'tools/check-cross-platform-metadata.cjs'
       - 'tools/test-tauri-open-queue.cjs'
@@ -72,9 +83,27 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev pkg-config rpm libfuse2t64 xvfb xauth dbus-x11 xdotool zenity xdg-utils imagemagick xclip tesseract-ocr python3-xlib
       - name: Install Tauri CLI
         run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.6
+      - name: Require reviewed translations before attaching release assets
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != '' || github.ref == 'refs/heads/codex/linux-matrix-build'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -eu
+          if [[ "$GITHUB_REF" == refs/heads/* ]] && [[ -z "$RELEASE_TAG" ]]; then
+            release_tag="v$(node -p "require('./native-tauri/tauri.conf.json').version")"
+            if ! gh release view "$release_tag" >/dev/null 2>&1; then
+              echo "No release $release_tag exists; skipping the release-readiness gate for this build artifact."
+              exit 0
+            fi
+          fi
+          node tools/export-localization.cjs --check-release-ready
       - name: Test native services
         run: |
           node tools/stage-tauri.cjs
+          node tools/test-localization-generation.cjs
+          node tools/test-linux-desktop-duplicates.cjs
+          node tools/check-native-error-localization.cjs
           node -e 'const fs = require("fs"); const v = require("./native-tauri/tauri.conf.json").version; const html = fs.readFileSync(".tmp/tauri-frontend/index.html", "utf8"); if (!html.includes(`data-version="${v}">Version ${v}</span>`)) throw Error("Staged version mismatch");'
           cargo test --locked --manifest-path native-tauri/Cargo.toml
           node tools/test-tauri-open-queue.cjs
@@ -123,6 +152,7 @@ jobs:
           if [ "$LINUX_ARCH" = x86_64 ]; then
             appimage=$(find native-tauri/target/release/bundle/appimage -maxdepth 1 -iname '*.appimage' -print -quit)
             test -n "$appimage"
+            sh tools/check-linux-appimage-metadata.sh "$appimage"
             file "$appimage"
             stat -c '%n %s bytes' "$appimage" | tee -a "$RUNNER_TEMP/linux-evidence/package-sizes.txt"
             sha256sum "$appimage" | tee -a "$RUNNER_TEMP/linux-evidence/package-sha256.txt"

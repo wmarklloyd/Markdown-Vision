@@ -1,6 +1,6 @@
 # Markdown Vision
 
-Markdown Vision bundles Libertinus Serif and Libertinus Mono, © 2012–2024 The Libertinus Project Authors, under the [SIL Open Font License 1.1](src/web/fonts/libertinus/OFL.txt). The unmodified fonts are from [Libertinus 7.051](https://github.com/alerque/libertinus/releases/tag/v7.051).
+Third-party font acknowledgements and license information are in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
 
 A native Windows Markdown reader and editor with Intel/AMD x64 and ARM64 builds. The Win32 C++ app uses Microsoft Edge WebView2 and supports Visual, Split, and Markdown editing, saving, and system printing.
 

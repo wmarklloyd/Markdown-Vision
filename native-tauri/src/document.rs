@@ -25,7 +25,7 @@ struct OpenDocument {
 }
 
 fn open_path(documents: &mut Documents, path: PathBuf) -> Result<Value, String> {
-    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    let bytes = fs::read(&path).map_err(|_| "Markdown Vision could not read this file.")?;
     let bom = bytes.starts_with(&[0xef, 0xbb, 0xbf]);
     let body = if bom { &bytes[3..] } else { &bytes[..] };
     let text = String::from_utf8_lossy(body);
@@ -127,34 +127,60 @@ pub fn pending_document(state: State<'_, Mutex<Documents>>, accept: bool) -> Res
     }))
 }
 
+fn dialog_label<'a>(labels: &'a Option<Value>, key: &str, default: &'a str) -> &'a str {
+    labels.as_ref().and_then(|value| value.get(key)).and_then(Value::as_str)
+        .filter(|text| !text.trim().is_empty() && !text.chars().any(char::is_control))
+        .unwrap_or(default)
+}
+
+fn suggested_filename(labels: &Option<Value>) -> &str {
+    let text = dialog_label(labels, "untitled", "Untitled.md");
+    if text.encode_utf16().count() > 200 || !text.ends_with(".md") || text.starts_with('.') || text.trim() != text
+        || text.chars().any(|ch| ch.is_control() || "<>:\"/\\|?*".contains(ch)) {
+        "Untitled.md"
+    } else {
+        text
+    }
+}
+
+fn save_dialog_filename(current: Option<&OpenDocument>, labels: &Option<Value>) -> String {
+    current.and_then(|document| document.path.file_name())
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| suggested_filename(labels).to_owned())
+}
+
 #[tauri::command]
-pub fn open_document(state: State<'_, Mutex<Documents>>) -> Result<Option<Value>, String> {
-    let path = rfd::FileDialog::new().add_filter("Markdown", &["md", "markdown", "mdown", "mkd"]).pick_file();
+pub fn open_document(state: State<'_, Mutex<Documents>>, labels: Option<Value>) -> Result<Option<Value>, String> {
+    let path = rfd::FileDialog::new()
+        .set_title(dialog_label(&labels, "open", "Open Markdown file"))
+        .add_filter(dialog_label(&labels, "markdown", "Markdown files"), &["md", "markdown", "mdown", "mkd"]).pick_file();
     let Some(path) = path else { return Ok(None) };
     let mut documents = state.lock().map_err(|e| e.to_string())?;
     open_path(&mut documents, path).map(Some)
 }
 
 #[tauri::command]
-pub fn save_document(state: State<'_, Mutex<Documents>>, document_id: Option<String>, content: String, save_as: bool) -> Value {
-    match save_impl(state, document_id, content, save_as) {
+pub fn save_document(state: State<'_, Mutex<Documents>>, document_id: Option<String>, content: String, save_as: bool, labels: Option<Value>) -> Value {
+    match save_impl(state, document_id, content, save_as, &labels) {
         Ok(Some(result)) => result,
         Ok(None) => json!({ "status": "canceled" }),
         Err(message) => json!({ "status": "error", "message": message }),
     }
 }
 
-fn save_impl(state: State<'_, Mutex<Documents>>, document_id: Option<String>, content: String, save_as: bool) -> Result<Option<Value>, String> {
-    let choose = {
+fn save_impl(state: State<'_, Mutex<Documents>>, document_id: Option<String>, content: String, save_as: bool, labels: &Option<Value>) -> Result<Option<Value>, String> {
+    let (choose, suggested_name) = {
         let documents = state.lock().map_err(|e| e.to_string())?;
         let current = current_for_save(&documents, document_id.as_deref(), save_as)?;
-        save_as || current.is_none()
+        (save_as || current.is_none(), save_dialog_filename(current, labels))
     };
     // File dialogs run a native event loop. Do not hold the document lock while
     // they are open: Finder can deliver another open request on that same loop.
     let chosen_path = if choose {
-        let Some(path) = rfd::FileDialog::new().add_filter("Markdown", &["md", "markdown"])
-            .set_file_name("Untitled.md").save_file() else { return Ok(None) };
+        let Some(path) = rfd::FileDialog::new()
+            .set_title(dialog_label(labels, "save", "Save Markdown file"))
+            .add_filter(dialog_label(labels, "markdown", "Markdown files"), &["md", "markdown"])
+            .set_file_name(suggested_name.as_str()).save_file() else { return Ok(None) };
         Some(path)
     } else {
         None
@@ -229,6 +255,41 @@ fn replace_document(path: &std::path::Path, bytes: &[u8], previous: Option<&[u8]
 mod tests {
     use super::*;
 
+    #[test]
+    fn localized_suggested_filename_rejects_paths_and_invalid_names() {
+        assert_eq!(suggested_filename(&Some(json!({"untitled": "Sans titre.md"}))), "Sans titre.md");
+        let unicode_name = format!("{}.md", "文".repeat(80));
+        let unicode_labels = Some(json!({"untitled": unicode_name.clone()}));
+        assert_eq!(suggested_filename(&unicode_labels), unicode_name);
+        let long_name = format!("{}.md", "a".repeat(198));
+        assert_eq!(suggested_filename(&Some(json!({"untitled": long_name}))), "Untitled.md");
+        for invalid in ["../outside.md", "folder\\name.md", "bad:name.md", ".md", "name.txt", "name\n.md"] {
+            assert_eq!(suggested_filename(&Some(json!({"untitled": invalid}))), "Untitled.md");
+        }
+        assert_eq!(suggested_filename(&None), "Untitled.md");
+    }
+
+    #[test]
+    fn missing_document_returns_translatable_error_without_replacing_current_document() {
+        let dir = tempfile::tempdir().unwrap();
+        let existing = dir.path().join("existing.md");
+        fs::write(&existing, "original").unwrap();
+        let mut documents = Documents::default();
+        open_path(&mut documents, existing.clone()).unwrap();
+        let error = open_path(&mut documents, dir.path().join("missing.md")).unwrap_err();
+        assert_eq!(error, "Markdown Vision could not read this file.");
+        assert_eq!(documents.current.unwrap().path, existing);
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn queued_unicode_paths_keep_their_order() {
+        let mut documents = Documents::default();
+        let paths = [PathBuf::from("文書.md"), PathBuf::from("ملف.md")];
+        for path in &paths { queue_open(&mut documents, path.clone()); }
+        assert_eq!(documents.pending.into_iter().collect::<Vec<_>>(), paths);
+    }
+
     #[cfg(target_os = "linux")]
     #[test]
     fn linux_open_arguments_preserve_order_and_resolve_relative_paths() {
@@ -261,6 +322,9 @@ mod tests {
         let mut documents = Documents::default();
         let result = open_path(&mut documents, path).unwrap();
         assert_eq!(result["name"], "文書-📘.md");
+        let labels = Some(json!({"untitled": "Sans titre.md"}));
+        assert_eq!(save_dialog_filename(documents.current.as_ref(), &labels), "文書-📘.md");
+        assert_eq!(save_dialog_filename(None, &labels), "Sans titre.md");
     }
 
     #[test]

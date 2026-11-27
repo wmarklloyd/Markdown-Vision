@@ -15,6 +15,7 @@
 #include <vector>
 
 #include <wrl.h>
+#include "StartupTranslations.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -94,8 +95,8 @@ std::wstring ReadTextFile(const std::wstring& path) {
 std::wstring ReadTextFileOrMessage(const std::wstring& path) {
     try {
         return ReadTextFile(path);
-    } catch (const std::exception& exception) {
-        return Utf8ToWide(exception.what());
+    } catch (const std::exception&) {
+        return StartupErrorsForLanguage(GetUserDefaultUILanguage()).read;
     }
 }
 

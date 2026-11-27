@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
@@ -60,11 +61,15 @@ public partial class MainWindow : Window
         }
         catch (Exception exception)
         {
+            var startupCulture = StartupCulture.FromPreferences(PreferencesPath, CultureInfo.CurrentUICulture);
+            var (message, rtl) = StartupTranslations.Format(startupCulture, exception.Message);
             MessageBox.Show(
-                $"Markdown Vision could not start.\n\n{exception.Message}",
+                message,
                 "Markdown Vision",
                 MessageBoxButton.OK,
-                MessageBoxImage.Error);
+                MessageBoxImage.Error,
+                MessageBoxResult.OK,
+                rtl ? MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign : MessageBoxOptions.None);
             Close();
         }
     }
@@ -89,7 +94,7 @@ public partial class MainWindow : Window
             object? result = request.Method switch
             {
                 "document.initial" => TakeInitialDocument(),
-                "document.open" => OpenDocument(),
+                "document.open" => OpenDocument(request.Payload),
                 "preferences.get" => ReadPreferences(),
                 "preferences.set" => WritePreferences(request.Payload),
                 "fonts.list" => ListSystemFonts(),
@@ -112,12 +117,25 @@ public partial class MainWindow : Window
         return document;
     }
 
-    private DocumentData? OpenDocument()
+    private static string FileDialogLabel(JsonElement labels, string key, string fallback)
     {
+        if (labels.ValueKind != JsonValueKind.Object ||
+            !labels.TryGetProperty(key, out var value) ||
+            value.ValueKind != JsonValueKind.String)
+            return fallback;
+        var text = value.GetString();
+        return string.IsNullOrWhiteSpace(text) || text.Length > 256 ||
+            text.Contains('|') || text.Any(char.IsControl) ? fallback : text;
+    }
+
+    private DocumentData? OpenDocument(JsonElement labels)
+    {
+        var markdown = FileDialogLabel(labels, "markdown", "Markdown files");
+        var text = FileDialogLabel(labels, "text", "Text files");
         var dialog = new OpenFileDialog
         {
-            Title = "Open Markdown file",
-            Filter = "Markdown files (*.md;*.markdown;*.mdown;*.mkd)|*.md;*.markdown;*.mdown;*.mkd|Text files (*.txt)|*.txt",
+            Title = FileDialogLabel(labels, "open", "Open Markdown file"),
+            Filter = $"{markdown} (*.md;*.markdown;*.mdown;*.mkd)|*.md;*.markdown;*.mdown;*.mkd|{text} (*.txt)|*.txt",
             CheckFileExists = true,
             Multiselect = false
         };
@@ -250,7 +268,7 @@ public partial class MainWindow : Window
             getInitialDocument: () => request('document.initial'),
             getPreferences: () => request('preferences.get'),
             savePreferences: (preferences) => request('preferences.set', preferences),
-            openMarkdownFile: () => request('document.open'),
+            openMarkdownFile: (labels) => request('document.open', labels),
             listSystemFonts: () => request('fonts.list'),
             onOpenDocument: (callback) => documentListeners.push(callback),
             onFullscreenChange: (callback) => fullscreenListeners.push(callback)

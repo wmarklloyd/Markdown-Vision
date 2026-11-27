@@ -1,7 +1,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
+execFileSync(process.execPath, [path.join(root, 'tools', 'export-localization.cjs'), '--check-generated'], { stdio: 'inherit' });
+execFileSync(process.execPath, [path.join(root, 'tools', 'check-native-error-localization.cjs')], { stdio: 'inherit' });
 const checkOnly = process.argv.includes('--check-only');
 const destinationArg = process.argv.indexOf('--destination');
 const destination = destinationArg >= 0

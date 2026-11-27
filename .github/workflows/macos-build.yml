@@ -7,6 +7,20 @@ on:
         description: Existing GitHub release tag to attach the DMG to
         required: false
         type: string
+  pull_request:
+    paths:
+      - '.github/workflows/macos-build.yml'
+      - 'src/web/**'
+      - 'native-tauri/**'
+      - 'native-cpp/StartupTranslations.h'
+      - 'native-cpp/WebViewHost.cpp'
+      - 'native-cpp/installer-localization.nsh'
+      - 'native-windows/StartupTranslations.cs'
+      - 'docs/LOCALIZATION.md'
+      - 'tools/stage-tauri.cjs'
+      - 'tools/export-localization.cjs'
+      - 'tools/check-native-error-localization.cjs'
+      - 'tools/test-localization-generation.cjs'
   push:
     branches:
       - codex/linux-matrix-build
@@ -34,9 +48,41 @@ jobs:
           test "${GITHUB_REF_NAME#v}" = "$(node -p "require('./native-tauri/tauri.conf.json').version")"
       - name: Install Tauri CLI
         run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.6
+      - name: Require reviewed translations before attaching release assets
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != '' || github.ref == 'refs/heads/codex/linux-matrix-build'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -eu
+          if [[ "$GITHUB_REF" == refs/heads/* ]] && [[ -z "$RELEASE_TAG" ]]; then
+            release_tag="v$(node -p "require('./native-tauri/tauri.conf.json').version")"
+            if ! gh release view "$release_tag" >/dev/null 2>&1; then
+              echo "No release $release_tag exists; skipping the release-readiness gate for this build artifact."
+              exit 0
+            fi
+          fi
+          node tools/export-localization.cjs --check-release-ready
+      - name: Test localization and native services
+        run: |
+          node tools/stage-tauri.cjs
+          node tools/test-localization-generation.cjs
+          node tools/check-native-error-localization.cjs
+          cargo test --locked --manifest-path native-tauri/Cargo.toml
       - name: Build unsigned universal DMG
         working-directory: native-tauri
         run: '"$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" build --target universal-apple-darwin --bundles dmg -- --locked'
+      - name: Verify localized document type resources
+        run: |
+          set -eu
+          app=$(find native-tauri/target/universal-apple-darwin/release/bundle/macos -maxdepth 1 -name '*.app' -type d -print -quit)
+          test -n "$app"
+          for source in native-tauri/macos-localizations/*.lproj/InfoPlist.strings; do
+            locale=$(basename "$(dirname "$source")")
+            target="$app/Contents/Resources/$locale/InfoPlist.strings"
+            cmp "$source" "$target"
+            plutil -lint "$target"
+          done
       - name: Retain unsigned macOS DMG
         uses: actions/upload-artifact@v4
         with:

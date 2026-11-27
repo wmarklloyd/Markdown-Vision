@@ -13,6 +13,10 @@ exit /b %errorlevel%
 :build
 set "ARCH=%~1"
 if /I not "%ARCH%"=="x64" if /I not "%ARCH%"=="arm64" exit /b 1
+node "%ROOT%\tools\export-localization.cjs" --sync-installer
+if errorlevel 1 exit /b %errorlevel%
+node "%ROOT%\tools\check-installer-associations.cjs"
+if errorlevel 1 exit /b %errorlevel%
 set "APP_OUT_NAME=MarkdownVision-Native-Editor-2.8.25"
 if /I "%ARCH%"=="arm64" set "APP_OUT_NAME=MarkdownVision-Native-Editor-2.8.25-arm64"
 call "%~dp0build.bat" "%APP_OUT_NAME%" "%ARCH%"

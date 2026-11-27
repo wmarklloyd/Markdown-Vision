@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../native-windows/StartupCulture.cs" Link="StartupCulture.cs" />
+    <Compile Include="../../native-windows/StartupTranslations.cs" Link="StartupTranslations.cs" />
+  </ItemGroup>
+</Project>

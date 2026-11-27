@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 
@@ -7,12 +8,31 @@ namespace MarkdownVision.Native;
 public partial class App : Application
 {
     private const string DetachedLaunchFlag = "--markdown-vision-detached";
+    private static readonly string PreferencesPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "Markdown Vision",
+        "preferences.json");
 
     protected override void OnStartup(StartupEventArgs e)
     {
         if (ShouldDetach(e.Args))
         {
-            LaunchDetachedCopy(e.Args);
+            try
+            {
+                LaunchDetachedCopy(e.Args);
+            }
+            catch (Exception exception)
+            {
+                var startupCulture = StartupCulture.FromPreferences(PreferencesPath, CultureInfo.CurrentUICulture);
+                var (message, rtl) = StartupTranslations.Format(startupCulture, exception.Message);
+                MessageBox.Show(
+                    message,
+                    "Markdown Vision",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error,
+                    MessageBoxResult.OK,
+                    rtl ? MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign : MessageBoxOptions.None);
+            }
             Shutdown();
             return;
         }

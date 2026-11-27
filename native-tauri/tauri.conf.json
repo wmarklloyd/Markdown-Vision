@@ -18,9 +18,10 @@
   "bundle": {
     "active": true,
     "icon": ["icons/icon.png", "icons/icon.icns", "../native-cpp/MarkdownVision.ico"],
+    "macOS": { "files": { "Resources": "macos-localizations" } },
     "linux": {
-      "deb": { "depends": ["zenity", "xdg-utils", "fontconfig", "curl", "pkexec"] },
-      "rpm": { "depends": ["webkit2gtk4.1", "gtk3", "zenity", "xdg-utils", "fontconfig", "curl", "polkit", "dnf"] }
+      "deb": { "desktopTemplate": "launcher.desktop", "depends": ["zenity", "xdg-utils", "fontconfig", "curl", "pkexec"] },
+      "rpm": { "desktopTemplate": "launcher.desktop", "depends": ["webkit2gtk4.1", "gtk3", "zenity", "xdg-utils", "fontconfig", "curl", "polkit", "dnf"] }
     },
     "fileAssociations": [
       { "ext": ["md", "markdown", "mdown", "mkd"], "name": "Markdown document", "mimeType": "text/markdown", "role": "Editor", "rank": "Alternate" }

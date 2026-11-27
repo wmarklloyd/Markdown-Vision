@@ -1,0 +1,42 @@
+# Generated from docs/LOCALIZATION.md by tools/export-localization.cjs.
+[Desktop Entry]
+Categories={{categories}}
+{{#if comment}}
+Comment={{comment}}
+{{/if}}
+Exec={{exec}}
+StartupWMClass={{exec}}
+Icon={{icon}}
+Name={{name}}
+GenericName=Markdown file viewer
+GenericName[ar]=عارض ملفات Markdown
+GenericName[zh]=Markdown 文件查看器
+GenericName[zh_CN]=Markdown 文件查看器
+GenericName[zh_SG]=Markdown 文件查看器
+GenericName[zh_TW]=Markdown 檔案檢視器
+GenericName[zh_HK]=Markdown 檔案檢視器
+GenericName[zh_MO]=Markdown 檔案檢視器
+GenericName[cs]=Prohlížeč souborů Markdown
+GenericName[nl]=Markdown-bestandsviewer
+GenericName[fr]=Visionneuse de fichiers Markdown
+GenericName[de]=Markdown-Dateibetrachter
+GenericName[hi]=Markdown फ़ाइल व्यूअर
+GenericName[id]=Penampil berkas Markdown
+GenericName[it]=Visualizzatore di file Markdown
+GenericName[ja]=Markdown ファイルビューア
+GenericName[ko]=Markdown 파일 뷰어
+GenericName[pl]=Przeglądarka plików Markdown
+GenericName[pt]=Visualizador de arquivo Markdown
+GenericName[pt_BR]=Visualizador de arquivo Markdown
+GenericName[ru]=Просмотрщик файлов Markdown
+GenericName[es]=Visor de archivos Markdown
+GenericName[sv]=Markdown-filvisare
+GenericName[th]=โปรแกรมดูไฟล์ Markdown
+GenericName[tr]=Markdown dosya görüntüleyici
+GenericName[uk]=Переглядач файлів Markdown
+GenericName[vi]=Trình xem tập tin Markdown
+Terminal=false
+Type=Application
+{{#if mime_type}}
+MimeType={{mime_type}}
+{{/if}}

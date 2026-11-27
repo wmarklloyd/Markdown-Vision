@@ -10,7 +10,7 @@ const detachedLaunchFlag = '--markdown-vision-detached';
 const initialDocuments = new Map();
 const startupDocumentPath = getDocumentPath();
 const preferencesPath = path.join(app.getPath('appData'), 'Markdown Vision', 'preferences.json');
-const defaultPreferences = { theme: 'dark', font: 'Libertinus Serif', monoFont: 'Libertinus Mono', size: 'auto', line: '1.75', width: 'auto' };
+const defaultPreferences = { theme: 'dark', font: 'Libertinus Serif', monoFont: 'Libertinus Mono', size: 'auto', line: '1.75', width: 'auto', language: 'system' };
 
 function getDocumentPath(argv = process.argv) {
   return argv
@@ -80,7 +80,8 @@ function writePreferences(preferences) {
     monoFont: preferences?.monoFont || defaultPreferences.monoFont,
     size: String(preferences?.size || defaultPreferences.size),
     line: String(preferences?.line || defaultPreferences.line),
-    width: String(preferences?.width || defaultPreferences.width)
+    width: String(preferences?.width || defaultPreferences.width),
+    language: typeof preferences?.language === 'string' ? preferences.language : defaultPreferences.language
   };
   fs.mkdirSync(path.dirname(preferencesPath), { recursive: true });
   fs.writeFileSync(preferencesPath, JSON.stringify(nextPreferences, null, 2));
@@ -143,14 +144,18 @@ ipcMain.handle('document:initial', (event) => {
   return document;
 });
 
-ipcMain.handle('document:open', async (event) => {
+ipcMain.handle('document:open', async (event, labels) => {
   const targetWindow = BrowserWindow.fromWebContents(event.sender);
+  const label = (key, fallback) => {
+    const text = labels?.[key];
+    return typeof text === 'string' && text.trim() && !/[\u0000-\u001f\u007f]/.test(text) ? text : fallback;
+  };
   const result = await dialog.showOpenDialog(targetWindow, {
-    title: 'Open Markdown file',
+    title: label('open', 'Open Markdown file'),
     properties: ['openFile'],
     filters: [
-      { name: 'Markdown', extensions: ['md', 'markdown', 'mdown', 'mkd'] },
-      { name: 'Text', extensions: ['txt'] }
+      { name: label('markdown', 'Markdown files'), extensions: ['md', 'markdown', 'mdown', 'mkd'] },
+      { name: label('text', 'Text files'), extensions: ['txt'] }
     ]
   });
   if (result.canceled) return null;
