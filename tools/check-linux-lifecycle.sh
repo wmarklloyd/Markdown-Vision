@@ -26,7 +26,9 @@ wait_for_window() {
     sleep 1
   done
   echo "Window did not appear within 60 seconds: $title" >&2
-  echo "::error title=Linux GUI window timeout::Timed out waiting for visible window titled '$title'."
+  window_titles=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | while read -r candidate; do xdotool getwindowname "$candidate" 2>/dev/null || true; done | tr '\n' '|')
+  app_log=$(tail -n 5 "$evidence/app.log" | tr '\n' ' ')
+  echo "::error title=Linux GUI window timeout::Timed out waiting for '$title'. Visible windows: ${window_titles:-none}. App log: ${app_log:-empty}."
   echo 'Visible windows at failure:' >&2
   xdotool search --onlyvisible --name '.*' 2>/dev/null | while read -r candidate; do
     printf '  %s: ' "$candidate" >&2
@@ -42,6 +44,24 @@ require_window() {
     echo "::error title=Linux GUI window timeout::Timed out waiting for visible window titled '$title'."
     return 1
   fi
+}
+wait_for_app_window() {
+  attempt=0
+  while [ "$attempt" -lt 60 ]; do
+    window=$(xdotool search --onlyvisible --pid "$pid" 2>/dev/null | head -n 1 || true)
+    if [ -n "$window" ]; then return 0; fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      cat "$evidence/app.log" >&2
+      echo 'Application exited before its window appeared.' >&2
+      return 1
+    fi
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+  window_titles=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | while read -r candidate; do xdotool getwindowname "$candidate" 2>/dev/null || true; done | tr '\n' '|')
+  app_log=$(tail -n 5 "$evidence/app.log" | tr '\n' ' ')
+  echo "::error title=Linux application window timeout::No visible window for process $pid. Visible windows: ${window_titles:-none}. App log: ${app_log:-empty}."
+  return 1
 }
 (cd "$test_dir" && exec "$app" "$fixture") >"$evidence/app.log" 2>&1 &
 pid=$!
@@ -81,7 +101,7 @@ wait_for_clipboard() {
   echo "Clipboard did not contain expected text: $expected" >&2
   return 1
 }
-require_window 'Markdown-total-torture-test.md'
+wait_for_app_window
 # Decline the first-run default-app prompt in this isolated test profile.
 xdotool windowfocus --sync "$window"
 xdotool key --clearmodifiers Escape
