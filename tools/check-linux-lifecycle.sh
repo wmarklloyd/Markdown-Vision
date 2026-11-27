@@ -68,6 +68,8 @@ wait_for_clipboard() {
   return 1
 }
 window=$(wait_for_window 'Markdown-total-torture-test.md')
+# Decline the first-run default-app prompt in this isolated test profile.
+xdotool key Escape
 xdotool windowfocus --sync "$window" key ctrl+p
 print_dialog=$(wait_for_window 'Print')
 import -window root "$evidence/linux-print.png"

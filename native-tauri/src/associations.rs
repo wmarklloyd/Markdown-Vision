@@ -164,7 +164,7 @@ mod macos {
         let content_type = markdown_type()?;
         let app_url = NSBundle::mainBundle().bundleURL();
         let current = NSWorkspace::sharedWorkspace().URLForApplicationToOpenContentType(&content_type);
-        Ok(current.is_some_and(|url| url.isEqual(&app_url)))
+        Ok(current.is_some_and(|url| url == app_url))
     }
 
     pub async fn set_default() -> Result<(), String> {
