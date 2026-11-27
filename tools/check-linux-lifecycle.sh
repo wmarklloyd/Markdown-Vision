@@ -63,6 +63,36 @@ wait_for_app_window() {
   echo "::error title=Linux application window timeout::No visible window for process $pid. Visible windows: ${window_titles:-none}. App log: ${app_log:-empty}."
   return 1
 }
+wait_for_no_auxiliary_window() {
+  main_window=$1
+  attempt=0
+  while [ "$attempt" -lt 20 ]; do
+    auxiliary=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | while read -r candidate; do
+      [ "$candidate" = "$main_window" ] || printf '%s\n' "$candidate"
+    done)
+    if [ -z "$auxiliary" ]; then return 0; fi
+    xdotool key --clearmodifiers Escape
+    attempt=$((attempt + 1))
+    sleep 0.25
+  done
+  echo "::error title=Linux setup prompt did not close::Visible auxiliary window(s) remained after declining setup: $auxiliary"
+  return 1
+}
+wait_for_new_window() {
+  main_window=$1
+  attempt=0
+  while [ "$attempt" -lt 60 ]; do
+    window=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | while read -r candidate; do
+      [ "$candidate" = "$main_window" ] || printf '%s\n' "$candidate"
+    done | head -n 1)
+    if [ -n "$window" ]; then return 0; fi
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+  window_titles=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | while read -r candidate; do xdotool getwindowname "$candidate" 2>/dev/null || true; done | tr '\n' '|')
+  echo "::error title=Linux print dialog timeout::No new print window appeared. Visible windows: ${window_titles:-none}."
+  return 1
+}
 (cd "$test_dir" && exec "$app" "$fixture") >"$evidence/app.log" 2>&1 &
 pid=$!
 trap 'kill "$pid" 2>/dev/null || true; rm -rf "$test_dir"' EXIT
@@ -105,9 +135,9 @@ wait_for_app_window
 # Decline the first-run default-app prompt in this isolated test profile.
 sleep 1
 xdotool key --clearmodifiers Escape
-sleep 1
+wait_for_no_auxiliary_window "$window"
 xdotool windowfocus --sync "$window" key ctrl+p
-require_window 'Print'
+wait_for_new_window "$window"
 print_dialog=$window
 import -window root "$evidence/linux-print.png"
 xdotool mousemove --window "$print_dialog" 85 85 click 1
