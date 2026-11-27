@@ -6,7 +6,6 @@ app=$1
 fixture=$2
 evidence=$3
 mkdir -p "$evidence"
-trap 'result=$?; line=$LINENO; echo "::error title=Linux lifecycle check failed::Command failed at line $line (exit $result)."; exit "$result"' ERR
 case "$app" in /*) ;; *) app="$(cd "$(dirname "$app")" && pwd)/$(basename "$app")" ;; esac
 case "$fixture" in /*) ;; *) fixture="$(cd "$(dirname "$fixture")" && pwd)/$(basename "$fixture")" ;; esac
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/markdown-vision-lifecycle.XXXXXX")
