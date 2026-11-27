@@ -2747,11 +2747,13 @@ async function run() {
     assert.match(await evaluate(window, 'document.querySelector("#printButton").title'), /Ctrl/);
     await evaluate(window, 'window.markdownVisionReader.applyShortcutLabels()');
 
-    await evaluate(window, 'window.fetch = () => new Promise((resolve, reject) => { window.__rejectReleaseCheck = reject; }); document.querySelector(".about-menu summary").click()');
+    await evaluate(window, 'window.fetch = (url) => url.includes("release-feed.json") ? Promise.reject(new Error("Offline fixture")) : new Promise((resolve, reject) => { window.__rejectReleaseCheck = reject; }); document.querySelector(".about-menu summary").click()');
     await waitFor(window, 'document.querySelector(".about-menu").open && document.querySelector("#latestVersion").textContent.includes("checking")', 'nonblocking About release check');
     await evaluate(window, 'window.__rejectReleaseCheck(new Error("Offline fixture"))');
     await waitFor(window, 'document.querySelector("#retryUpdateCheck").hidden === false', 'About offline state');
-    assert.match(await evaluate(window, 'document.querySelector("#latestVersion").textContent'), /Unable to check/);
+    assert.equal(await evaluate(window, 'document.querySelector("#latestVersion").textContent'), 'Release check failed');
+    assert.equal(await evaluate(window, 'document.querySelector("#updateLink").hidden'), false);
+    assert.match(await evaluate(window, 'document.querySelector("#updateLink").href'), /\/releases\/latest$/);
     await evaluate(window, `window.desktop.getPlatformInfo = async () => ({ platform: 'linux', architecture: 'x86_64', distribution: 'ubuntu' }); window.fetch = async () => ({ ok: true, json: async () => [{ tag_name: "v${installedVersion}", assets: [] }] }); document.querySelector(".about-menu").open = false; document.querySelector(".about-menu").open = true`);
     await waitFor(window, `document.querySelector("#latestVersion").textContent === "Latest compatible version: ${installedVersion}"`, 'About current-version state');
     assert.equal(await evaluate(window, 'document.querySelector("#updateLink").hidden'), true);
@@ -2760,6 +2762,14 @@ async function run() {
     assert.equal(await evaluate(window, 'document.querySelector("#updateLink").hidden'), false, 'manual release link appears without auto-updater capability');
     await evaluate(window, `window.desktop.getPlatformInfo = async () => ({ platform: 'linux', architecture: 'x86_64', distribution: 'fedora' }); window.desktop.installLinuxUpdate = async () => {}; window.fetch = async () => ({ ok: true, json: async () => [{ tag_name: 'v${newerVersion}', assets: [{name: 'Markdown-Vision-${newerVersion}-ubuntu-x86_64.deb', browser_download_url: 'https://example.com/update.deb', digest: 'sha256:' + 'a'.repeat(64)}, {name: 'Markdown-Vision-${newerVersion}-fedora-x86_64.rpm', browser_download_url: 'https://example.com/update.rpm', digest: 'sha256:' + 'b'.repeat(64)}] }] }); document.querySelector('.about-menu').open = false; document.querySelector('.about-menu').open = true;`);
     await waitFor(window, 'document.querySelector("#updateLink").textContent === "Upgrade Markdown Vision" && document.querySelector("#updateLink").href.endsWith("update.rpm")', 'Fedora in-app RPM upgrade');
+    await evaluate(window, `window.fetch = async (url) => url.includes('api.github.com')
+      ? { ok: false, status: 403 }
+      : { ok: true, json: async () => ({ version: '${newerVersion}', assets: {
+        'Markdown-Vision-${newerVersion}-ubuntu-x86_64.deb': 'a'.repeat(64),
+        'Markdown-Vision-${newerVersion}-fedora-x86_64.rpm': 'b'.repeat(64) } }) };
+      void checkForUpdates();`);
+    await waitFor(window, `document.querySelector('#updateLink').href.endsWith('/releases/download/v${newerVersion}/Markdown-Vision-${newerVersion}-fedora-x86_64.rpm')
+      && document.querySelector('#updateLink').textContent === 'Upgrade Markdown Vision'`, 'verified Fedora update from the fallback feed');
     await evaluate(window, `document.querySelector('#installedVersion').dataset.version = '2.8.99'; window.fetch = async () => ({ ok: true, json: async () => [{ tag_name: 'v2.9.0', assets: [{name: 'Markdown-Vision-2.9.0-fedora-x86_64.rpm', browser_download_url: 'https://example.com/2.9.0.rpm', digest: 'sha256:' + 'b'.repeat(64)}] }] }); document.querySelector('.about-menu').open = false; document.querySelector('.about-menu').open = true;`);
     await waitFor(window, 'document.querySelector("#latestVersion").textContent === "Latest compatible version: 2.9.0" && !document.querySelector("#updateLink").hidden', 'minor version upgrade 2.8 to 2.9');
     await evaluate(window, `document.querySelector('#installedVersion').dataset.version = '2.10.0'; document.querySelector('.about-menu').open = false; document.querySelector('.about-menu').open = true;`);

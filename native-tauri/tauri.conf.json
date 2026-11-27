@@ -13,7 +13,7 @@
     "windows": [
       { "title": "Markdown Vision", "width": 1100, "height": 800, "create": false }
     ],
-    "security": { "csp": "default-src 'self'; img-src 'self' data: https: mvimage: http://mvimage.localhost; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://api.github.com" }
+    "security": { "csp": "default-src 'self'; img-src 'self' data: https: mvimage: http://mvimage.localhost; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://api.github.com https://raw.githubusercontent.com" }
   },
   "bundle": {
     "active": true,

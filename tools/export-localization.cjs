@@ -82,7 +82,7 @@ const previewInterfaceSources = [
   'Latest compatible version: {version}', 'Update', 'Check for updates', 'Restart Markdown Vision',
   'Unsupported architecture', 'Unsupported platform', 'Installer verification is unavailable',
   'Upgrade Markdown Vision', 'Download macOS update', 'Download Linux update',
-  'Unable to check for updates. Check your internet connection and try again.',
+  'Release check failed',
   'Downloading and verifying the update. You may be asked to authenticate.',
   'Update installed. Restart to use the new version.', 'Update failed: {error}',
   'Would you like Markdown Vision to open Markdown files by default?',
