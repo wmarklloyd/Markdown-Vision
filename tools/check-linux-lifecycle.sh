@@ -73,12 +73,15 @@ wait_for_no_auxiliary_window() {
     if [ -z "$auxiliary" ]; then return 0; fi
     printf '%s\n' "$auxiliary" | while read -r candidate; do
       xdotool windowfocus --sync "$candidate"
-      xdotool key --clearmodifiers Escape
+      xdotool key --clearmodifiers --window "$candidate" Escape
     done
     attempt=$((attempt + 1))
     sleep 0.25
   done
-  echo "::error title=Linux setup prompt did not close::Visible auxiliary window(s) remained after declining setup: $auxiliary"
+  auxiliary_info=$(printf '%s\n' "$auxiliary" | while read -r candidate; do
+    printf '%s[name=%s,pid=%s] ' "$candidate" "$(xdotool getwindowname "$candidate" 2>/dev/null || true)" "$(xdotool getwindowpid "$candidate" 2>/dev/null || true)"
+  done)
+  echo "::error title=Linux setup prompt did not close::Auxiliary window(s) remained: $auxiliary_info"
   return 1
 }
 wait_for_new_window() {
