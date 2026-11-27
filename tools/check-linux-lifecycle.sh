@@ -155,7 +155,11 @@ stage='waiting for the Markdown fixture to load'
 require_window 'Markdown-total-torture-test.md'
 baseline_windows=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | tr '\n' ' ')
 stage='opening the print dialog'
-xdotool windowfocus --sync "$window" key ctrl+p
+window_width=$(xdotool getwindowgeometry --shell "$window" | sed -n 's/^WIDTH=//p')
+test -n "$window_width"
+print_button_x=$((window_width - 202))
+xdotool windowfocus --sync "$window"
+xdotool mousemove --window "$window" "$print_button_x" 30 click 1
 stage='waiting for the print dialog'
 wait_for_new_window "$baseline_windows"
 print_dialog=$window
