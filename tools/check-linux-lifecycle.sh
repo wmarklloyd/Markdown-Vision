@@ -6,6 +6,7 @@ app=$1
 fixture=$2
 evidence=$3
 mkdir -p "$evidence"
+trap 'result=$?; line=$LINENO; echo "::error title=Linux lifecycle check failed::Command failed at line $line (exit $result)."; exit "$result"' ERR
 case "$app" in /*) ;; *) app="$(cd "$(dirname "$app")" && pwd)/$(basename "$app")" ;; esac
 case "$fixture" in /*) ;; *) fixture="$(cd "$(dirname "$fixture")" && pwd)/$(basename "$fixture")" ;; esac
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/markdown-vision-lifecycle.XXXXXX")
@@ -27,6 +28,7 @@ wait_for_window() {
     sleep 1
   done
   echo "Window did not appear within 60 seconds: $title" >&2
+  echo "::error title=Linux GUI window timeout::Timed out waiting for visible window titled '$title'."
   echo 'Visible windows at failure:' >&2
   xdotool search --onlyvisible --name '.*' 2>/dev/null | while read -r candidate; do
     printf '  %s: ' "$candidate" >&2
