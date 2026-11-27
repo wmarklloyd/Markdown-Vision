@@ -151,17 +151,6 @@ for (const file of ['src/web/app.js', 'src/web/editor-ui.js']) {
   }
   console.log(`Checked ${literals.size} literal interface texts in ${file}.`);
 }
-const optionBlock = /const languageOptions = (\[[\s\S]*?\n\]);/.exec(source)?.[1];
-assert.ok(optionBlock, 'Missing language selector options');
-const options = vm.runInNewContext(optionBlock).map(option => option[0]);
-assert.deepEqual([...options].sort(), ['en', ...locales].sort(), 'Language selector and catalog differ');
-const systemLabelsBlock = /const systemLanguageLabels = (\{[\s\S]*?\n\});/.exec(source)?.[1];
-assert.ok(systemLabelsBlock, 'Missing system language labels');
-const systemLabels = vm.runInNewContext(`(${systemLabelsBlock})`);
-assert.deepEqual(Object.keys(systemLabels).sort(), ['en', ...locales].sort(), 'System language labels and catalog differ');
-for (const [locale, label] of Object.entries(systemLabels)) {
-  assert.ok(typeof label === 'string' && label.trim(), `${locale}: empty system language label`);
-}
 const preferences = fs.readFileSync(path.join(root, 'native-tauri/src/preferences.rs'), 'utf8');
 const languageValidator = /fn is_supported_language\(text: &str\) -> bool \{([\s\S]*?)\n\}/.exec(preferences)?.[1];
 assert.ok(languageValidator, 'Missing native language validator');

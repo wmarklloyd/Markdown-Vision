@@ -8,11 +8,6 @@ namespace MarkdownVision.Native;
 public partial class App : Application
 {
     private const string DetachedLaunchFlag = "--markdown-vision-detached";
-    private static readonly string PreferencesPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "Markdown Vision",
-        "preferences.json");
-
     protected override void OnStartup(StartupEventArgs e)
     {
         if (ShouldDetach(e.Args))
@@ -23,7 +18,8 @@ public partial class App : Application
             }
             catch (Exception exception)
             {
-                var startupCulture = StartupCulture.FromPreferences(PreferencesPath, CultureInfo.CurrentUICulture);
+                var startupCulture = StartupCulture.FromLanguage(
+                    Environment.GetEnvironmentVariable("MARKDOWN_VISION_LANGUAGE"), CultureInfo.CurrentUICulture);
                 var (message, rtl) = StartupTranslations.Format(startupCulture, exception.Message);
                 MessageBox.Show(
                     message,

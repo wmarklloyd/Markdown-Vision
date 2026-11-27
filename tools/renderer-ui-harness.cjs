@@ -89,150 +89,15 @@ async function checkLocalizedInterface(window, indexFile) {
     { text: 'Variable-width font', accessible: 'Variable-width font', associated: true },
     { text: 'Fixed-width font', accessible: 'Fixed-width font', associated: true },
   ], 'English font controls have visible, associated labels');
-  await window.loadFile(indexFile);
-  await evaluate(window, `localStorage.setItem('markdown-vision-preferences', JSON.stringify({ language: 'unsupported' }));
-    localStorage.removeItem('markdown-vision-language-pending');`);
+  await evaluate(window, "localStorage.setItem('markdown-vision-preferences', JSON.stringify({ language: 'en' }))");
   await window.loadFile(indexFile, { query: { testSystemLanguage: 'pl-PL' } });
-  assert.equal(await evaluate(window, 'document.querySelector("#searchInput").placeholder'), 'Szukaj w tekście',
-    'unsupported saved language falls back to the system language');
-  assert.equal(await evaluate(window, 'document.querySelector("#languageSelect").value'), 'system');
-  await evaluate(window, `localStorage.setItem('markdown-vision-preferences', JSON.stringify({ language: 'en' }))`);
-  await window.loadFile(indexFile, { query: { testSystemLanguage: 'pl-PL' } });
-  const systemSelection = await evaluate(window, `(() => {
-    const selector = document.querySelector('#languageSelect');
-    const before = document.querySelector('#searchInput').placeholder;
-    selector.value = 'system';
-    selector.dispatchEvent(new Event('change', { bubbles: true }));
-    const status = document.querySelector('#languageStatus');
-    return { before, after: document.querySelector('#searchInput').placeholder,
-      hidden: status.hidden, language: status.lang, text: status.textContent };
-  })()`);
-  assert.deepEqual(systemSelection, { before: 'Search text', after: 'Search text', hidden: false,
-    language: 'pl', text: 'Uruchom ponownie aplikację, aby zmienić język.' },
-    'selecting a different system language requests a restart without changing the current interface');
+  assert.equal(await evaluate(window, 'document.documentElement.lang'), 'pl');
+  assert.equal(await evaluate(window, 'document.querySelector("#languageSelect")'), null);
+  await window.loadFile(indexFile, { query: { testSystemLanguage: 'pl-PL', testLanguageOverride: 'fr-CA' } });
+  assert.equal(await evaluate(window, 'document.documentElement.lang'), 'fr');
+  await window.loadFile(indexFile, { query: { testSystemLanguage: 'pl-PL', testLanguageOverride: 'unsupported' } });
+  assert.equal(await evaluate(window, 'document.documentElement.lang'), 'pl');
   await evaluate(window, "localStorage.removeItem('markdown-vision-preferences')");
-  await window.loadFile(indexFile, { query: { previewLocale: 'pl', testMenuDelay: '1' } });
-  await waitFor(window, 'window.__nativeMenuLabels?.["file-menu"] === "Plik"', 'native menu translation after startup delay');
-  assert.equal(await evaluate(window, 'window.__menuAttempts'), 3, 'native menu update retried until available');
-  await window.loadFile(indexFile);
-  await evaluate(window, `localStorage.removeItem('markdown-vision-preferences');
-    localStorage.removeItem('markdown-vision-language-pending');
-    sessionStorage.removeItem('test-startup-loads');
-    sessionStorage.removeItem('test-initial-requests');`);
-  await window.loadFile(indexFile, { query: { testNativeLanguage: 'pl' } });
-  await waitFor(window, `document.querySelector('#searchInput').placeholder === 'Szukaj w tekście'
-    && document.querySelector('#markdownOutput').textContent.includes('Startup document')`,
-    'native language restored before opening the startup document');
-  const startup = await evaluate(window, `({
-    loads: Number(sessionStorage.getItem('test-startup-loads')),
-    initialRequests: Number(sessionStorage.getItem('test-initial-requests')),
-    language: JSON.parse(localStorage.getItem('markdown-vision-preferences')).language,
-  })`);
-  assert.deepEqual(startup, { loads: 2, initialRequests: 1, language: 'pl' });
-  await evaluate(window, "localStorage.removeItem('markdown-vision-preferences')");
-  await evaluate(window, `sessionStorage.removeItem('test-startup-loads'); sessionStorage.removeItem('test-initial-requests')`);
-  await window.loadFile(indexFile, { query: { testNativeLanguage: 'pl', testSlowPreferences: '1' } });
-  await waitFor(window, `document.querySelector('#markdownOutput').textContent.includes('Startup document')`,
-    'startup document opens while preferences are slow');
-  await waitFor(window, `document.querySelector('#languageSelect').value === 'pl'`, 'slow native language preference');
-  const slowStartup = await evaluate(window, `({
-    loads: Number(sessionStorage.getItem('test-startup-loads')),
-    initialRequests: Number(sessionStorage.getItem('test-initial-requests')),
-    warningVisible: !document.querySelector('#languageStatus').hidden,
-  })`);
-  assert.deepEqual(slowStartup, { loads: 1, initialRequests: 1, warningVisible: true });
-  await evaluate(window, "localStorage.removeItem('markdown-vision-preferences')");
-  await evaluate(window, `sessionStorage.removeItem('test-startup-loads'); sessionStorage.removeItem('test-initial-requests')`);
-  await window.loadFile(indexFile, { query: { testNativeLanguage: 'pl', testPreferenceFailure: '1' } });
-  await waitFor(window, `document.querySelector('#markdownOutput').textContent.includes('Startup document')`,
-    'startup document opens when native preferences fail');
-  const failedStartup = await evaluate(window, `({
-    loads: Number(sessionStorage.getItem('test-startup-loads')),
-    initialRequests: Number(sessionStorage.getItem('test-initial-requests')),
-  })`);
-  assert.deepEqual(failedStartup, { loads: 1, initialRequests: 1 });
-  await window.loadFile(indexFile);
-  await evaluate(window, `(() => {
-    window.markdownVisionReader.showDocument('Started editing', 'in-progress.md');
-    document.querySelector('#editorToggle').click();
-    const source = document.querySelector('#markdownSource');
-    source.value = 'Do not lose this draft';
-    source.dispatchEvent(new Event('input', { bubbles: true }));
-    window.__desktopFixture.resolvePreferences({ language: 'ja' });
-  })()`);
-  await waitFor(window, 'document.querySelector("#languageSelect").value === "ja"', 'late language preference');
-  assert.equal(await evaluate(window, 'document.querySelector("#markdownSource").value'), 'Do not lose this draft');
-  assert.equal(await evaluate(window, 'window.markdownVisionReader.hasUnsavedChanges()'), true);
-  assert.equal(await evaluate(window, 'document.querySelector("#languageStatus").hidden'), false);
-  await evaluate(window, `localStorage.setItem('markdown-vision-preferences', JSON.stringify({ language: 'en' }));
-    localStorage.removeItem('markdown-vision-language-pending');`);
-  await window.loadFile(indexFile);
-  await evaluate(window, `(() => {
-    const selector = document.querySelector('#languageSelect');
-    selector.value = 'pl';
-    selector.dispatchEvent(new Event('change', { bubbles: true }));
-    window.__desktopFixture.resolvePreferences({ language: 'ja', theme: 'light' });
-  })()`);
-  await waitFor(window, `window.__desktopFixture.calls.some(([name, value]) =>
-    name === 'savePreferences' && value.language === 'pl' && value.theme === 'light')`,
-    'preserving a new language choice when older native preferences arrive');
-  assert.equal(await evaluate(window, 'document.querySelector("#languageSelect").value'), 'pl');
-  assert.equal(await evaluate(window, 'JSON.parse(localStorage.getItem("markdown-vision-preferences")).language'), 'pl');
-  assert.equal(await evaluate(window, 'document.querySelector("#languageStatus").hidden'), false);
-  await evaluate(window, `localStorage.setItem('markdown-vision-preferences', JSON.stringify({ language: 'en' }));
-    localStorage.removeItem('markdown-vision-language-pending');`);
-  await window.loadFile(indexFile);
-  await evaluate(window, `(() => {
-    window.__desktopFixture.resolvePreferences({ language: 'en' });
-    window.desktop.savePreferences = async () => {
-      window.__simulatedSaveFailed = true;
-      throw new Error('Simulated write failure');
-    };
-  })()`);
-  await evaluate(window, `(() => {
-    const selector = document.querySelector('#languageSelect');
-    selector.value = 'pl';
-    selector.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
-  await waitFor(window, `window.__simulatedSaveFailed &&
-    JSON.parse(localStorage.getItem('markdown-vision-language-pending') || '{}').language === 'pl'`,
-    'retaining an unsaved language choice');
-  await window.loadFile(indexFile);
-  await evaluate(window, `window.__desktopFixture.resolvePreferences({ language: 'en' })`);
-  await waitFor(window, `window.__desktopFixture.calls.some(([name, value]) =>
-    name === 'savePreferences' && value.language === 'pl')`, 'retrying a failed language save after restart');
-  await waitFor(window, `!localStorage.getItem('markdown-vision-language-pending')`, 'clearing the successful retry marker');
-  assert.equal(await evaluate(window, 'document.querySelector("#languageSelect").value'), 'pl');
-  assert.equal(await evaluate(window, 'document.querySelector("#searchInput").placeholder'), 'Szukaj w tekście');
-  await evaluate(window, `localStorage.setItem('markdown-vision-preferences', JSON.stringify({ language: 'en' }));
-    localStorage.removeItem('markdown-vision-language-pending');`);
-  await window.loadFile(indexFile);
-  const languageChanges = await evaluate(window, `(() => {
-    window.markdownVisionReader.showDocument('Original', 'language.md');
-    document.querySelector('#editorToggle').click();
-    const source = document.querySelector('#markdownSource');
-    source.value = 'Keep this unsaved draft';
-    source.dispatchEvent(new Event('input', { bubbles: true }));
-    const selector = document.querySelector('#languageSelect');
-    return [...selector.options].filter(option => option.value !== 'system').map(option => {
-      selector.value = option.value;
-      selector.dispatchEvent(new Event('change', { bubbles: true }));
-      const status = document.querySelector('#languageStatus');
-      return { code: option.value, hidden: status.hidden, lang: status.lang, dir: status.dir,
-        text: status.textContent, value: source.value, dirty: window.markdownVisionReader.hasUnsavedChanges() };
-    });
-  })()`);
-  for (const choice of languageChanges) {
-    assert.equal(choice.hidden, choice.code === 'en', `${choice.code}: incorrect restart notice visibility`);
-    assert.equal(choice.lang, choice.code, `${choice.code}: restart notice language`);
-    assert.equal(choice.dir, choice.code === 'ar' ? 'rtl' : 'ltr', `${choice.code}: restart notice direction`);
-    assert.ok(choice.text.trim(), `${choice.code}: empty restart notice`);
-    assert.equal(choice.value, 'Keep this unsaved draft');
-    assert.equal(choice.dirty, true);
-  }
-  await evaluate(window, "localStorage.removeItem('markdown-vision-preferences')");
-  await evaluate(window, "localStorage.removeItem('markdown-vision-language-pending')");
-  await window.loadFile(indexFile);
   const resolved = await evaluate(window, `[
     resolveSystemLanguage(['zh-TW']), resolveSystemLanguage(['zh-CN']),
     resolveSystemLanguage(['pt-PT']), resolveSystemLanguage(['invalid_tag', 'pl-PL']),
@@ -284,52 +149,6 @@ async function checkLocalizedInterface(window, indexFile) {
     finally { Intl.Locale = original; }
   })()`);
   assert.equal(withoutMaximize, 'zh-hant', 'Chinese fallback works without locale maximization');
-  const selection = await evaluate(window, `(() => {
-    const reader = window.markdownVisionReader;
-    reader.showDocument('Keep this document.', 'language.md');
-    document.querySelector('#editorToggle').click();
-    const source = document.querySelector('#markdownSource');
-    source.value = 'Unsaved text stays here.';
-    source.dispatchEvent(new Event('input', { bubbles: true }));
-    const selector = document.querySelector('#languageSelect');
-    selector.value = 'pl';
-    selector.dispatchEvent(new Event('change', { bubbles: true }));
-    return {
-      source: source.value,
-      dirty: reader.hasUnsavedChanges(),
-      stored: JSON.parse(localStorage.getItem('markdown-vision-preferences')).language,
-      messageVisible: !document.querySelector('#languageStatus').hidden,
-    };
-  })()`);
-  assert.deepEqual(selection, { source: 'Unsaved text stays here.', dirty: true, stored: 'pl', messageVisible: true });
-  await window.loadFile(indexFile);
-  assert.equal(await evaluate(window, 'document.querySelector("#searchInput").placeholder'), 'Szukaj w tekście');
-  assert.equal(await evaluate(window, 'document.querySelector("#languageSelect").value'), 'pl');
-  await evaluate(window, `window.__desktopFixture.resolvePreferences({
-    theme: 'dark', font: 'Georgia', monoFont: 'Consolas', size: '20', line: '1.8', width: '800'
-  })`);
-  await waitFor(window, 'window.__desktopFixture.calls.some(([name, value]) => name === "savePreferences" && value.language === "pl")',
-    'migrating the cached language into an older native preference file');
-  assert.equal(await evaluate(window, 'document.querySelector("#languageSelect").value'), 'pl');
-  assert.equal(await evaluate(window, 'JSON.parse(localStorage.getItem("markdown-vision-preferences")).language'), 'pl');
-  await evaluate(window, `localStorage.setItem('markdown-vision-language-pending',
-    JSON.stringify({ language: 'pl', token: 'interrupted-write' }))`);
-  await window.loadFile(indexFile);
-  await evaluate(window, `window.__desktopFixture.resolvePreferences({
-    theme: 'dark', font: 'Georgia', monoFont: 'Consolas', size: '20', line: '1.8', width: '800', language: 'de'
-  })`);
-  await waitFor(window, 'window.__desktopFixture.calls.some(([name, value]) => name === "savePreferences" && value.language === "pl")',
-    'retrying a language choice after an interrupted native save');
-  assert.equal(await evaluate(window, 'document.querySelector("#languageSelect").value'), 'pl');
-  await waitFor(window, '!localStorage.getItem("markdown-vision-language-pending")', 'clearing a saved language marker');
-  await evaluate(window, "localStorage.removeItem('markdown-vision-preferences')");
-  for (const code of ['en', ...new Set(regionalVariants.map(([, expected]) => expected))]) {
-    await evaluate(window, `localStorage.setItem('markdown-vision-preferences', JSON.stringify({ language: ${JSON.stringify(code)} }))`);
-    await window.loadFile(indexFile);
-    const restored = await evaluate(window, `({ locale: counterLocale, choice: document.querySelector('#languageSelect').value })`);
-    assert.deepEqual(restored, { locale: code, choice: code }, `${code}: saved interface language was not restored`);
-  }
-  await evaluate(window, "localStorage.removeItem('markdown-vision-preferences')");
   for (const [variant, expected] of [['fr-CA', 'fr'], ['zh-TW', 'zh-hant'], ['zh-CN', 'zh-hans'], ['pt-PT', 'pt-br']]) {
     await window.loadFile(indexFile, { query: { previewLocale: variant } });
     assert.equal(await evaluate(window, 'document.querySelector("#searchPanel").lang'), expected, variant);
@@ -1035,51 +854,6 @@ async function checkLocalizedInterface(window, indexFile) {
     return document.querySelector('#editorStats').textContent;
   })()`);
   assert.equal(fallbackLatin, '2 个词', 'space-separated fallback is not marked approximate');
-  await window.loadFile(indexFile, { query: { previewLocale: 'en', testNoResizeObserver: '1' } });
-  const languageHintFallback = await evaluate(window, `(() => {
-    document.querySelector('#settingsButton').click();
-    const select = document.querySelector('#languageSelect');
-    const full = document.querySelector('.language-selection-full');
-    const initiallyHidden = full.hidden;
-    select.value = 'pt-br';
-    select.style.width = '60px';
-    select.dispatchEvent(new Event('input', { bubbles: true }));
-    const narrow = { visible: !full.hidden, text: full.textContent, language: full.lang };
-    select.style.width = '600px';
-    window.dispatchEvent(new Event('resize'));
-    const wide = { visible: !full.hidden };
-    document.querySelector('#closeSettings').click();
-    return { initiallyHidden, narrow, wide };
-  })()`);
-  assert.deepEqual(languageHintFallback, { initiallyHidden: true,
-    narrow: { visible: true, text: 'Português (Brasil)', language: 'pt-br' }, wide: { visible: false } },
-  'language-selection label works without ResizeObserver');
-  await window.loadFile(indexFile, { query: { previewLocale: 'en' } });
-  const languageHintResize = await evaluate(window, `(async () => {
-    document.querySelector('#settingsButton').click();
-    const select = document.querySelector('#languageSelect');
-    const full = document.querySelector('.language-selection-full');
-    const frame = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    select.value = 'pt-br';
-    select.dispatchEvent(new Event('input', { bubbles: true }));
-    select.style.width = '60px';
-    await frame();
-    const narrow = { visible: !full.hidden, text: full.textContent, language: full.lang };
-    select.style.width = '600px';
-    await frame();
-    const wide = { visible: !full.hidden };
-    document.querySelector('#closeSettings').click();
-    select.style.width = '60px';
-    document.querySelector('#settingsButton').click();
-    await frame();
-    const reopened = { visible: !full.hidden, text: full.textContent, language: full.lang };
-    document.querySelector('#closeSettings').click();
-    return { narrow, wide, reopened };
-  })()`);
-  assert.deepEqual(languageHintResize, {
-    narrow: { visible: true, text: 'Português (Brasil)', language: 'pt-br' }, wide: { visible: false },
-    reopened: { visible: true, text: 'Português (Brasil)', language: 'pt-br' },
-  }, 'language-selection label follows resize and reopening');
   const previousSize = window.getContentSize();
   window.setContentSize(320, 500);
   for (const locale of ['ar', 'zh-hans', 'zh-hant', 'cs', 'nl', 'fr', 'de', 'hi', 'id', 'it', 'ja',
@@ -1295,15 +1069,18 @@ async function checkLocalizedInterface(window, indexFile) {
         assert.ok(result.label.includes(`\u2068${result.number}\u2069`), 'Arabic font count is isolated in RTL text');
       }
     }
-    await evaluate(window, `(() => {
+    await evaluate(window, `(async () => {
       document.querySelector('#settingsButton').click();
       const input = document.querySelector('#fontInput');
+      await loadSystemFonts();
       input.focus();
+      await Promise.resolve();
       input.value = 'Libertinus';
       input.dispatchEvent(new Event('input', { bubbles: true }));
     })()`);
     await waitFor(window, '!document.querySelector("#fontSuggestions").hidden', `${locale} font suggestions`);
     if (locale === 'ar') {
+      await waitFor(window, 'document.querySelector("#fontStatus").textContent.includes("Libertinus")', 'Arabic filtered font feedback');
       const status = await evaluate(window, 'document.querySelector("#fontStatus").textContent');
       assert.ok(status.includes('\u2068Libertinus\u2069'), 'Arabic font feedback isolates a Latin query');
       const localizedOne = await evaluate(window, "new Intl.NumberFormat('ar').format(1)");
@@ -1691,8 +1468,7 @@ async function checkLocalizedInterface(window, indexFile) {
       await waitFor(window, 'document.querySelector("#editorWorkspace").hidden', `${locale}: close screenshot editor`);
       await evaluate(window, `(() => {
         const locale = ${JSON.stringify(locale)};
-        const language = [...document.querySelector('#languageSelect').options]
-          .find(option => option.value === locale)?.textContent || locale;
+        const language = new Intl.DisplayNames([locale], { type: "language" }).of(locale);
         const content = ['# ' + language, '', language + ' 0123456789', '', '~~~text', language, '~~~']
           .join(String.fromCharCode(10));
         window.markdownVisionReader.showDocument(content, locale + '-glyph-review.md');
@@ -2206,16 +1982,6 @@ async function checkLocalizedInterface(window, indexFile) {
       assert.equal(label.associated, true, `${locale}: font label is associated with the wrong input`);
       assert.equal(label.visible, true, `${locale}: font label is not visible`);
     }
-    const languageOptions = await evaluate(window, `Array.from(document.querySelectorAll('#languageSelect option'), option => ({
-      value: option.value, lang: option.lang, dir: option.dir, text: option.textContent,
-    }))`);
-    assert.equal(languageOptions.length, 23, `${locale}: missing language choices`);
-    for (const option of languageOptions) {
-      assert.equal(option.lang, option.value === 'system' ? locale : option.value,
-        `${locale}: wrong language for ${option.value}`);
-      assert.equal(option.dir, 'auto', `${locale}: language choice has no automatic direction`);
-      assert.ok(option.text.trim(), `${locale}: empty language choice`);
-    }
     const counts = await evaluate(window, `(() => {
       window.markdownVisionReader.showDocument('unique-localization-token', 'locale.md');
       document.querySelector('#searchButton').click();
@@ -2530,27 +2296,10 @@ async function checkLocalizedInterface(window, indexFile) {
         document.querySelector('#closeSearch').click();
         document.querySelector('#settingsButton').click();
         const settings = document.querySelector('#settingsPanel');
-        const language = settings.querySelector('#languageSelect');
-        const fullLanguage = settings.querySelector('.language-selection-full');
-        const measure = document.createElement('canvas').getContext('2d');
-        measure.font = getComputedStyle(language).font;
-        const originalLanguage = language.value;
-        const languageChoices = [...language.options].map(option => {
-          language.value = option.value;
-          language.dispatchEvent(new Event('input', { bubbles: true }));
-          return { text: option.textContent, width: measure.measureText(option.textContent).width,
-            available: language.clientWidth - 35, fullText: fullLanguage.textContent, visible: !fullLanguage.hidden,
-            language: fullLanguage.lang, expectedLanguage: option.lang, direction: fullLanguage.dir,
-            hiddenFromAccessibility: fullLanguage.getAttribute('aria-hidden'),
-            fullWidth: fullLanguage.clientWidth, fullScroll: fullLanguage.scrollWidth };
-        });
-        language.value = originalLanguage;
-        language.dispatchEvent(new Event('input', { bubbles: true }));
         const settingsRect = settings.getBoundingClientRect();
         const settingsResult = { kind: 'settings', left: settingsRect.left, right: settingsRect.right, bottom: settingsRect.bottom,
           width: settings.clientWidth, content: settings.scrollWidth,
           headingHeight: settings.querySelector('.settings-heading strong').getBoundingClientRect().height,
-          languageChoices,
           overflowing: [...settings.querySelectorAll('*')].filter(node => node.scrollWidth > node.clientWidth + 1).map(node => node.id || node.tagName) };
         document.querySelector('#closeSettings').click();
         const menu = document.querySelector('.about-menu');
@@ -2631,43 +2380,9 @@ async function checkLocalizedInterface(window, indexFile) {
       if (panel.kind === 'settings' && locale === 'ar') {
         assert.ok(panel.headingHeight <= 20, `${locale}: settings heading wraps awkwardly: ${JSON.stringify(panel)}`);
       }
-      if (panel.kind === 'settings') for (const option of panel.languageChoices) {
-        if (option.width > option.available) {
-          assert.equal(option.visible, true, `${locale}: selected language name is clipped`);
-          assert.equal(option.fullText, option.text, `${locale}: full language name differs`);
-          assert.equal(option.language, option.expectedLanguage, `${locale}: language name is tagged incorrectly`);
-          assert.equal(option.direction, 'auto', `${locale}: language name direction`);
-          assert.equal(option.hiddenFromAccessibility, 'true', `${locale}: language name is announced twice`);
-          assert.ok(option.fullScroll <= option.fullWidth + 1, `${locale}: full language name overflows`);
-        }
-      }
     }
   }
   window.setContentSize(480, 700);
-  await evaluate(window, `localStorage.setItem('markdown-vision-preferences', JSON.stringify({ language: 'en' }));
-    localStorage.removeItem('markdown-vision-language-pending');`);
-  await window.loadFile(indexFile);
-  window.webContents.setZoomFactor(2);
-  await waitFor(window, 'Math.abs(innerWidth - 240) < 3', 'zoomed language-selector viewport');
-  const notices = await evaluate(window, `(() => {
-    document.querySelector('#settingsButton').click();
-    const select = document.querySelector('#languageSelect');
-    const notice = document.querySelector('#languageStatus');
-    const panel = document.querySelector('#settingsPanel');
-    return [...select.options].filter(option => !['system', 'en'].includes(option.value)).map(option => {
-      select.value = option.value;
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-      return { code: option.value, hidden: notice.hidden, noticeWidth: notice.clientWidth,
-        noticeContent: notice.scrollWidth, panelWidth: panel.clientWidth, panelContent: panel.scrollWidth };
-    });
-  })()`);
-  for (const notice of notices) {
-    assert.equal(notice.hidden, false, `${notice.code}: scaled restart notice is hidden`);
-    assert.ok(notice.noticeContent <= notice.noticeWidth + 1, `${notice.code}: scaled restart notice overflows`);
-    assert.ok(notice.panelContent <= notice.panelWidth + 1, `${notice.code}: scaled settings overflow`);
-  }
-  await evaluate(window, `localStorage.removeItem('markdown-vision-preferences');
-    localStorage.removeItem('markdown-vision-language-pending');`);
   window.webContents.setZoomFactor(1);
   for (const locale of locales) {
     await window.loadFile(indexFile, { query: { previewLocale: locale } });
@@ -2757,6 +2472,7 @@ async function run() {
         Object.defineProperty(navigator, 'platform', { configurable: true, value: 'MacIntel' });
       }
       const systemLanguage = new URLSearchParams(location.search).get('testSystemLanguage');
+      window.__markdownVisionLanguageOverride = new URLSearchParams(location.search).get('testLanguageOverride');
       if (systemLanguage) {
         Object.defineProperty(navigator, 'languages', { configurable: true, value: [systemLanguage] });
       }

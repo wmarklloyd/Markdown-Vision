@@ -92,7 +92,7 @@ const previewInterfaceSources = [
   'Discard your unsaved changes and open another document?',
 ];
 
-function syncPreview({ messages, locales, wordForms, searchForms, languageSelector }, checkOnly = false) {
+function syncPreview({ messages, locales, wordForms, searchForms }, checkOnly = false) {
   const bySource = new Map(Object.values(messages).map(message => [message.source, message]));
   const interfaceSources = new Set(previewInterfaceSources);
   for (const message of Object.values(messages)) {
@@ -133,16 +133,7 @@ function syncPreview({ messages, locales, wordForms, searchForms, languageSelect
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
   const rows = entries.map(([locale, copy]) => `  ${JSON.stringify(locale)}: ${JSON.stringify(copy)},`);
   const block = [start, 'const previewMessages = {', ...rows, '};', end].join(newline);
-  let revised = source.slice(0, from) + block + source.slice(to + end.length);
-  const options = `const languageOptions = [${newline}${Object.entries(languageSelector).map(([code, values]) =>
-    `  [${[code, ...values.slice(0, 3)].map(value => JSON.stringify(value)).join(', ')}],`).join(newline)}${newline}];`;
-  const labels = `const systemLanguageLabels = {${newline}${Object.entries(languageSelector).map(([code, values]) =>
-    `  ${JSON.stringify(code)}: ${JSON.stringify(values[3])},`).join(newline)}${newline}};`;
-  if (!/const languageOptions = \[[\s\S]*?\n\];/.test(revised) || !/const systemLanguageLabels = \{[\s\S]*?\n\};/.test(revised)) {
-    fail('Missing language selector definitions');
-  }
-  revised = revised.replace(/const languageOptions = \[[\s\S]*?\n\];/, () => options)
-    .replace(/const systemLanguageLabels = \{[\s\S]*?\n\};/, () => labels);
+  const revised = source.slice(0, from) + block + source.slice(to + end.length);
   if (revised !== source) {
     if (checkOnly) fail('Application translations are stale. Run node tools/export-localization.cjs --sync-preview');
     fs.writeFileSync(rendererPath, revised, 'utf8');

@@ -41,7 +41,9 @@ public partial class MainWindow : Window
             var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder);
             Browser.DefaultBackgroundColor = System.Drawing.Color.FromArgb(0xFF, 0x1C, 0x1C, 0x1B);
             await Browser.EnsureCoreWebView2Async(environment);
-            await Browser.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(BridgeScript);
+            var language = Environment.GetEnvironmentVariable("MARKDOWN_VISION_LANGUAGE");
+            await Browser.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+                BridgeScript + "\nwindow.__markdownVisionLanguageOverride = " + JsonSerializer.Serialize(language) + ";");
 
             Browser.CoreWebView2.Settings.AreDevToolsEnabled = false;
             Browser.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
@@ -61,7 +63,8 @@ public partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            var startupCulture = StartupCulture.FromPreferences(PreferencesPath, CultureInfo.CurrentUICulture);
+            var startupCulture = StartupCulture.FromLanguage(
+                Environment.GetEnvironmentVariable("MARKDOWN_VISION_LANGUAGE"), CultureInfo.CurrentUICulture);
             var (message, rtl) = StartupTranslations.Format(startupCulture, exception.Message);
             MessageBox.Show(
                 message,

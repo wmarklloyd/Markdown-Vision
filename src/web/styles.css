@@ -363,7 +363,6 @@ body.is-editing .search-panel { width: min(430px, calc(100vw - 24px)); }
   background: var(--code-bg);
 }
 .font-status { margin-top: 7px; color: var(--muted); font-size: 11px; line-height: 1.4; }
-.language-selection-full:not([hidden]) { display: block; }
 .settings input[type="range"] { width: 100%; accent-color: var(--accent); }
 .settings :is(input[type="text"], input[type="range"], select) { min-width: 0; max-width: 100%; }
 .settings .automatic-setting { justify-content: flex-start; align-items: center; gap: 6px; margin: 4px 0 8px; }

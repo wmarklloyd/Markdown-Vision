@@ -780,7 +780,13 @@ void InitializeWebView() {
   };
 })();
 )JS";
-                            g_webView->AddScriptToExecuteOnDocumentCreated(bridge, nullptr);
+                            wchar_t language[64]{};
+                            const auto length = GetEnvironmentVariableW(L"MARKDOWN_VISION_LANGUAGE", language, ARRAYSIZE(language));
+                            std::wstring script(bridge);
+                            if (length > 0 && length < ARRAYSIZE(language)) {
+                                script += L"window.__markdownVisionLanguageOverride = " + JsonString(language) + L";";
+                            }
+                            g_webView->AddScriptToExecuteOnDocumentCreated(script.c_str(), nullptr);
 
                             EventRegistrationToken token{};
                             controller->add_AcceleratorKeyPressed(

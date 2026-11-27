@@ -190,7 +190,10 @@ jobs:
           else
             version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' native-tauri/Cargo.toml | head -n 1)
             release_tag="v$version"
-            gh release view "$release_tag" >/dev/null
+            if ! gh release view "$release_tag" >/dev/null 2>&1; then
+              echo "No GitHub Release exists for $release_tag; retaining the RPM as a workflow artifact."
+              exit 0
+            fi
           fi
           version=${release_tag#v}
           rpm_package=$(find native-tauri/target/release/bundle/rpm -maxdepth 1 -name '*.rpm' -print -quit)

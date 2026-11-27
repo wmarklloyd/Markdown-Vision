@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Text.Json;
 
 namespace MarkdownVision.Native;
 
@@ -14,25 +12,9 @@ internal static class StartupCulture
         "ja", "ko", "pl", "pt-br", "ru", "es", "sv", "th", "tr", "uk", "vi"
     };
 
-    internal static CultureInfo FromPreferences(string preferencesPath, CultureInfo systemCulture)
-    {
-        try
-        {
-            using var preferences = JsonDocument.Parse(File.ReadAllText(preferencesPath));
-            if (preferences.RootElement.ValueKind == JsonValueKind.Object &&
-                preferences.RootElement.TryGetProperty("language", out var language) &&
-                language.ValueKind == JsonValueKind.String)
-                return FromLanguage(language.GetString(), systemCulture);
-        }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
-        catch (JsonException) { }
-
-        return systemCulture;
-    }
-
     internal static CultureInfo FromLanguage(string? language, CultureInfo systemCulture)
     {
+        language = language?.Trim();
         if (string.IsNullOrWhiteSpace(language) ||
             language.Equals("system", StringComparison.OrdinalIgnoreCase) ||
             !SupportedLanguages.Contains(language))

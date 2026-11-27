@@ -32,7 +32,9 @@ If the webview lacks word segmentation, the editor identifies counts containing 
 
 ### Interface language and testing
 
-In this working tree, the Settings panel contains a language selector. By default it follows the system language, including Simplified and Traditional Chinese; the user does not need to opt in to that behavior. Portuguese currently maps to Brazilian Portuguese. The chosen language takes effect the next time the app opens, so changing it does not interrupt an open document. The Tauri and Electron hosts also save the choice in their preferences. For testing, a query such as `?previewLocale=pl` temporarily overrides the saved choice.
+Markdown Vision follows the system language when it starts. Simplified and Traditional Chinese are separate locales, and Portuguese maps to Brazilian Portuguese. To override the app language for a launch, set the `MARKDOWN_VISION_LANGUAGE` environment variable to a supported locale such as `fr` or `zh-hant` before starting the executable. Fully quit existing instances first so the new process receives the override. Clear the variable and relaunch to follow the system again. The installer and platform dialogs use the system language.
+
+For renderer testing, `?previewLocale=pl` sets the language for that page load.
 
 Case-insensitive document search uses the selected interface language for casing. For example, Turkish distinguishes dotted and dotless I even if the operating system uses another language. A document can use a different language, so reviewers should also check multilingual searches and make this tradeoff explicit when reviewing search behavior.
 
@@ -40,17 +42,17 @@ The current translations cover search, settings, the formatting toolbar, editor 
 
 For a visual review aid, set `MARKDOWN_VISION_LOCALE_SCREENSHOTS` to an output directory before running `node tools/run-renderer-ui-harness.cjs`. The harness writes Settings and Search panel PNGs with an empty search field for each locale using a 480×700 CSS-pixel window, plus Editor, About, new-file confirmation, visual-link dialog, and script-fallback samples at 1000×750 CSS pixels, then restores its test viewport. It also writes an `index.html` gallery that groups the captures by locale and verifies the full screenshot set exists. The Search capture shows the localized placeholder and zero-result count. The script samples use each language's native name in reader prose and a code block to reveal missing glyphs or poor font fallback. These captures help reviewers compare translated labels and wrapping; they do not replace the rendered-interface review of other screens, scripts, accessibility, or packaged builds.
 
-Run `node tools/export-localization.cjs --sync-preview` after updating application text, count forms, or language-selector labels. This regenerates the messages used by the shared renderer, including the selector definitions. Run `--check-generated` to detect any stale generated files before building.
+Run `node tools/export-localization.cjs --sync-preview` after updating application text or count forms. This regenerates the messages used by the shared renderer for the supported locales. Run `--check-generated` to detect any stale generated files before building.
 
 The Windows native installer uses `native-cpp/installer-localization.nsh`, generated with `node tools/export-localization.cjs --sync-installer`. Its standard pages and custom messages follow the Windows interface language when supported. The native installer build regenerates this file from the catalog.
 
-Windows startup errors that occur before the webview loads use the Windows display language, since the app's saved language is not yet available. The Windows Explorer preview handler also uses the Windows display language for file-read errors because it runs outside the app. The generated native and managed Windows translations are updated with `node tools/export-localization.cjs --sync-startup`.
+Windows startup errors use the Windows display language by default. The managed Windows host also honors the external override for its startup errors. The Windows Explorer preview handler also uses the Windows display language for file-read errors because it runs outside the app. The generated native and managed Windows translations are updated with `node tools/export-localization.cjs --sync-startup`.
 
 Run `dotnet run --project tools/managed-startup-tests/ManagedStartupTests.csproj` to check the managed Windows startup locale selection and error-detail formatting.
 
 macOS document type names are generated into `native-tauri/macos-localizations` with `node tools/export-localization.cjs --sync-macos`. The macOS build checks that these resources are present in the app bundle; Finder behavior still needs testing on macOS.
 
-DEB and RPM launchers use `native-tauri/launcher.desktop`, generated with `node tools/export-localization.cjs --sync-launcher`. The AppImage bundler also uses the DEB desktop template when preparing its contents. Desktop environments select the translated generic app description using their own locale; the in-app language setting does not change system launcher metadata. Package validation checks the descriptions in the DEB, RPM, and AppImage artifacts.
+DEB and RPM launchers use `native-tauri/launcher.desktop`, generated with `node tools/export-localization.cjs --sync-launcher`. The AppImage bundler also uses the DEB desktop template when preparing its contents. Desktop environments select the translated generic app description using their own locale; the application language override does not change system launcher metadata. Package validation checks the descriptions in the DEB, RPM, and AppImage artifacts.
 
 Run `node tools/export-localization.cjs --check-generated` to verify the generated renderer, installer, Windows startup, Linux launcher and macOS translations match the catalog. The package build scripts run this check before assembling application assets. `node tools/test-localization-generation.cjs` checks that each stale generated output is rejected using temporary copies.
 
@@ -260,7 +262,7 @@ Each JSON array contains the language name, the language label, the restart noti
 | `clipboard_unavailable_4ff69f` | Clipboard unavailable | `src/web/app.js:923` | Error shown when the platform clipboard API cannot be accessed while copying a code block. |
 | `code_copied_39868c` | Code copied | `src/web/app.js:946` | Confirmation after successfully copying a code block. |
 | `could_not_copy_code_4a563f` | Could not copy code | `src/web/app.js:947` | Error shown after the attempt to copy a code block to the clipboard fails. |
-| `the_native_print_dialog_could_not_open_320714` | The system print dialog could not open. | `src/web/app.js:1009` | Error shown when the desktop host cannot open the operating system or WebView print dialog. “System” means supplied by the platform, not a dialog built into Markdown Vision. |
+| `the_native_print_dialog_could_not_open_320714` | The system print dialog could not open. | `src/web/app.js:1009` | Error shown when the desktop host cannot open the operating system or WebView print dialog. “System” means supplied by the platform, not a dialog built into Markdown Vision. Stable key retains the earlier wording “native print dialog”. |
 | `could_not_open_the_print_dialog_4bd85a` | Could not open the print dialog. | `src/web/app.js:1015` | Error shown when the browser print dialog cannot be opened in the web-based preview. |
 | `discard_your_unsaved_changes_and_open_another_document_d01eb9` | Discard your unsaved changes and open another document? | `native-tauri/bridge.js:12`, `src/web/app.js:1057` | Confirmation shown before replacing the current document. If accepted, unsaved edits are discarded and another file opens. |
 | `could_not_open_document_69abda` | Could not open document: | `src/web/app.js:1069`, `src/web/app.js:1466` | Developer console log. Exclude from user-facing translation exports. |
@@ -464,8 +466,8 @@ Each JSON array contains the language name, the language label, the restart noti
 | `markdown_vision_is_still_running_close_it_and_select_re_7c911d` | Markdown Vision is still running. Close it and select Retry, or cancel setup. | `native-cpp/installer.nsi:101` | Windows installer interface. |
 | `removing_the_currently_installed_markdown_vision_editio_2fa13b` | Removing the currently installed Markdown Vision edition… | `native-cpp/installer.nsi:113` | Installer progress. The existing edition is being removed. |
 | `the_existing_markdown_vision_installation_could_not_be_5fb02b` | The existing Markdown Vision installation could not be removed. Setup will stop without installing the native edition. | `native-cpp/installer.nsi:116` | Blocking installer failure. Setup stops and the Native edition will not be installed. |
-| `markdown_vision_can_register_itself_as_a_viewer_for_mar_3f55d9` | You can choose Markdown Vision as the default app for Markdown files in Windows Settings. | `native-cpp/installer.nsi:128` | Installer choice. Windows lets the user choose the default application. |
-| `set_markdown_vision_as_the_default_application_for_mark_ce44e2` | Open Windows default app settings after installation | `native-cpp/installer.nsi:130` | Installer choice. Windows lets the user choose the default application. |
+| `markdown_vision_can_register_itself_as_a_viewer_for_mar_3f55d9` | You can choose Markdown Vision as the default app for Markdown files in Windows Settings. | `native-cpp/installer.nsi:128` | Installer information shown to explain where to choose the default app. The stable key retains earlier wording about registering as a viewer. |
+| `set_markdown_vision_as_the_default_application_for_mark_ce44e2` | Open Windows default app settings after installation | `native-cpp/installer.nsi:130` | Optional installer checkbox that opens Windows Settings after installation. The stable key retains earlier wording about setting the default directly. |
 | `markdown_vision_has_been_installed_40d44f` | Markdown Vision has been installed. | `native-cpp/installer.nsi:155` | Successful installation message. |
 | `open_markdown_vision_when_setup_closes_8422c7` | Open Markdown Vision when setup closes | `native-cpp/installer.nsi:157` | Windows installer interface. |
 | `markdown_vision_native_could_not_be_installed_setup_wil_a877f0` | Markdown Vision Native could not be installed. Setup will stop without registering an incomplete installation. | `native-cpp/installer.nsi:191` | Blocking installer failure. No incomplete installation is registered. |
@@ -582,8 +584,8 @@ Arabic
 | `count_variable_width_fonts_available_9d234c` | عدد الخطوط المتاحة ذات العرض المتغير: {count} |
 | `count_match_for_query_2e77ac` | عرض نتائج البحث عن «{query}»: {count} |
 | `count_matches_for_query_7db710` | عرض نتائج البحث عن «{query}»: {count} |
-| `no_fixed_width_fonts_match_query_fb1fab` | لا توجد خطوط ذات عرض ثابت تتطابق مع "{query}". |
-| `no_variable_width_fonts_match_query_a64030` | لا توجد خطوط ذات عرض متغير تتطابق مع "{query}". |
+| `no_fixed_width_fonts_match_query_fb1fab` | لا توجد خطوط ذات عرض ثابت تتطابق مع «{query}». |
+| `no_variable_width_fonts_match_query_a64030` | لا توجد خطوط ذات عرض متغير تتطابق مع «{query}». |
 | `current_of_total_35d900` | {current} من {total} |
 | `current_of_total_scope_94ebe5` | {current} من {total} · {scope} |
 | `copy_code_49a005` | نسخ التعليمات البرمجية |
@@ -828,7 +830,7 @@ Chinese (Simplified)
 | `italic_ctrl_i_ccc60d` | 斜体 (Ctrl+I) |
 | `italic_9bf37c` | 斜体 |
 | `strikethrough_9aabbc` | 删除线 |
-| `cycle_heading_level_h1_h6_then_normal_text_7eec48` | 循环切换标题级别 (H1–H6, 然后切换到正文) |
+| `cycle_heading_level_h1_h6_then_normal_text_7eec48` | 循环切换标题级别 （H1–H6，然后切换到正文） |
 | `cycle_heading_level_bde9c4` | 循环切换标题级别 |
 | `bulleted_list_ce51b3` | 项目符号列表 |
 | `task_list_5d3253` | 任务清单 |
@@ -1158,7 +1160,7 @@ Chinese (Traditional)
 | `italic_ctrl_i_ccc60d` | 斜體 (Ctrl+I) |
 | `italic_9bf37c` | 斜體 |
 | `strikethrough_9aabbc` | 刪除線 |
-| `cycle_heading_level_h1_h6_then_normal_text_7eec48` | 循環切換標題層級 (H1–H6, 接著切換至正文) |
+| `cycle_heading_level_h1_h6_then_normal_text_7eec48` | 循環切換標題層級 （H1–H6，接著切換至正文） |
 | `cycle_heading_level_bde9c4` | 循環切換標題層級 |
 | `bulleted_list_ce51b3` | 項目符號清單 |
 | `task_list_5d3253` | 任務清單 |
@@ -1902,8 +1904,8 @@ Dutch
 | `count_variable_width_fonts_available_9d234c` | Beschikbare lettertypen met variabele breedte: {count} |
 | `count_match_for_query_2e77ac` | Zoekresultaten voor ‘{query}’: {count} |
 | `count_matches_for_query_7db710` | Zoekresultaten voor ‘{query}’: {count} |
-| `no_fixed_width_fonts_match_query_fb1fab` | Er zijn geen lettertypen met een vaste breedte die overeenkomen met '{query}'. |
-| `no_variable_width_fonts_match_query_a64030` | Er zijn geen lettertypen met variabele breedte die overeenkomen met '{query}'. |
+| `no_fixed_width_fonts_match_query_fb1fab` | Er zijn geen lettertypen met een vaste breedte die overeenkomen met ‘{query}’. |
+| `no_variable_width_fonts_match_query_a64030` | Er zijn geen lettertypen met variabele breedte die overeenkomen met ‘{query}’. |
 | `current_of_total_35d900` | {current} van {total} |
 | `current_of_total_scope_94ebe5` | {current} van {total} · {scope} |
 | `copy_code_49a005` | Kopieer code |
@@ -1929,7 +1931,7 @@ Dutch
 | `downloading_and_verifying_the_update_you_may_be_asked_t_99b46d` | De update wordt gedownload en gecontroleerd. Mogelijk wordt u gevraagd uw identiteit te bevestigen. |
 | `update_installed_restart_to_use_the_new_version_bb8a43` | Update geïnstalleerd. Start opnieuw op om de nieuwe versie te gebruiken. |
 | `update_failed_error_e4f7dc` | Update mislukt: {error} |
-| `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Download en voer het Markdown Vision-installatieprogramma uit? Sla eventuele geopende documenten eerst op. Het installatieprogramma vraagt mogelijk om Markdown Vision te sluiten. |
+| `download_and_run_the_markdown_vision_installer_save_any_3e315d` | Wilt u het Markdown Vision-installatieprogramma downloaden en uitvoeren? Sla eventuele geopende documenten eerst op. Het installatieprogramma vraagt mogelijk om Markdown Vision te sluiten. |
 | `downloading_and_verifying_update_02b3ba` | Update downloaden en verifiëren… |
 | `installer_started_865e10` | Het installatieprogramma is gestart. |
 | `could_not_download_verify_or_start_the_installer_please_b0d6ee` | Kan het installatieprogramma niet downloaden, verifiëren of starten. Probeer het opnieuw. |
@@ -2230,7 +2232,7 @@ French
 | `count_fixed_width_fonts_available_5df530` | Nombre de polices à chasse fixe disponibles : {count} |
 | `count_variable_width_font_available_583582` | Nombre de polices proportionnelles disponibles : {count} |
 | `count_variable_width_fonts_available_9d234c` | Nombre de polices proportionnelles disponibles : {count} |
-| `count_match_for_query_2e77ac` | Résultats pour « {query} »: {count} |
+| `count_match_for_query_2e77ac` | Résultats pour « {query} » : {count} |
 | `count_matches_for_query_7db710` | Résultats pour « {query} » : {count} |
 | `no_fixed_width_fonts_match_query_fb1fab` | Aucune police à chasse fixe ne correspond à « {query} ». |
 | `no_variable_width_fonts_match_query_a64030` | Aucune police proportionnelle ne correspond à « {query} ». |
@@ -2624,8 +2626,8 @@ German
 | `type_to_edit_this_cell_press_alt_enter_for_table_option_0f91ed` | Schreiben Sie direkt in diese Zelle. Drücken Sie Alt+Enter, um die Tabellenoptionen anzuzeigen. |
 | `type_directly_in_plain_cells_use_table_options_or_edit_5bc433` | Geben Sie Text direkt in Zellen ein, die nur einfachen Text enthalten. Für komplexere Inhalte verwenden Sie die Tabellenoptionen oder bearbeiten Sie Markdown. |
 | `table_options_cf924a` | Tabellenoptionen |
-| `edit_note_299e60` | Notiz bearbeiten |
-| `use_edit_note_to_change_supported_footnote_text_2805fa` | Verwenden Sie „Notiz bearbeiten“, um den bearbeitbaren Text der Fußnote zu ändern. |
+| `edit_note_299e60` | Fußnote bearbeiten |
+| `use_edit_note_to_change_supported_footnote_text_2805fa` | Verwenden Sie „Fußnote bearbeiten“, um den bearbeitbaren Text der Fußnote zu ändern. |
 | `this_layout_uses_html_edit_it_in_markdown_3bcc5c` | Dieses Layout verwendet HTML. Bearbeiten Sie es in Markdown. |
 | `edit_inline_code_bf93ee` | Inline-Code bearbeiten |
 | `edit_list_structure_in_markdown_17a222` | Listenstruktur in Markdown bearbeiten |
@@ -2892,8 +2894,8 @@ Hindi
 | `count_variable_width_fonts_available_9d234c` | उपलब्ध अनुपाती फ़ॉन्ट: {count} |
 | `count_match_for_query_2e77ac` | “{query}” के खोज परिणाम: {count} |
 | `count_matches_for_query_7db710` | “{query}” के खोज परिणाम: {count} |
-| `no_fixed_width_fonts_match_query_fb1fab` | कोई समान-चौड़ाई वाला फ़ॉन्ट "{query}" से मेल नहीं खाता। |
-| `no_variable_width_fonts_match_query_a64030` | कोई अनुपाती फ़ॉन्ट "{query}" से मेल नहीं खाता। |
+| `no_fixed_width_fonts_match_query_fb1fab` | कोई समान-चौड़ाई वाला फ़ॉन्ट “{query}” से मेल नहीं खाता। |
+| `no_variable_width_fonts_match_query_a64030` | कोई अनुपाती फ़ॉन्ट “{query}” से मेल नहीं खाता। |
 | `current_of_total_35d900` | {total} में से {current} |
 | `current_of_total_scope_94ebe5` | {total} में से {current} · {scope} |
 | `copy_code_49a005` | कोड कॉपी करें |
@@ -3222,8 +3224,8 @@ Indonesian
 | `count_variable_width_fonts_available_9d234c` | Font lebar variabel yang tersedia: {count} |
 | `count_match_for_query_2e77ac` | Hasil pencarian untuk “{query}”: {count} |
 | `count_matches_for_query_7db710` | Hasil pencarian untuk “{query}”: {count} |
-| `no_fixed_width_fonts_match_query_fb1fab` | Tidak ada font dengan lebar tetap yang cocok dengan "{query}". |
-| `no_variable_width_fonts_match_query_a64030` | Tidak ada font dengan lebar variabel yang cocok dengan "{query}". |
+| `no_fixed_width_fonts_match_query_fb1fab` | Tidak ada font dengan lebar tetap yang cocok dengan “{query}”. |
+| `no_variable_width_fonts_match_query_a64030` | Tidak ada font dengan lebar variabel yang cocok dengan “{query}”. |
 | `current_of_total_35d900` | {current} dari {total} |
 | `current_of_total_scope_94ebe5` | {current} dari {total} · {scope} |
 | `copy_code_49a005` | Salin kode |
@@ -3552,8 +3554,8 @@ Italian
 | `count_variable_width_fonts_available_9d234c` | Font proporzionali disponibili: {count} |
 | `count_match_for_query_2e77ac` | Risultati per «{query}»: {count} |
 | `count_matches_for_query_7db710` | Risultati per «{query}»: {count} |
-| `no_fixed_width_fonts_match_query_fb1fab` | Nessun font a larghezza fissa corrisponde a "{query}". |
-| `no_variable_width_fonts_match_query_a64030` | Nessun font proporzionale corrisponde a "{query}". |
+| `no_fixed_width_fonts_match_query_fb1fab` | Nessun font a larghezza fissa corrisponde a «{query}». |
+| `no_variable_width_fonts_match_query_a64030` | Nessun font proporzionale corrisponde a «{query}». |
 | `current_of_total_35d900` | {current} di {total} |
 | `current_of_total_scope_94ebe5` | {current} di {total} · {scope} |
 | `copy_code_49a005` | Copia il codice |
@@ -3599,8 +3601,8 @@ Italian
 | `type_directly_in_the_code_block_to_edit_its_contents_us_57266a` | Digita direttamente nel blocco di codice per modificarne il contenuto. Usa Markdown per modificare le righe che ne segnano l'inizio e la fine. |
 | `use_edit_item_to_change_the_text_to_change_the_nesting_75146c` | Usa «Modifica la voce di elenco» per cambiare il testo. Per cambiare il livello di annidamento, modifica l’elenco in Markdown. |
 | `use_edit_item_or_the_checkboxes_to_change_this_list_730d9b` | Usa «Modifica la voce di elenco» o le caselle di spunta per cambiare l’elenco. |
-| `edit_list_item_text_a982e6` | Modifica il testo dell'elemento dell'elenco |
-| `edit_item_text_directly_edit_the_list_structure_in_mark_af9c40` | Modifica direttamente il testo dell'elemento. Modifica la struttura dell'elenco in Markdown. |
+| `edit_list_item_text_a982e6` | Modifica il testo della voce di elenco |
+| `edit_item_text_directly_edit_the_list_structure_in_mark_af9c40` | Modifica direttamente il testo della voce. Modifica la struttura dell'elenco in Markdown. |
 | `task_4bc74b` | Compito |
 | `edit_item_9f84ee` | Modifica la voce di elenco |
 | `list_options_fc3320` | Opzioni dell’elenco |
@@ -3633,22 +3635,22 @@ Italian
 | `edit_heading_text_f3806c` | Modifica il testo dell'intestazione |
 | `edit_the_heading_text_directly_edit_the_heading_style_i_aa8552` | Modifica direttamente il testo dell'intestazione. Modifica lo stile dell'intestazione in Markdown. |
 | `heading_style_c0c25b` | Stile di intestazione |
-| `edit_this_item_in_markdown_83b112` | Modifica questo elemento in Markdown |
+| `edit_this_item_in_markdown_83b112` | Modifica questa voce in Markdown |
 | `markdown_only_f6e1f7` | Solo Markdown |
 | `visual_only_29a136` | Solo editor visuale |
 | `action_64cff1` | Azione |
 | `apply_31e392` | Applica |
 | `the_markdown_changed_reopen_this_editor_to_try_again_f8f91b` | Il testo Markdown è cambiato. Riapri questo editor per riprovare. |
 | `edit_list_item_f69436` | Modifica la voce di elenco |
-| `item_text_markdown_0bbe7d` | Testo dell'elemento (Markdown) |
+| `item_text_markdown_0bbe7d` | Testo della voce (Markdown) |
 | `new_item_b84cad` | Nuova voce di elenco |
 | `enter_item_text_or_choose_remove_item_e4003a` | Inserisci il testo della voce o scegli “Rimuovi voce”. |
-| `enter_item_text_82c7ea` | Inserisci il testo dell'elemento. |
-| `add_item_below_a6d694` | Aggiungi un elemento sotto |
+| `enter_item_text_82c7ea` | Inserisci il testo della voce. |
+| `add_item_below_a6d694` | Aggiungi una voce sotto |
 | `remove_item_5a89ed` | Rimuovi voce |
 | `indent_under_previous_item_2e6b03` | Rientra sotto la voce precedente |
 | `outdent_item_07e9b1` | Riduci il rientro della voce |
-| `this_item_has_no_parent_to_outdent_from_dd148a` | Questo elemento non ha un elemento superiore, quindi non è possibile ridurne il rientro. |
+| `this_item_has_no_parent_to_outdent_from_dd148a` | Questa voce non ha una voce superiore, quindi non è possibile ridurne il rientro. |
 | `heading_b34f17` | Intestazione |
 | `edit_footnote_cdcee6` | Modifica nota a piè di pagina |
 | `note_text_369e75` | Testo della nota a piè di pagina |
@@ -3866,7 +3868,7 @@ Japanese
 | `dismiss_48845b` | 通知を閉じる |
 | `count_word_1f505c` | {count}語 |
 | `count_words_caab29` | {count}語 |
-| `approximate_word_count_7b987a` | 単語数（概算）：{count} |
+| `approximate_word_count_7b987a` | 単語数 (概算): {count} |
 | `line_line_column_column_21e9f4` | 行 {line}、列 {column} |
 | `untitled_md_2dccf8` | 無題.md |
 | `save_your_changes_56dd16` | 変更を保存しますか? |
@@ -4212,8 +4214,8 @@ Korean
 | `count_variable_width_fonts_available_9d234c` | 사용 가능한 가변 너비 글꼴: {count} |
 | `count_match_for_query_2e77ac` | ‘{query}’ 검색 결과: {count} |
 | `count_matches_for_query_7db710` | ‘{query}’ 검색 결과: {count} |
-| `no_fixed_width_fonts_match_query_fb1fab` | "{query}"와 일치하는 고정 너비 글꼴이 없습니다. |
-| `no_variable_width_fonts_match_query_a64030` | "{query}"와 일치하는 가변 너비 글꼴이 없습니다. |
+| `no_fixed_width_fonts_match_query_fb1fab` | ‘{query}’와 일치하는 고정 너비 글꼴이 없습니다. |
+| `no_variable_width_fonts_match_query_a64030` | ‘{query}’와 일치하는 가변 너비 글꼴이 없습니다. |
 | `current_of_total_35d900` | {total}개 중 {current}번째 |
 | `current_of_total_scope_94ebe5` | {total}개 중 {current}번째 · {scope} |
 | `copy_code_49a005` | 코드 복사 |
@@ -4619,7 +4621,7 @@ Polish
 | `edit_the_text_directly_edit_the_surrounding_structure_i_2e635c` | Edytuj tekst bezpośrednio. Edytuj otaczającą konstrukcję w Markdown. |
 | `edit_structure_in_markdown_fe607e` | Edytuj strukturę w Markdown |
 | `edit_quoted_text_9de474` | Edytuj cytowany tekst |
-| `edit_the_plain_text_directly_edit_the_quote_structure_i_34c1cf` | Edytuj zwykły tekst bezpośrednio. Edytuj strukturę cytatu blokowego w Markdownie. |
+| `edit_the_plain_text_directly_edit_the_quote_structure_i_34c1cf` | Edytuj zwykły tekst bezpośrednio. Edytuj strukturę cytatu blokowego w Markdown. |
 | `edit_heading_text_f3806c` | Edytuj tekst nagłówka |
 | `edit_the_heading_text_directly_edit_the_heading_style_i_aa8552` | Edytuj bezpośrednio tekst nagłówka. Edytuj styl nagłówka w Markdown. |
 | `heading_style_c0c25b` | Styl nagłówka |
@@ -4872,8 +4874,8 @@ Portuguese (Brazil)
 | `count_variable_width_fonts_available_9d234c` | Fontes de largura variável disponíveis: {count} |
 | `count_match_for_query_2e77ac` | Resultados da busca por “{query}”: {count} |
 | `count_matches_for_query_7db710` | Resultados da busca por “{query}”: {count} |
-| `no_fixed_width_fonts_match_query_fb1fab` | Nenhuma fonte de largura fixa corresponde a "{query}". |
-| `no_variable_width_fonts_match_query_a64030` | Nenhuma fonte de largura variável corresponde a "{query}". |
+| `no_fixed_width_fonts_match_query_fb1fab` | Nenhuma fonte de largura fixa corresponde a “{query}”. |
+| `no_variable_width_fonts_match_query_a64030` | Nenhuma fonte de largura variável corresponde a “{query}”. |
 | `current_of_total_35d900` | {current} de {total} |
 | `current_of_total_scope_94ebe5` | {current} de {total} · {scope} |
 | `copy_code_49a005` | Copiar código |
@@ -5449,7 +5451,7 @@ Spanish
 | `italic_9bf37c` | Cursiva |
 | `strikethrough_9aabbc` | Tachado |
 | `cycle_heading_level_h1_h6_then_normal_text_7eec48` | Recorrer los niveles de encabezado (H1–H6 y, después, texto normal) |
-| `cycle_heading_level_bde9c4` | Alternar entre niveles de encabezado |
+| `cycle_heading_level_bde9c4` | Recorrer los niveles de encabezado |
 | `bulleted_list_ce51b3` | Lista con viñetas |
 | `task_list_5d3253` | Lista de tareas |
 | `numbered_list_cc62f6` | Lista numerada |
@@ -5532,8 +5534,8 @@ Spanish
 | `count_variable_width_fonts_available_9d234c` | Fuentes proporcionales disponibles: {count} |
 | `count_match_for_query_2e77ac` | Resultados de búsqueda para «{query}»: {count} |
 | `count_matches_for_query_7db710` | Resultados de búsqueda para «{query}»: {count} |
-| `no_fixed_width_fonts_match_query_fb1fab` | Ninguna fuente monoespaciada coincide con "{query}". |
-| `no_variable_width_fonts_match_query_a64030` | Ninguna fuente proporcional coincide con "{query}". |
+| `no_fixed_width_fonts_match_query_fb1fab` | Ninguna fuente monoespaciada coincide con «{query}». |
+| `no_variable_width_fonts_match_query_a64030` | Ninguna fuente proporcional coincide con «{query}». |
 | `current_of_total_35d900` | {current} de {total} |
 | `current_of_total_scope_94ebe5` | {current} de {total} · {scope} |
 | `copy_code_49a005` | Copiar código |
@@ -5838,8 +5840,8 @@ Swedish
 | `save_as_a4b76a` | Spara som… |
 | `markdown_source_580118` | Markdown-källtext |
 | `markdown_pane_width_ab0129` | Markdown-panelens bredd |
-| `percent_markdown_0a45d1` | {percent} % Markdown |
-| `percent_visual_a8635d` | {percent} % Visuell |
+| `percent_markdown_0a45d1` | {percent} % Markdown |
+| `percent_visual_a8635d` | {percent} % Visuell |
 | `visual_editor_5665dd` | Visuell redigerare |
 | `visual_editing_restriction_d42cea` | Visuell redigeringsbegränsning |
 | `edit_in_markdown_165fd4` | Redigera i Markdown |
@@ -5862,8 +5864,8 @@ Swedish
 | `count_variable_width_fonts_available_9d234c` | Tillgängliga teckensnitt med variabel bredd: {count} |
 | `count_match_for_query_2e77ac` | Sökresultat för ”{query}”: {count} |
 | `count_matches_for_query_7db710` | Sökresultat för ”{query}”: {count} |
-| `no_fixed_width_fonts_match_query_fb1fab` | Inga teckensnitt med fast bredd matchar "{query}". |
-| `no_variable_width_fonts_match_query_a64030` | Inga teckensnitt med variabel bredd matchar "{query}". |
+| `no_fixed_width_fonts_match_query_fb1fab` | Inga teckensnitt med fast bredd matchar ”{query}”. |
+| `no_variable_width_fonts_match_query_a64030` | Inga teckensnitt med variabel bredd matchar ”{query}”. |
 | `current_of_total_35d900` | {current} av {total} |
 | `current_of_total_scope_94ebe5` | {current} av {total} · {scope} |
 | `copy_code_49a005` | Kopiera kod |
@@ -5950,7 +5952,7 @@ Swedish
 | `apply_31e392` | Verkställ |
 | `the_markdown_changed_reopen_this_editor_to_try_again_f8f91b` | Markdown har ändrats. Öppna redigeraren igen för att försöka igen. |
 | `edit_list_item_f69436` | Redigera listpost |
-| `item_text_markdown_0bbe7d` | Listpunktens text (Markdown) |
+| `item_text_markdown_0bbe7d` | Listpostens text (Markdown) |
 | `new_item_b84cad` | Ny listpost |
 | `enter_item_text_or_choose_remove_item_e4003a` | Ange text för listposten eller välj ”Ta bort listpost”. |
 | `enter_item_text_82c7ea` | Ange listpunktens text. |
@@ -5977,7 +5979,7 @@ Swedish
 | `this_cell_text_would_change_the_table_structure_add_a_s_984ac6` | Denna celltext skulle ändra tabellstrukturen. Lägg till ett mellanslag före avgränsaren i Markdown. |
 | `alt_text_16f898` | Alternativtext |
 | `link_text_markdown_9b92bd` | Länktext (Markdown) |
-| `image_url_e55026` | Bildens webbadress |
+| `image_url_e55026` | Bildens URL |
 | `link_url_9dfd0b` | Länk-URL |
 | `url_e7a241` | URL |
 | `edit_linked_image_2f9456` | Redigera länkad bild |
@@ -6192,8 +6194,8 @@ Thai
 | `count_variable_width_fonts_available_9d234c` | แบบอักษรที่มีความกว้างแปรผันที่ใช้ได้: {count} |
 | `count_match_for_query_2e77ac` | ผลการค้นหาสำหรับ “{query}”: {count} |
 | `count_matches_for_query_7db710` | ผลการค้นหาสำหรับ “{query}”: {count} |
-| `no_fixed_width_fonts_match_query_fb1fab` | ไม่มีแบบอักษรที่มีความกว้างคงที่ที่ตรงกับ "{query}" |
-| `no_variable_width_fonts_match_query_a64030` | ไม่มีแบบอักษรที่มีความกว้างแปรผันที่ตรงกับ "{query}" |
+| `no_fixed_width_fonts_match_query_fb1fab` | ไม่มีแบบอักษรที่มีความกว้างคงที่ที่ตรงกับ “{query}” |
+| `no_variable_width_fonts_match_query_a64030` | ไม่มีแบบอักษรที่มีความกว้างแปรผันที่ตรงกับ “{query}” |
 | `current_of_total_35d900` | รายการที่ {current} จาก {total} |
 | `current_of_total_scope_94ebe5` | รายการที่ {current} จาก {total} · {scope} |
 | `copy_code_49a005` | คัดลอกโค้ด |
@@ -6448,7 +6450,7 @@ Turkish
 | `code_block_754538` | Kod bloğu |
 | `link_a6a32d` | Bağlantı |
 | `insert_table_67318e` | Tablo ekle |
-| `edit_markdown_6ff388` | Markdown'ı düzenleyin |
+| `edit_markdown_6ff388` | Markdown'ı düzenle |
 | `new_markdown_file_ctrl_n_f22ed5` | Yeni Markdown dosyası (Ctrl+N) |
 | `new_markdown_file_0928e9` | Yeni Markdown dosyası |
 | `open_markdown_file_b7764a` | Markdown dosyasını aç |
@@ -6502,11 +6504,11 @@ Turkish
 | `percent_visual_a8635d` | {percent}% Görsel |
 | `visual_editor_5665dd` | Görsel düzenleyici |
 | `visual_editing_restriction_d42cea` | Görsel düzenleme kısıtlaması |
-| `edit_in_markdown_165fd4` | Markdown'da düzenleyin |
+| `edit_in_markdown_165fd4` | Markdown'da düzenle |
 | `dismiss_48845b` | Bildirimi kapat |
-| `count_word_1f505c` | {count} kelimesi |
-| `count_words_caab29` | {count} kelimeler |
-| `approximate_word_count_7b987a` | Yaklaşık sözcük sayısı: {count} |
+| `count_word_1f505c` | {count} kelime |
+| `count_words_caab29` | {count} kelime |
+| `approximate_word_count_7b987a` | Yaklaşık kelime sayısı: {count} |
 | `line_line_column_column_21e9f4` | {line} satırı, {column} sütunu |
 | `untitled_md_2dccf8` | Adsız.md |
 | `save_your_changes_56dd16` | Değişiklikleriniz kaydedilsin mi? |
@@ -6522,8 +6524,8 @@ Turkish
 | `count_variable_width_fonts_available_9d234c` | Kullanılabilir değişken genişlikli yazı tipleri: {count} |
 | `count_match_for_query_2e77ac` | “{query}” için arama sonuçları: {count} |
 | `count_matches_for_query_7db710` | “{query}” için arama sonuçları: {count} |
-| `no_fixed_width_fonts_match_query_fb1fab` | "{query}" ile eşleşen sabit genişlikli yazı tipi yok. |
-| `no_variable_width_fonts_match_query_a64030` | "{query}" ile eşleşen değişken genişlikli yazı tipi yok. |
+| `no_fixed_width_fonts_match_query_fb1fab` | “{query}” ile eşleşen sabit genişlikli yazı tipi yok. |
+| `no_variable_width_fonts_match_query_a64030` | “{query}” ile eşleşen değişken genişlikli yazı tipi yok. |
 | `current_of_total_35d900` | {current} / {total} |
 | `current_of_total_scope_94ebe5` | {current} / {total} · {scope} |
 | `copy_code_49a005` | Kodu kopyala |
@@ -6576,7 +6578,7 @@ Turkish
 | `list_options_fc3320` | Liste seçenekleri |
 | `this_table_needs_to_be_edited_in_markdown_8a62a4` | Bu tablonun Markdown'da düzenlenmesi gerekiyor. |
 | `add_text_to_this_empty_cell_37f900` | Bu boş hücreye metin ekleyin |
-| `edit_this_cell_in_markdown_4304b1` | Bu hücreyi Markdown'da düzenleyin |
+| `edit_this_cell_in_markdown_4304b1` | Bu hücreyi Markdown'da düzenle |
 | `edit_table_cell_a4212e` | Tablo hücresini düzenle |
 | `select_a_cell_to_edit_it_you_can_edit_the_underlying_ta_1bdbc1` | Düzenlemek için bir hücre seçin. Kaynak tabloyu Markdown'da düzenleyebilirsiniz. |
 | `this_cell_contains_html_edit_this_cell_in_markdown_04e59f` | Bu hücre HTML içeriyor. Bu hücreyi Markdown'da düzenleyin. |
@@ -6588,16 +6590,16 @@ Turkish
 | `use_edit_note_to_change_supported_footnote_text_2805fa` | Dipnotun düzenlenebilir metnini değiştirmek için “Dipnotu düzenle” seçeneğini kullanın. |
 | `this_layout_uses_html_edit_it_in_markdown_3bcc5c` | Bu düzen HTML kullanır. Markdown'da düzenleyin. |
 | `edit_inline_code_bf93ee` | Satır içi kodu düzenle |
-| `edit_list_structure_in_markdown_17a222` | Markdown'da liste yapısını düzenleyin |
+| `edit_list_structure_in_markdown_17a222` | Markdown'da liste yapısını düzenle |
 | `edit_the_plain_list_text_directly_edit_the_list_structu_f7679e` | Düz liste metnini doğrudan düzenleyin. Liste yapısını Markdown'da düzenleyin. |
-| `edit_code_in_table_cell_535cb9` | Tablo hücresindeki kodu düzenleyin |
+| `edit_code_in_table_cell_535cb9` | Tablo hücresindeki kodu düzenle |
 | `edit_table_cell_text_ca30e7` | Tablo hücresi metnini düzenle |
-| `edit_preformatted_text_9737bd` | Önceden biçimlendirilmiş metni düzenleyin |
-| `edit_disclosure_title_79fb92` | Genişletilebilir bölümün başlığını düzenleyin |
+| `edit_preformatted_text_9737bd` | Önceden biçimlendirilmiş metni düzenle |
+| `edit_disclosure_title_79fb92` | Genişletilebilir bölümün başlığını düzenle |
 | `edit_text_7967d9` | Metni düzenle |
 | `type_in_the_cell_text_press_alt_enter_for_cell_options_e3772e` | Hücre metnini yazın. Hücre seçenekleri için Alt+Enter tuşuna basın. |
 | `edit_the_text_directly_edit_the_surrounding_structure_i_2e635c` | Metni doğrudan düzenleyin. Çevreleyen yapıyı Markdown'da düzenleyin. |
-| `edit_structure_in_markdown_fe607e` | Markdown'daki yapıyı düzenleyin |
+| `edit_structure_in_markdown_fe607e` | Markdown'daki yapıyı düzenle |
 | `edit_quoted_text_9de474` | Alıntılanan metni düzenle |
 | `edit_the_plain_text_directly_edit_the_quote_structure_i_34c1cf` | Düz metni doğrudan düzenleyin. Blok alıntının yapısını Markdown içinde düzenleyin. |
 | `edit_heading_text_f3806c` | Başlık metnini düzenle |
@@ -6852,8 +6854,8 @@ Ukrainian
 | `count_variable_width_fonts_available_9d234c` | Доступні пропорційні шрифти: {count} |
 | `count_match_for_query_2e77ac` | Результати пошуку за запитом «{query}»: {count} |
 | `count_matches_for_query_7db710` | Результати пошуку за запитом «{query}»: {count} |
-| `no_fixed_width_fonts_match_query_fb1fab` | Немає моноширинних шрифтів, що відповідають "{query}". |
-| `no_variable_width_fonts_match_query_a64030` | Жоден пропорційний шрифт не відповідає "{query}". |
+| `no_fixed_width_fonts_match_query_fb1fab` | Немає моноширинних шрифтів, що відповідають «{query}». |
+| `no_variable_width_fonts_match_query_a64030` | Жоден пропорційний шрифт не відповідає «{query}». |
 | `current_of_total_35d900` | {current} з {total} |
 | `current_of_total_scope_94ebe5` | {current} з {total} · {scope} |
 | `copy_code_49a005` | Скопіюйте код |
@@ -6905,12 +6907,12 @@ Ukrainian
 | `edit_item_9f84ee` | Редагувати елемент списку |
 | `list_options_fc3320` | Параметри списку |
 | `this_table_needs_to_be_edited_in_markdown_8a62a4` | Цю таблицю потрібно відредагувати в Markdown. |
-| `add_text_to_this_empty_cell_37f900` | Додайте текст до цієї порожньої комірки |
+| `add_text_to_this_empty_cell_37f900` | Додайте текст до цієї порожньої клітинки |
 | `edit_this_cell_in_markdown_4304b1` | Відредагуйте цю клітинку в Markdown |
 | `edit_table_cell_a4212e` | Редагувати клітинку таблиці |
 | `select_a_cell_to_edit_it_you_can_edit_the_underlying_ta_1bdbc1` | Виберіть клітинку, щоб відредагувати її. Ви можете редагувати базову таблицю в Markdown. |
-| `this_cell_contains_html_edit_this_cell_in_markdown_04e59f` | Ця комірка містить HTML. Відредагуйте цю комірку в Markdown. |
-| `this_cell_uses_markdown_references_edit_this_cell_in_ma_bb2d82` | Ця комірка використовує посилання Markdown. Відредагуйте цю клітинку в Markdown. |
+| `this_cell_contains_html_edit_this_cell_in_markdown_04e59f` | Ця клітинка містить HTML. Відредагуйте цю клітинку в Markdown. |
+| `this_cell_uses_markdown_references_edit_this_cell_in_ma_bb2d82` | Ця клітинка використовує посилання Markdown. Відредагуйте цю клітинку в Markdown. |
 | `type_to_edit_this_cell_press_alt_enter_for_table_option_0f91ed` | Вводьте текст, щоб редагувати цю клітинку. Натисніть Alt+Enter, щоб переглянути параметри таблиці. |
 | `type_directly_in_plain_cells_use_table_options_or_edit_5bc433` | Вводьте текст безпосередньо в клітинки, що містять лише звичайний текст. Для складнішого вмісту використовуйте параметри таблиці або редагуйте Markdown. |
 | `table_options_cf924a` | Параметри таблиці |
@@ -6921,11 +6923,11 @@ Ukrainian
 | `edit_list_structure_in_markdown_17a222` | Редагувати структуру списку в Markdown |
 | `edit_the_plain_list_text_directly_edit_the_list_structu_f7679e` | Відредагуйте звичайний текст списку безпосередньо. Відредагуйте структуру списку в Markdown. |
 | `edit_code_in_table_cell_535cb9` | Відредагуйте код у клітинці таблиці |
-| `edit_table_cell_text_ca30e7` | Редагувати текст комірки таблиці |
+| `edit_table_cell_text_ca30e7` | Редагувати текст клітинки таблиці |
 | `edit_preformatted_text_9737bd` | Редагувати попередньо відформатований текст |
 | `edit_disclosure_title_79fb92` | Редагувати заголовок розгортаного розділу |
 | `edit_text_7967d9` | Редагувати текст |
-| `type_in_the_cell_text_press_alt_enter_for_cell_options_e3772e` | Введіть текст у клітинку. Натисніть Alt+Enter для опцій комірки. |
+| `type_in_the_cell_text_press_alt_enter_for_cell_options_e3772e` | Введіть текст у клітинку. Натисніть Alt+Enter для опцій клітинки. |
 | `edit_the_text_directly_edit_the_surrounding_structure_i_2e635c` | Відредагуйте текст безпосередньо. Відредагуйте навколишню структуру в Markdown. |
 | `edit_structure_in_markdown_fe607e` | Редагувати структуру в Markdown |
 | `edit_quoted_text_9de474` | Відредагуйте цитований текст |
@@ -6964,7 +6966,7 @@ Ukrainian
 | `align_column_right_850a8f` | Вирівняти стовпець праворуч |
 | `cell_text_markdown_a9e5f9` | Текст клітинки (Markdown) |
 | `close_inline_code_before_adding_a_line_break_1d66a9` | Закрийте вбудований код перед додаванням розриву рядка. |
-| `this_cell_text_would_change_the_table_structure_add_a_s_984ac6` | Цей текст комірки змінить структуру таблиці. Додайте пробіл перед роздільником у Markdown. |
+| `this_cell_text_would_change_the_table_structure_add_a_s_984ac6` | Цей текст клітинки змінить структуру таблиці. Додайте пробіл перед роздільником у Markdown. |
 | `alt_text_16f898` | Альтернативний текст |
 | `link_text_markdown_9b92bd` | Текст посилання (Markdown) |
 | `image_url_e55026` | URL зображення |
@@ -6979,7 +6981,7 @@ Ukrainian
 | `return_to_reader_dcd8f7` | Повернутися до режиму читання |
 | `number_of_columns_2_8_893663` | Кількість стовпців (2–8) |
 | `header_number_b79482` | Заголовок стовпця {number} |
-| `cell_75fa38` | Комірка |
+| `cell_75fa38` | Клітинка |
 | `open_1f1d59` | Відкрити… |
 | `new_18fdd5` | Новий |
 | `print_07c371` | Роздрукувати… |
@@ -7182,8 +7184,8 @@ Vietnamese
 | `count_variable_width_fonts_available_9d234c` | Phông chữ có chiều rộng thay đổi có sẵn: {count} |
 | `count_match_for_query_2e77ac` | Kết quả tìm kiếm cho “{query}”: {count} |
 | `count_matches_for_query_7db710` | Kết quả tìm kiếm cho “{query}”: {count} |
-| `no_fixed_width_fonts_match_query_fb1fab` | Không có phông chữ có chiều rộng cố định nào khớp với "{query}". |
-| `no_variable_width_fonts_match_query_a64030` | Không có phông chữ có chiều rộng thay đổi nào khớp với "{query}". |
+| `no_fixed_width_fonts_match_query_fb1fab` | Không có phông chữ có chiều rộng cố định nào khớp với “{query}”. |
+| `no_variable_width_fonts_match_query_a64030` | Không có phông chữ có chiều rộng thay đổi nào khớp với “{query}”. |
 | `current_of_total_35d900` | {current} trên {total} |
 | `current_of_total_scope_94ebe5` | {current} trên {total} · {scope} |
 | `copy_code_49a005` | Sao chép mã |

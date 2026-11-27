@@ -1,5 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('desktop', {
+  languageOverride: process.env.MARKDOWN_VISION_LANGUAGE,
   getInitialDocument: () => ipcRenderer.invoke('document:initial'),
   getPreferences: () => ipcRenderer.invoke('preferences:get'),
   savePreferences: (preferences) => ipcRenderer.invoke('preferences:set', preferences),

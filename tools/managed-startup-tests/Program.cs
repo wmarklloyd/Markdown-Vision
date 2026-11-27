@@ -29,23 +29,9 @@ Check(Message("zh-Hant-CN").Message == Message("zh-TW").Message, "Explicit Tradi
 Check(Message("pt-PT").Message == Message("pt-BR").Message, "Portuguese fallback");
 Check(Message("is").Message == english.Message, "Unsupported language fallback");
 var systemCulture = CultureInfo.GetCultureInfo("fr-FR");
-Check(StartupCulture.FromLanguage("system", systemCulture) == systemCulture, "System language preference");
-Check(StartupCulture.FromLanguage("ar", systemCulture).TwoLetterISOLanguageName == "ar", "Saved Arabic preference");
-Check(StartupCulture.FromLanguage("zh-hant", systemCulture).Name == "zh-TW", "Saved Traditional Chinese preference");
-Check(StartupCulture.FromLanguage("pt-br", systemCulture).Name == "pt-BR", "Saved Brazilian Portuguese preference");
-Check(StartupCulture.FromLanguage("unsupported", systemCulture) == systemCulture, "Unsupported preference fallback");
-var preferencesPath = Path.Combine(Path.GetTempPath(), $"markdown-vision-preferences-{Guid.NewGuid():N}.json");
-try
-{
-    File.WriteAllText(preferencesPath, "{\"language\":\"ja\"}");
-    Check(StartupCulture.FromPreferences(preferencesPath, systemCulture).TwoLetterISOLanguageName == "ja",
-        "Startup honors saved application language");
-    File.WriteAllText(preferencesPath, "invalid json");
-    Check(StartupCulture.FromPreferences(preferencesPath, systemCulture) == systemCulture,
-        "Invalid preferences fall back to the system language");
-}
-finally
-{
-    if (File.Exists(preferencesPath)) File.Delete(preferencesPath);
-}
+Check(StartupCulture.FromLanguage("system", systemCulture) == systemCulture, "System language override");
+Check(StartupCulture.FromLanguage("ar", systemCulture).TwoLetterISOLanguageName == "ar", "External Arabic override");
+Check(StartupCulture.FromLanguage("zh-hant", systemCulture).Name == "zh-TW", "External Traditional Chinese override");
+Check(StartupCulture.FromLanguage("pt-br", systemCulture).Name == "pt-BR", "External Brazilian Portuguese override");
+Check(StartupCulture.FromLanguage("unsupported", systemCulture) == systemCulture, "Unsupported override fallback");
 Console.WriteLine("Managed startup localization tests passed.");
