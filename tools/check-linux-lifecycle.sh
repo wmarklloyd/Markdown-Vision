@@ -15,7 +15,6 @@ wait_for_window() {
   while [ "$attempt" -lt 60 ]; do
     window=$(xdotool search --onlyvisible --name "$title" 2>/dev/null | head -n 1 || true)
     if [ -n "$window" ]; then
-      printf '%s\n' "$window"
       return 0
     fi
     if ! kill -0 "$pid" 2>/dev/null; then
@@ -36,6 +35,13 @@ wait_for_window() {
   echo 'Application log:' >&2
   cat "$evidence/app.log" >&2
   return 1
+}
+require_window() {
+  title=$1
+  if ! wait_for_window "$title"; then
+    echo "::error title=Linux GUI window timeout::Timed out waiting for visible window titled '$title'."
+    return 1
+  fi
 }
 (cd "$test_dir" && exec "$app" "$fixture") >"$evidence/app.log" 2>&1 &
 pid=$!
@@ -75,13 +81,14 @@ wait_for_clipboard() {
   echo "Clipboard did not contain expected text: $expected" >&2
   return 1
 }
-window=$(wait_for_window 'Markdown-total-torture-test.md')
+require_window 'Markdown-total-torture-test.md'
 # Decline the first-run default-app prompt in this isolated test profile.
 xdotool windowfocus --sync "$window"
 xdotool key --clearmodifiers Escape
 sleep 1
 xdotool windowfocus --sync "$window" key ctrl+p
-print_dialog=$(wait_for_window 'Print')
+require_window 'Print'
+print_dialog=$window
 import -window root "$evidence/linux-print.png"
 xdotool mousemove --window "$print_dialog" 85 85 click 1
 import -window root "$evidence/linux-print-to-file.png"
@@ -137,7 +144,8 @@ import -window root "$evidence/linux-split-vertical.png"
 second=$!
 wait_for_process_exit "$second"
 wait "$second"
-dialog=$(wait_for_window 'Unsaved changes')
+require_window 'Unsaved changes'
+dialog=$window
 import -window root "$evidence/linux-open-confirm.png"
 xdotool windowfocus --sync "$dialog" key Return
 kill -0 "$pid"
@@ -152,7 +160,8 @@ event = protocol.event.ClientMessage(window=window, client_type=connection.inter
 window.send_event(event, event_mask=0)
 connection.flush()
 PY
-dialog=$(wait_for_window 'Unsaved changes')
+require_window 'Unsaved changes'
+dialog=$window
 import -window root "$evidence/linux-close-confirm.png"
 xdotool windowfocus --sync "$dialog" key Return
 kill -0 "$pid"
