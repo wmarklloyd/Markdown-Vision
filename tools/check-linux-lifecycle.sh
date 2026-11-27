@@ -14,6 +14,8 @@ stage='selecting the Markdown desktop handler'
 finish() {
   result=$?
   if [ "$result" -ne 0 ]; then
+    import -window root "$evidence/linux-lifecycle-failure.png" 2>/dev/null || true
+    xwininfo -root -tree >"$evidence/linux-window-tree.txt" 2>&1 || true
     app_log=$(tail -n 5 "$evidence/app.log" 2>/dev/null | tr '\n' ' ' || true)
     echo "::error title=Linux lifecycle failed::Stage: $stage; exit: $result; app log: ${app_log:-empty}."
   fi
@@ -21,6 +23,12 @@ finish() {
   rm -rf "$test_dir"
 }
 trap finish EXIT
+# Limit printer discovery to the PDF backend in this isolated desktop.
+export XDG_CONFIG_HOME="$test_dir/config"
+export GTK_USE_PORTAL=0
+mkdir -p "$XDG_CONFIG_HOME/gtk-3.0"
+printf '[Settings]\ngtk-print-backends=file\n' >"$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
+printf 'XDG_DOCUMENTS_DIR="%s"\n' "$test_dir" >"$XDG_CONFIG_HOME/user-dirs.dirs"
 # Keep the opt-in setup prompt out of this GUI lifecycle run; its association
 # choice is already covered by the native service checks.
 desktop_entry=$(find /usr/share/applications -maxdepth 1 -type f -name '*.desktop' \
@@ -94,26 +102,41 @@ wait_for_app_window() {
   echo "::error title=Linux application window timeout::No visible window for process $pid. Visible windows: ${window_titles:-none}. App log: ${app_log:-empty}."
   return 1
 }
-wait_for_new_window() {
-  baseline_windows=$1
-  attempt=0
-  while [ "$attempt" -lt 60 ]; do
-    window=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | while read -r candidate; do
-      case " $baseline_windows " in
-        *" $candidate "*) ;;
-        *) printf '%s\n' "$candidate" ;;
-      esac
-    done | head -n 1)
-    if [ -n "$window" ]; then return 0; fi
-    attempt=$((attempt + 1))
-    sleep 1
-  done
-  window_titles=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | while read -r candidate; do xdotool getwindowname "$candidate" 2>/dev/null || true; done | tr '\n' '|')
-  screenshot="$evidence/linux-print-timeout.png"
-  import -window root "$screenshot" 2>/dev/null || true
-  screen_text=$(tesseract "$screenshot" stdout --psm 11 2>/dev/null | tr '\n' ' ' || true)
-  echo "::error title=Linux print dialog timeout::No new print window appeared. Visible windows: ${window_titles:-none}. Click: ${click_info:-unknown}. Screen text: ${screen_text:-none}."
-  return 1
+wait_for_print_dialog() {
+  # WebKitGTK opens an untitled dialog. Xvfb runs without a window manager.
+  /usr/bin/python3 - "$app_window" "$pid" <<'PY'
+import sys
+import time
+from Xlib import X, Xatom, display, error
+
+app_window, pid = map(int, sys.argv[1:])
+connection = display.Display()
+root = connection.screen().root
+window_type = connection.intern_atom("_NET_WM_WINDOW_TYPE")
+dialog_type = connection.intern_atom("_NET_WM_WINDOW_TYPE_DIALOG")
+window_pid = connection.intern_atom("_NET_WM_PID")
+
+deadline = time.monotonic() + 30
+while time.monotonic() < deadline:
+    for candidate in root.query_tree().children:
+        try:
+            if candidate.id == app_window or candidate.get_attributes().map_state != X.IsViewable:
+                continue
+            transient = candidate.get_wm_transient_for()
+            kind = candidate.get_full_property(window_type, Xatom.ATOM)
+            owner = candidate.get_full_property(window_pid, Xatom.CARDINAL)
+            if (transient and transient.id == app_window) or (
+                kind is not None and dialog_type in kind.value
+                and owner is not None and pid in owner.value
+            ):
+                print(candidate.id)
+                sys.exit(0)
+        except error.BadWindow:
+            continue
+    time.sleep(0.25)
+
+sys.exit("No visible GTK print dialog appeared")
+PY
 }
 (cd "$test_dir" && exec "$app" "$fixture") >"$evidence/app.log" 2>&1 &
 pid=$!
@@ -156,38 +179,22 @@ stage='waiting for the app window'
 wait_for_app_window
 stage='waiting for the Markdown fixture to load'
 require_window 'Markdown-total-torture-test.md'
-baseline_windows=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | tr '\n' ' ')
+app_window=$window
 stage='opening the print dialog'
-window_width=$(xdotool getwindowgeometry --shell "$window" | sed -n 's/^WIDTH=//p')
-test -n "$window_width"
-print_button_x=$((window_width - 220))
-click_info="window width=$window_width, x=$print_button_x, attempted y=30 and y=60"
-stage="opening print dialog at window x=$print_button_x, y=30 (width=$window_width)"
-xdotool windowfocus --sync "$window"
-xdotool mousemove --window "$window" "$print_button_x" 30 click 1
-sleep 1
-new_window=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | while read -r candidate; do
-  case " $baseline_windows " in
-    *" $candidate "*) ;;
-    *) printf '%s\n' "$candidate" ;;
-  esac
-done | head -n 1)
-if [ -z "$new_window" ]; then
-  stage="opening print dialog at window x=$print_button_x, y=60 (width=$window_width)"
-  xdotool mousemove --window "$window" "$print_button_x" 60 click 1
-fi
+xdotool windowfocus --sync "$app_window" key --clearmodifiers ctrl+p
 stage='waiting for the print dialog'
-wait_for_new_window "$baseline_windows"
-print_dialog=$window
+print_dialog=$(wait_for_print_dialog)
 import -window root "$evidence/linux-print.png"
+stage='printing to PDF'
 xdotool mousemove --window "$print_dialog" 85 85 click 1
 import -window root "$evidence/linux-print-to-file.png"
-xdotool mousemove --window "$print_dialog" 580 486 click 1
+xdotool windowfocus --sync "$print_dialog" key --clearmodifiers alt+p
 pdf="$test_dir/output.pdf"
 wait_for_file "$pdf"
 file "$pdf" | grep -q 'PDF document'
 cp "$pdf" "$evidence/linux-print.pdf"
-xdotool windowfocus --sync "$window" key ctrl+n
+stage='editing a new document'
+xdotool windowfocus --sync "$app_window" key ctrl+n
 printf '\303\251' | xclip -selection clipboard -i
 xdotool key ctrl+v
 xdotool key ctrl+a ctrl+c
@@ -240,7 +247,7 @@ import -window root "$evidence/linux-open-confirm.png"
 xdotool windowfocus --sync "$dialog" key Return
 kill -0 "$pid"
 echo 'The already-running instance prompted before opening a file over unsaved changes.'
-/usr/bin/python3 - "$window" <<'PY'
+/usr/bin/python3 - "$app_window" <<'PY'
 import sys
 from Xlib import display, protocol
 connection = display.Display()
