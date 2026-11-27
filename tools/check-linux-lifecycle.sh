@@ -71,7 +71,10 @@ wait_for_no_auxiliary_window() {
       [ "$candidate" = "$main_window" ] || printf '%s\n' "$candidate"
     done)
     if [ -z "$auxiliary" ]; then return 0; fi
-    xdotool key --clearmodifiers Escape
+    printf '%s\n' "$auxiliary" | while read -r candidate; do
+      xdotool windowfocus --sync "$candidate"
+      xdotool key --clearmodifiers Escape
+    done
     attempt=$((attempt + 1))
     sleep 0.25
   done
