@@ -109,7 +109,10 @@ wait_for_new_window() {
     sleep 1
   done
   window_titles=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | while read -r candidate; do xdotool getwindowname "$candidate" 2>/dev/null || true; done | tr '\n' '|')
-  echo "::error title=Linux print dialog timeout::No new print window appeared. Visible windows: ${window_titles:-none}."
+  screenshot="$evidence/linux-print-timeout.png"
+  import -window root "$screenshot" 2>/dev/null || true
+  screen_text=$(tesseract "$screenshot" stdout --psm 11 2>/dev/null | tr '\n' ' ' || true)
+  echo "::error title=Linux print dialog timeout::No new print window appeared. Visible windows: ${window_titles:-none}. Click: ${click_info:-unknown}. Screen text: ${screen_text:-none}."
   return 1
 }
 (cd "$test_dir" && exec "$app" "$fixture") >"$evidence/app.log" 2>&1 &
@@ -158,6 +161,7 @@ stage='opening the print dialog'
 window_width=$(xdotool getwindowgeometry --shell "$window" | sed -n 's/^WIDTH=//p')
 test -n "$window_width"
 print_button_x=$((window_width - 220))
+click_info="window width=$window_width, x=$print_button_x, attempted y=30 and y=60"
 stage="opening print dialog at window x=$print_button_x, y=30 (width=$window_width)"
 xdotool windowfocus --sync "$window"
 xdotool mousemove --window "$window" "$print_button_x" 30 click 1
