@@ -877,6 +877,7 @@ markdownParser.renderer.rules.fence = (tokens, index) =>
 function decorateMarkdown(tokens, lines) {
   const aliases = new Map();
   const usedIds = new Set();
+  const nextSuffix = new Map();
   for (const token of tokens) {
     if (token.type !== 'inline') continue;
     const children = token.children;
@@ -898,7 +899,11 @@ function decorateMarkdown(tokens, lines) {
       const section = text.match(/^(\d+)\.\s/);
       const base = aliases.get(text) || slug || 'section';
       let id = base;
-      for (let suffix = 1; usedIds.has(id); suffix += 1) id = base + '-' + suffix;
+      if (usedIds.has(id)) {
+        let suffix = nextSuffix.get(base) ?? 1;
+        do { id = base + '-' + suffix++; } while (usedIds.has(id));
+        nextSuffix.set(base, suffix);
+      }
       usedIds.add(id);
       token.attrSet('id', id);
       if (section) {

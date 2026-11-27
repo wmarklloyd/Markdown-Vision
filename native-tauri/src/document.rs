@@ -24,7 +24,7 @@ struct OpenDocument {
     editable: bool,
 }
 
-fn open_path(documents: &mut Documents, path: PathBuf) -> Result<Value, String> {
+fn read_document(path: PathBuf) -> Result<(OpenDocument, String), String> {
     let bytes = fs::read(&path).map_err(|_| "Markdown Vision could not read this file.")?;
     let bom = bytes.starts_with(&[0xef, 0xbb, 0xbf]);
     let body = if bom { &bytes[3..] } else { &bytes[..] };
@@ -36,13 +36,35 @@ fn open_path(documents: &mut Documents, path: PathBuf) -> Result<Value, String> 
     let mixed = [crlf > 0, cr > 0, lf > 0].into_iter().filter(|v| *v).count() > 1;
     let ending = if crlf > 0 { "\r\n" } else if cr > 0 { "\r" } else { "\n" };
     let content = text.replace("\r\n", "\n").replace('\r', "\n");
-    let name = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
+    Ok((OpenDocument { id: String::new(), path, bytes, bom, ending, editable: valid && !mixed }, content))
+}
+
+fn register_document(documents: &mut Documents, mut document: OpenDocument, content: String) -> Value {
+    let name = document.path.file_name().unwrap_or_default().to_string_lossy().into_owned();
     documents.sequence += 1;
     let id = documents.sequence.to_string();
-    documents.current = Some(OpenDocument { id: id.clone(), path, bytes, bom, ending, editable: valid && !mixed });
+    document.id.clone_from(&id);
+    documents.current = Some(document);
     let scheme = if cfg!(windows) { "http://mvimage.localhost" } else { "mvimage://localhost" };
-    Ok(json!({ "content": content, "name": name, "documentId": id,
-        "imageBase": format!("{scheme}/{id}/") }))
+    json!({ "content": content, "name": name, "documentId": id,
+        "imageBase": format!("{scheme}/{id}/") })
+}
+
+fn open_path(documents: &mut Documents, path: PathBuf) -> Result<Value, String> {
+    let (document, content) = read_document(path)?;
+    Ok(register_document(documents, document, content))
+}
+
+async fn read_and_register(
+    state: &Mutex<Documents>, path: PathBuf, sequence: u64,
+) -> Result<Option<Value>, String> {
+    // Slow reads and text decoding must not run on the desktop event loop or
+    // hold the lock needed by open requests from the operating system.
+    let (document, content) = tauri::async_runtime::spawn_blocking(move || read_document(path))
+        .await.map_err(|_| "Markdown Vision could not read this file.".to_string())??;
+    let mut documents = state.lock().map_err(|error| error.to_string())?;
+    if documents.sequence != sequence { return Ok(None); }
+    Ok(Some(register_document(&mut documents, document, content)))
 }
 
 pub fn read_image(documents: &Documents, request_path: &str) -> Option<(&'static str, Vec<u8>)> {
@@ -117,14 +139,18 @@ pub fn has_pending_document(state: State<'_, Mutex<Documents>>) -> Result<bool, 
 }
 
 #[tauri::command]
-pub fn pending_document(state: State<'_, Mutex<Documents>>, accept: bool) -> Result<Option<Value>, String> {
-    let mut documents = state.lock().map_err(|e| e.to_string())?;
-    let Some(path) = documents.pending.pop_front() else { return Ok(None) };
+pub async fn pending_document(state: State<'_, Mutex<Documents>>, accept: bool) -> Result<Option<Value>, String> {
+    let (path, sequence) = {
+        let mut documents = state.lock().map_err(|e| e.to_string())?;
+        let Some(path) = documents.pending.pop_front() else { return Ok(None) };
+        (path, documents.sequence)
+    };
     if !accept { return Ok(Some(json!({ "discarded": true }))); }
-    Ok(Some(match open_path(&mut documents, path) {
-        Ok(document) => document,
-        Err(error) => json!({ "error": error }),
-    }))
+    match read_and_register(state.inner(), path, sequence).await {
+        Ok(Some(document)) => Ok(Some(document)),
+        Ok(None) => Ok(Some(json!({ "discarded": true }))),
+        Err(error) => Ok(Some(json!({ "error": error }))),
+    }
 }
 
 fn dialog_label<'a>(labels: &'a Option<Value>, key: &str, default: &'a str) -> &'a str {
@@ -150,13 +176,14 @@ fn save_dialog_filename(current: Option<&OpenDocument>, labels: &Option<Value>) 
 }
 
 #[tauri::command]
-pub fn open_document(state: State<'_, Mutex<Documents>>, labels: Option<Value>) -> Result<Option<Value>, String> {
-    let path = rfd::FileDialog::new()
+pub async fn open_document(state: State<'_, Mutex<Documents>>, labels: Option<Value>) -> Result<Option<Value>, String> {
+    let sequence = state.lock().map_err(|error| error.to_string())?.sequence;
+    let file = rfd::AsyncFileDialog::new()
         .set_title(dialog_label(&labels, "open", "Open Markdown file"))
-        .add_filter(dialog_label(&labels, "markdown", "Markdown files"), &["md", "markdown", "mdown", "mkd"]).pick_file();
-    let Some(path) = path else { return Ok(None) };
-    let mut documents = state.lock().map_err(|e| e.to_string())?;
-    open_path(&mut documents, path).map(Some)
+        .add_filter(dialog_label(&labels, "markdown", "Markdown files"), &["md", "markdown", "mdown", "mkd"])
+        .pick_file().await;
+    let Some(file) = file else { return Ok(None) };
+    read_and_register(state.inner(), file.path().to_path_buf(), sequence).await
 }
 
 #[tauri::command]
