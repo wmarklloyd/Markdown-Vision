@@ -21,16 +21,25 @@ const requests = [];
 const window = {
   markdownVisionReader: { interfaceText: text => 'translated ' + text, interfaceDirection: 'rtl' },
 };
-const chrome = { webview: { postMessage(message) {
-  requests.push(message);
-  const id = message.slice(0, message.indexOf('|'));
-  queueMicrotask(() => window.__markdownVisionResolve(id, true));
-} } };
+let handleNativeMessage;
+const opened = { name: 'Document.md', content: 'Markup with "quotes", \\ and \n' };
+const chrome = { webview: {
+  addEventListener(type, listener) {
+    assert.equal(type, 'message');
+    handleNativeMessage = listener;
+  },
+  postMessage(message) {
+    requests.push(message);
+    const [id, method] = message.split('|', 2);
+    const result = method === 'document.initial' || method === 'document.open' ? opened : true;
+    queueMicrotask(() => handleNativeMessage({ data: { id, result } }));
+  },
+} };
 vm.runInNewContext(bridge, { window, chrome, Promise });
 
 (async () => {
-  await window.desktop.getInitialDocument();
-  await window.desktop.openMarkdownFile();
+  assert.equal(await window.desktop.getInitialDocument(), opened);
+  assert.equal(await window.desktop.openMarkdownFile(), opened);
   await window.desktop.saveMarkdownFile('id', '100%\0text', true);
   assert.match(requests[0], /^1\|document\.labels\|translated Open Markdown file\|translated Save Markdown file\|translated Markdown files\|translated Text files\|translated All files\|translated Markdown Vision could not read this file\.\|translated Untitled\.md\|rtl$/);
   assert.equal(requests[1], '2|document.initial');
