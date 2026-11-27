@@ -5,7 +5,7 @@ Unicode True
 !include "installer-localization.nsh"
 
 !define APP_NAME "Markdown Vision"
-!define APP_VERSION "2.8.28"
+!define APP_VERSION "2.8.29"
 !define APP_ID "8d1dd6d6-9e38-5fc2-8139-94aece1f4a40"
 !ifndef SOURCE_DIR
 !ifdef ARM64
