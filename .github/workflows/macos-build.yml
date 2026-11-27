@@ -63,12 +63,29 @@ jobs:
             fi
           fi
           node tools/export-localization.cjs --check-release-ready
-      - name: Test localization and native services
+      - name: Test localization and native source checks
         run: |
           node tools/stage-tauri.cjs
           node tools/test-localization-generation.cjs
           node tools/check-native-error-localization.cjs
-          cargo test --locked --manifest-path native-tauri/Cargo.toml
+      - name: Test macOS native services
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked --manifest-path native-tauri/Cargo.toml 2>&1 | tee "$RUNNER_TEMP/cargo-test.log"
+          result=${PIPESTATUS[0]}
+          set -e
+          if [ "$result" -ne 0 ]; then
+            diagnostic=$(grep -m 1 -A 8 -E '^error([[:space:]]|\[)' "$RUNNER_TEMP/cargo-test.log" | tr '\n' ' ')
+            if [ -z "$diagnostic" ]; then
+              diagnostic=$(tail -n 20 "$RUNNER_TEMP/cargo-test.log" | tr '\n' ' ')
+            fi
+            diagnostic=${diagnostic//'%'/'%25'}
+            diagnostic=${diagnostic//$'\r'/'%0D'}
+            diagnostic=${diagnostic//$'\n'/'%0A'}
+            echo "::error title=macOS native service validation failed::$diagnostic"
+            exit "$result"
+          fi
       - name: Build unsigned universal DMG
         working-directory: native-tauri
         run: '"$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" build --target universal-apple-darwin --bundles dmg -- --locked'
