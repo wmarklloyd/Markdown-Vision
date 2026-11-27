@@ -130,8 +130,7 @@ wait_for_clipboard() {
 wait_for_app_window
 require_window 'Markdown-total-torture-test.md'
 baseline_windows=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | tr '\n' ' ')
-xdotool windowfocus --sync "$window"
-xdotool mousemove --window "$window" 125 35 click 1
+xdotool windowfocus --sync "$window" key ctrl+p
 wait_for_new_window "$baseline_windows"
 print_dialog=$window
 import -window root "$evidence/linux-print.png"
