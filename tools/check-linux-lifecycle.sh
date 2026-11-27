@@ -9,6 +9,18 @@ mkdir -p "$evidence"
 case "$app" in /*) ;; *) app="$(cd "$(dirname "$app")" && pwd)/$(basename "$app")" ;; esac
 case "$fixture" in /*) ;; *) fixture="$(cd "$(dirname "$fixture")" && pwd)/$(basename "$fixture")" ;; esac
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/markdown-vision-lifecycle.XXXXXX")
+pid=
+stage='selecting the Markdown desktop handler'
+finish() {
+  result=$?
+  if [ "$result" -ne 0 ]; then
+    app_log=$(tail -n 5 "$evidence/app.log" 2>/dev/null | tr '\n' ' ' || true)
+    echo "::error title=Linux lifecycle failed::Stage: $stage; exit: $result; app log: ${app_log:-empty}."
+  fi
+  if [ -n "$pid" ]; then kill "$pid" 2>/dev/null || true; fi
+  rm -rf "$test_dir"
+}
+trap finish EXIT
 # Keep the opt-in setup prompt out of this GUI lifecycle run; its association
 # choice is already covered by the native service checks.
 desktop_entry=$(find /usr/share/applications -maxdepth 1 -type f -name '*.desktop' \
@@ -27,6 +39,7 @@ if [ "$current_default" != "$desktop_id" ]; then
   echo "::error title=Linux test setup failed::Expected Markdown handler '$desktop_id'; xdg-mime reports '$current_default'."
   exit 1
 fi
+stage='launching the installed app'
 wait_for_window() {
   title=$1
   attempt=0
@@ -101,7 +114,6 @@ wait_for_new_window() {
 }
 (cd "$test_dir" && exec "$app" "$fixture") >"$evidence/app.log" 2>&1 &
 pid=$!
-trap 'kill "$pid" 2>/dev/null || true; rm -rf "$test_dir"' EXIT
 wait_for_file() {
   file_path=$1
   attempt=0
@@ -137,10 +149,14 @@ wait_for_clipboard() {
   echo "Clipboard did not contain expected text: $expected" >&2
   return 1
 }
+stage='waiting for the app window'
 wait_for_app_window
+stage='waiting for the Markdown fixture to load'
 require_window 'Markdown-total-torture-test.md'
 baseline_windows=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | tr '\n' ' ')
+stage='opening the print dialog'
 xdotool windowfocus --sync "$window" key ctrl+p
+stage='waiting for the print dialog'
 wait_for_new_window "$baseline_windows"
 print_dialog=$window
 import -window root "$evidence/linux-print.png"
