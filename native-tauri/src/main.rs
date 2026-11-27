@@ -25,13 +25,14 @@ fn main() {
         .setup(|app| {
             let config = &app.config().app.windows[0];
             let language = std::env::var("MARKDOWN_VISION_LANGUAGE").unwrap_or_default();
-            let language_script = format!(
-                "window.__markdownVisionLanguageOverride = {}; window.__markdownVisionUsesNativeMenu = {};",
+            let startup_script = format!(
+                "window.__markdownVisionLanguageOverride = {}; window.__markdownVisionUsesNativeMenu = {}; window.__markdownVisionPlatform = {};",
                 serde_json::json!(language),
-                !cfg!(target_os = "linux")
+                !cfg!(target_os = "linux"),
+                serde_json::json!(std::env::consts::OS)
             );
             let window = tauri::WebviewWindowBuilder::from_config(app, config)?
-                .initialization_script(language_script)
+                .initialization_script(startup_script)
                 .on_navigation(|url| {
                     let local = (url.scheme() == "tauri" && url.host_str() == Some("localhost"))
                         || (matches!(url.scheme(), "http" | "https") && url.host_str() == Some("tauri.localhost"));

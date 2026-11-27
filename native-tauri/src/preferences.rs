@@ -16,7 +16,7 @@ fn is_supported_language(text: &str) -> bool {
 fn validate(value: &Value) -> Result<Value, String> {
     let object = value.as_object().ok_or("Invalid preferences")?;
     let mut result = Map::new();
-    for key in ["theme", "font", "monoFont", "size", "line", "width", "language"] {
+    for key in ["theme", "font", "monoFont", "size", "line", "width", "language", "readingDefaultsVersion"] {
         let Some(item) = object.get(key) else { continue };
         let text = item.as_str().ok_or_else(|| format!("Invalid {key}"))?;
         let valid = match key {
@@ -26,6 +26,7 @@ fn validate(value: &Value) -> Result<Value, String> {
             "line" => text.parse::<f64>().is_ok_and(|n| (1.35..=2.1).contains(&n)),
             "width" => text == "auto" || text.parse::<f64>().is_ok_and(|n| (540.0..=920.0).contains(&n)),
             "language" => is_supported_language(text),
+            "readingDefaultsVersion" => text == "1",
             _ => false,
         };
         if !valid { return Err(format!("Invalid {key}")); }
@@ -128,7 +129,7 @@ mod tests {
         assert!(read_preferences(&path).unwrap().is_none());
         let preferences = json!({
             "theme":"dark", "font":"Georgia", "monoFont":"Cascadia Mono",
-            "size":"18", "line":"1.75", "width":"720"
+            "size":"18", "line":"1.75", "width":"720", "readingDefaultsVersion":"1"
         });
         write_preferences(&path, &preferences).unwrap();
         assert_eq!(read_preferences(&path).unwrap(), Some(preferences));

@@ -25,6 +25,11 @@
   --reading-gutter: clamp(16px, 4vw, 32px);
 }
 
+:root[data-platform="linux"] {
+  --reader-size: clamp(1.1875rem, calc(1.0625rem + .5vw), 1.625rem);
+  --reader-width: min(calc(var(--reader-size) * 38), 57.5rem);
+}
+
 [data-theme="light"] {
   color-scheme: light;
   --bg: #e5dfd1;

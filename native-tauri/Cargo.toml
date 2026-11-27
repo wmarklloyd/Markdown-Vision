@@ -1,6 +1,6 @@
 [package]
 name = "markdown-vision"
-version = "2.8.30"
+version = "2.8.31"
 edition = "2021"
 
 [workspace]

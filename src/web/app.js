@@ -362,10 +362,9 @@ const defaults = {
 const preferenceStorageKey = 'markdown-vision-preferences';
 const fontCacheStorageKey = 'markdown-vision-font-cache';
 const fontCacheTtlMs = 7 * 24 * 60 * 60 * 1000;
-const storedPreferences = readLocalPreferences();
-const preferences = { ...defaults, ...storedPreferences };
-delete preferences.language;
-preferences.font = legacyFonts[preferences.font] || preferences.font;
+const linuxReadingDefaults = window.__markdownVisionPlatform === 'linux';
+if (linuxReadingDefaults) root.dataset.platform = 'linux';
+const preferences = mergePreferences(readLocalPreferences());
 let preferenceLoadPending = Boolean(window.desktop?.getPreferences);
 let preferenceNativeAvailable = true;
 let preferenceSnapshot = { ...preferences };
@@ -397,16 +396,33 @@ function readLocalPreferences() {
   }
 }
 
+function needsLinuxReadingMigration(stored) {
+  return linuxReadingDefaults && stored?.readingDefaultsVersion !== '1';
+}
+
+function mergePreferences(stored) {
+  const merged = { ...defaults, ...stored };
+  delete merged.language;
+  merged.font = legacyFonts[merged.font] || merged.font;
+  if (needsLinuxReadingMigration(stored)) {
+    // Earlier versions saved both factory defaults as if they were manual.
+    if (merged.size === '18' && merged.width === '720') {
+      merged.size = 'auto';
+      merged.width = 'auto';
+    }
+    merged.readingDefaultsVersion = '1';
+  }
+  return merged;
+}
+
 async function loadPreferences() {
   if (!window.desktop?.getPreferences) return;
   try {
     const stored = await window.desktop.getPreferences();
     if (stored && typeof stored === 'object') {
-      const merged = { ...defaults, ...stored };
-      delete merged.language;
+      const merged = mergePreferences(stored);
       for (const key of preferenceEdits) merged[key] = preferences[key];
       Object.assign(preferences, merged);
-      preferences.font = legacyFonts[preferences.font] || preferences.font;
       applyPreferences();
       try {
         localStorage.setItem(preferenceStorageKey, JSON.stringify(preferences));
@@ -414,7 +430,7 @@ async function loadPreferences() {
     }
     preferenceLoadPending = false;
     preferenceSnapshot = { ...preferences };
-    if (!stored || preferenceEdits.size) persistNativePreferences();
+    if (!stored || preferenceEdits.size || needsLinuxReadingMigration(stored)) persistNativePreferences();
   } catch {
     preferenceLoadPending = false;
     preferenceNativeAvailable = false;

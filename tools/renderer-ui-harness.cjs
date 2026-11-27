@@ -2468,6 +2468,9 @@ async function run() {
     `<script>
       window.__desktopFixture = createDesktopBridgeFixture("preferences-pending");
       window.desktop = window.__desktopFixture;
+      if (new URLSearchParams(location.search).has('testLinuxReadingDefaults')) {
+        window.__markdownVisionPlatform = 'linux';
+      }
       if (new URLSearchParams(location.search).has('testMacShortcuts')) {
         Object.defineProperty(navigator, 'platform', { configurable: true, value: 'MacIntel' });
       }
@@ -2797,6 +2800,38 @@ async function run() {
     await waitFor(window, 'window.__shutdownRequests.includes("close")', 'Close menu dispatch');
     await evaluate(window, 'window.__markdownVisionDispatchMenuCommand("quit")');
     await waitFor(window, 'window.__shutdownRequests.includes("quit")', 'Quit menu dispatch');
+
+    await evaluate(window, "localStorage.removeItem('markdown-vision-preferences')");
+    const linuxReading = { query: { testLinuxReadingDefaults: '1' } };
+    const readingPreferences = () => evaluate(window, `({
+      autoSize: document.querySelector('#autoFontSize').checked,
+      autoWidth: document.querySelector('#autoReadingWidth').checked,
+      size: parseFloat(getComputedStyle(document.querySelector('#markdownOutput')).fontSize)
+    })`);
+    await window.loadFile(indexFile, linuxReading);
+    const freshLinux = await readingPreferences();
+    assert.ok(freshLinux.autoSize && freshLinux.autoWidth, 'fresh Linux profiles start with both automatic options');
+    assert.ok(freshLinux.size >= 21.5, `automatic Linux body text is larger at desktop widths: ${freshLinux.size}px`);
+    window.setContentSize(420, 400);
+    await waitFor(window, 'innerWidth === 420', 'compact Linux reader');
+    const compactLinux = await readingPreferences();
+    assert.ok(compactLinux.size >= 19 && compactLinux.size < freshLinux.size, 'Linux text scales on compact windows');
+    await evaluate(window, "window.__desktopFixture.resolvePreferences({ size: '18', width: '720', theme: 'light' })");
+    await waitFor(window, `window.__desktopFixture.calls.some(([name, value]) => name === 'savePreferences'
+      && value.size === 'auto' && value.width === 'auto' && value.theme === 'light' && value.readingDefaultsVersion === '1')`,
+    'migration of the old Linux factory defaults');
+    assert.deepEqual(await readingPreferences(), compactLinux);
+    await window.loadFile(indexFile, linuxReading);
+    await evaluate(window, "window.__desktopFixture.resolvePreferences({ size: '18', width: '720', readingDefaultsVersion: '1' })");
+    await waitFor(window, "!document.querySelector('#autoFontSize').checked && !document.querySelector('#autoReadingWidth').checked",
+      'explicit Linux choices after migration are preserved');
+    assert.equal((await readingPreferences()).size, 18);
+    await window.loadFile(indexFile, linuxReading);
+    await evaluate(window, "window.__desktopFixture.resolvePreferences({ size: '21', width: '760' })");
+    await waitFor(window, "document.querySelector('#fontSize').value === '21' && document.querySelector('#readingWidth').value === '760'",
+      'older custom Linux sizes are preserved');
+    await evaluate(window, "localStorage.removeItem('markdown-vision-preferences')");
+    window.setContentSize(1000, 750);
 
     await checkLocalizedInterface(window, indexFile);
     writeLocaleScreenshotGallery();

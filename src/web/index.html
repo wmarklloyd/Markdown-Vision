@@ -60,7 +60,7 @@
             <strong>Markdown Vision</strong>
             <span>© 2026 Mark Lloyd</span>
             <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU GPLv3 license</a>
-            <span id="installedVersion" data-version="2.8.30">Version 2.8.30</span>
+            <span id="installedVersion" data-version="2.8.31">Version 2.8.31</span>
             <span id="latestVersion" aria-live="polite">Latest version: checking…</span>
             <a id="updateLink" class="update-link" href="https://github.com/wmarklloyd/Markdown-Vision/releases/latest" target="_blank" rel="noopener noreferrer" hidden>Update</a>
             <button id="retryUpdateCheck" class="update-link" type="button" hidden>Check for updates</button>
@@ -122,12 +122,12 @@
         </div>
         <div class="font-status" id="monoFontStatus" role="status" aria-live="polite">Used for code and other monospaced text.</div>
         <label for="fontSize">Text size <output id="fontSizeOutput" for="fontSize autoFontSize"></output></label>
-        <label class="automatic-setting"><input id="autoFontSize" type="checkbox" aria-label="Automatic text size" /> Automatic</label>
+        <label class="automatic-setting"><input id="autoFontSize" type="checkbox" aria-label="Automatic text size" checked /> Automatic</label>
         <input id="fontSize" type="range" min="14" max="26" step="1" value="18" />
         <label for="lineHeight">Line spacing <output id="lineHeightOutput">1.75</output></label>
         <input id="lineHeight" type="range" min="1.35" max="2.1" step="0.05" value="1.75" />
         <label for="readingWidth">Page width limit <output id="readingWidthOutput" for="readingWidth autoReadingWidth"></output></label>
-        <label class="automatic-setting"><input id="autoReadingWidth" type="checkbox" aria-label="Automatic page width" /> Automatic</label>
+        <label class="automatic-setting"><input id="autoReadingWidth" type="checkbox" aria-label="Automatic page width" checked /> Automatic</label>
         <input id="readingWidth" type="range" min="540" max="920" step="20" value="720" />
       </aside>
     </header>
