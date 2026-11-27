@@ -158,8 +158,20 @@ stage='opening the print dialog'
 window_width=$(xdotool getwindowgeometry --shell "$window" | sed -n 's/^WIDTH=//p')
 test -n "$window_width"
 print_button_x=$((window_width - 220))
+stage="opening print dialog at window x=$print_button_x, y=30 (width=$window_width)"
 xdotool windowfocus --sync "$window"
 xdotool mousemove --window "$window" "$print_button_x" 30 click 1
+sleep 1
+new_window=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | while read -r candidate; do
+  case " $baseline_windows " in
+    *" $candidate "*) ;;
+    *) printf '%s\n' "$candidate" ;;
+  esac
+done | head -n 1)
+if [ -z "$new_window" ]; then
+  stage="opening print dialog at window x=$print_button_x, y=60 (width=$window_width)"
+  xdotool mousemove --window "$window" "$print_button_x" 60 click 1
+fi
 stage='waiting for the print dialog'
 wait_for_new_window "$baseline_windows"
 print_dialog=$window
