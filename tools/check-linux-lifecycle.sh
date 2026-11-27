@@ -27,6 +27,13 @@ wait_for_window() {
     sleep 1
   done
   echo "Window did not appear within 60 seconds: $title" >&2
+  echo 'Visible windows at failure:' >&2
+  xdotool search --onlyvisible --name '.*' 2>/dev/null | while read -r candidate; do
+    printf '  %s: ' "$candidate" >&2
+    xdotool getwindowname "$candidate" 2>/dev/null >&2 || true
+  done
+  echo 'Application log:' >&2
+  cat "$evidence/app.log" >&2
   return 1
 }
 (cd "$test_dir" && exec "$app" "$fixture") >"$evidence/app.log" 2>&1 &
@@ -69,7 +76,9 @@ wait_for_clipboard() {
 }
 window=$(wait_for_window 'Markdown-total-torture-test.md')
 # Decline the first-run default-app prompt in this isolated test profile.
-xdotool key Escape
+xdotool windowfocus --sync "$window"
+xdotool key --clearmodifiers Escape
+sleep 1
 xdotool windowfocus --sync "$window" key ctrl+p
 print_dialog=$(wait_for_window 'Print')
 import -window root "$evidence/linux-print.png"

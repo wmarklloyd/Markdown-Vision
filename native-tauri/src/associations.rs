@@ -167,7 +167,7 @@ mod macos {
         Ok(current.is_some_and(|url| url == app_url))
     }
 
-    pub async fn set_default() -> Result<(), String> {
+    fn request_default_selection() -> Result<mpsc::Receiver<bool>, String> {
         let content_type = markdown_type()?;
         let app_url = NSBundle::mainBundle().bundleURL();
         let (sender, receiver) = mpsc::channel();
@@ -177,6 +177,13 @@ mod macos {
         NSWorkspace::sharedWorkspace().setDefaultApplicationAtURL_toOpenContentType_completionHandler(
             &app_url, &content_type, Some(&completion),
         );
+        Ok(receiver)
+    }
+
+    pub async fn set_default() -> Result<(), String> {
+        // Keep Objective-C's !Send completion block out of the async future. The
+        // system retains its copy while the detached blocking task waits for it.
+        let receiver = request_default_selection()?;
         let result = tauri::async_runtime::spawn_blocking(move || receiver.recv_timeout(Duration::from_secs(180)))
             .await
             .map_err(|_| "macOS could not complete the Markdown file association request.".to_string())?;
