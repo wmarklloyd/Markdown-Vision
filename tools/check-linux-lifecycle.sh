@@ -13,10 +13,20 @@ test_dir=$(mktemp -d "${TMPDIR:-/tmp}/markdown-vision-lifecycle.XXXXXX")
 # choice is already covered by the native service checks.
 desktop_entry=$(find /usr/share/applications -maxdepth 1 -type f -name '*.desktop' \
   -exec grep -lE '^Exec=.*markdown-vision([[:space:]]|$)' {} + | head -n 1)
-test -n "$desktop_entry"
+if [ -z "$desktop_entry" ]; then
+  echo '::error title=Linux test setup failed::Could not find the installed Markdown Vision desktop launcher.'
+  exit 1
+fi
 desktop_id=$(basename "$desktop_entry")
-xdg-mime default "$desktop_id" text/markdown
-test "$(xdg-mime query default text/markdown)" = "$desktop_id"
+if ! xdg-mime default "$desktop_id" text/markdown; then
+  echo "::error title=Linux test setup failed::xdg-mime could not select $desktop_id as the Markdown handler."
+  exit 1
+fi
+current_default=$(xdg-mime query default text/markdown)
+if [ "$current_default" != "$desktop_id" ]; then
+  echo "::error title=Linux test setup failed::Expected Markdown handler '$desktop_id'; xdg-mime reports '$current_default'."
+  exit 1
+fi
 wait_for_window() {
   title=$1
   attempt=0
