@@ -1,0 +1,132 @@
+name: Publish Markdown Vision 2.8.31
+
+on:
+  push:
+    branches: ['codex/publish-2.8.31']
+    paths: ['.github/workflows/publish-2.8.31.yml']
+
+permissions:
+  contents: read
+
+concurrency: publish-markdown-vision-2.8.31
+
+env:
+  SOURCE_COMMIT: 4b07076f24bc2efbfb9998e09d068382059ac654
+  RELEASE_VERSION: 2.8.31
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Prepare Windows compiler and packaging tools
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.Tools.ARM64 -property installationPath
+          if (!$vs) { throw 'Visual Studio with x64 and ARM64 C++ tools was not found.' }
+          $nsis = Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe'
+          if (!(Test-Path $nsis)) {
+            choco install nsis -y --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          if (!(Test-Path $nsis)) { throw 'NSIS compiler was not found.' }
+          $webViewVersion = '1.0.3537.50'
+          $package = Join-Path $env:RUNNER_TEMP 'webview2.zip'
+          Invoke-WebRequest "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/$webViewVersion/microsoft.web.webview2.$webViewVersion.nupkg" -OutFile $package
+          Expand-Archive -LiteralPath $package -DestinationPath "$env:USERPROFILE\.nuget\packages\microsoft.web.webview2\$webViewVersion" -Force
+          $build = 'native-cpp/build.bat'
+          $installer = 'native-cpp/build-installer.bat'
+          $script = Get-Content $build -Raw
+          $script.Replace('C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat', (Join-Path $vs 'Common7\Tools\VsDevCmd.bat')) | Set-Content $build
+          $script = Get-Content $installer -Raw
+          $script.Replace('%LOCALAPPDATA%\electron-builder\Cache\nsis-3.0.4.1\nsis-3.0.4.1-1mx3n\makensis.exe', $nsis) | Set-Content $installer
+      - name: Build Windows installers and portable apps
+        shell: cmd
+        run: call native-cpp\build-installer.bat
+      - name: Verify Windows application versions and architectures
+        shell: pwsh
+        run: |
+          $version = $env:RELEASE_VERSION
+          foreach ($entry in @(@{Suffix=''; Machine=0x8664}, @{Suffix='-arm64'; Machine=0xaa64})) {
+            $exe = Get-Item "dist/MarkdownVision-Native-Editor-$version$($entry.Suffix)/Markdown-Vision.exe"
+            $bytes = [IO.File]::ReadAllBytes($exe.FullName)
+            $machine = [BitConverter]::ToUInt16($bytes, [BitConverter]::ToInt32($bytes, 0x3c) + 4)
+            if ($machine -ne $entry.Machine -or $exe.VersionInfo.ProductVersion -ne $version) {
+              throw "Incorrect version or architecture for $exe"
+            }
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-packages
+          path: |
+            dist/Markdown-Vision-Native-Setup-2.8.31-*.exe
+            dist/MarkdownVision-Native-Editor-2.8.31-win-*.zip
+          if-no-files-found: error
+
+  publish:
+    needs: windows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release-packages
+          path: assets
+      - name: Collect validated artifacts and publish stable
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$RELEASE_VERSION"
+          tag="v$version"
+          test "$(node -p "require('./package.json').version")" = "$version"
+          for run in 46085203786 46085203821 46085203799 46085203816; do
+            git_head=$(gh run view "$run" --json headSha,conclusion --jq 'select(.conclusion == "success") | .headSha')
+            test "$git_head" = "$SOURCE_COMMIT"
+          done
+          gh run download 46085203786 --pattern 'markdown-vision-ubuntu-*' --dir packages/ubuntu
+          gh run download 46085203821 --pattern 'markdown-vision-fedora-*' --dir packages/fedora
+          gh run download 46085203799 --name markdown-vision-macos-universal-46085203799 --dir packages/macos
+
+          stage() {
+            local directory="$1" suffix="$2" target="$3"
+            local -a files
+            mapfile -d '' -t files < <(find "$directory" -type f -iname "*.$suffix" -print0)
+            test "${#files[@]}" -eq 1
+            cp -- "${files[0]}" "assets/$target"
+          }
+          for arch in x86_64 aarch64; do
+            stage "packages/ubuntu/markdown-vision-ubuntu-$arch-46085203786" deb "Markdown-Vision-$version-ubuntu-$arch.deb"
+            stage "packages/fedora/markdown-vision-fedora-$arch-46085203821" rpm "Markdown-Vision-$version-fedora-$arch.rpm"
+          done
+          stage packages/ubuntu/markdown-vision-ubuntu-x86_64-46085203786 AppImage "Markdown-Vision-$version-ubuntu-x86_64.AppImage"
+          stage packages/macos dmg "Markdown-Vision-$version-macos-universal.dmg"
+          for suffix in Intel-AMD-x64 Windows-ARM64; do
+            test -s "assets/Markdown-Vision-Native-Setup-$version-$suffix.exe"
+          done
+          for arch in x64 arm64; do
+            test -s "assets/MarkdownVision-Native-Editor-$version-win-$arch.zip"
+          done
+          (cd assets && sha256sum -- * > SHA256SUMS.txt)
+
+          cat > release-notes.md <<'NOTES'
+          - Fedora and Ubuntu now start with Automatic text size and page width selected. Existing profiles that still have the old factory defaults switch to Automatic once.
+          - Automatic text is larger on Linux and scales with the window. Custom reading settings and print sizing are preserved.
+          - Document loading and the transition into Visual editing do less work, especially on larger documents.
+          - The updater can use a public release feed when GitHub's API rate limit is reached. Installer checksums are still verified.
+
+          Download the installer for your system below. Ubuntu users should choose the DEB, and Fedora users should choose the RPM. The macOS DMG is universal and unsigned.
+          NOTES
+          gh release create "$tag" assets/* --target "$SOURCE_COMMIT" --title "Markdown Vision $version" --notes-file release-notes.md --latest
+          gh release view "$tag" --json url,isDraft,isPrerelease,assets
