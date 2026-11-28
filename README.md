@@ -12,14 +12,14 @@ Portable ZIPs: [Windows x64](https://github.com/wmarklloyd/Markdown-Vision/relea
 
 ## Linux downloads (v2.8.31)
 
-Choose the DEB for Ubuntu or the RPM for Fedora. The AppImage is a portable option for x86_64.
+Choose the DEB for Ubuntu or the RPM for Fedora. AppImages are available for Ubuntu x86_64 and ARM64.
 
 - Ubuntu x86_64: [DEB package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-ubuntu-x86_64.deb) · [AppImage](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-ubuntu-x86_64.AppImage)
-- Ubuntu ARM64: [DEB package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-ubuntu-aarch64.deb)
+- Ubuntu ARM64: [DEB package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-ubuntu-aarch64.deb) · [AppImage](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-ubuntu-aarch64.AppImage)
 - Fedora x86_64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-fedora-x86_64.rpm)
 - Fedora ARM64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-fedora-aarch64.rpm)
 
-The links download the packages directly from the GitHub release. Ubuntu x86_64 users can install the DEB with `sudo apt install ./Markdown-Vision-2.8.31-ubuntu-x86_64.deb` or run the AppImage.
+The links download the packages directly from the GitHub release. Ubuntu users can install the matching DEB with `sudo apt install ./Markdown-Vision-2.8.31-ubuntu-x86_64.deb` or run the AppImage built for their processor architecture.
 
 ## macOS download (v2.8.31)
 
