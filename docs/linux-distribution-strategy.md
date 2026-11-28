@@ -4,7 +4,7 @@
 
 Use one signed GitHub release tag as the version and source of truth, then fan that exact source revision out through separate package channels. Do not try to make one Linux binary work as every package type: `.deb`, RPM, Flatpak, Snap, AppImage, and AUR have different dependency models, review rules, and publishing credentials.
 
-The configured candidate matrix uses native Ubuntu 24.04 x86-64/ARM64 runners for DEB packages and Fedora 44 x86-64/ARM64 containers on matching native runners for RPMs. It also builds an x86-64 AppImage candidate. These targets remain validation candidates until GitHub builds, installs, and GUI lifecycle checks pass; do not advertise architectures or distro ranges from configuration alone. Snap and Flatpak need their own packaging manifests. [Tauri Linux distribution formats](https://v2.tauri.app/distribute/)
+The configured candidate matrix uses native Ubuntu 24.04 x86-64/ARM64 runners for DEB packages and AppImages, plus Fedora 44 x86-64/ARM64 containers on matching native runners for RPMs. AppImages must be built on their target architecture because Tauri's linuxdeploy tooling does not cross-compile them. These targets remain validation candidates until GitHub builds, launches, and GUI lifecycle checks pass; do not advertise architectures or distro ranges from configuration alone. Snap and Flatpak need their own packaging manifests. [Tauri Linux distribution formats](https://v2.tauri.app/distribute/)
 
 ## Channels to cover
 
@@ -75,7 +75,7 @@ GitHub is the canonical release and fallback download. Distribution channels can
 
 ### Stage 1: dependable GitHub release
 
-- Run the Ubuntu 24.04 x86-64/ARM64 and Fedora 44 x86-64/ARM64 candidate workflows. They install and exercise native DEB/RPM packages in virtual desktops; x86-64 AppImage receives a launch smoke test.
+- Run the Ubuntu 24.04 x86-64/ARM64 and Fedora 44 x86-64/ARM64 candidate workflows. They install and exercise native DEB/RPM packages in virtual desktops; both Ubuntu AppImages receive launch smoke tests on matching native runners.
 - Check the generated package dependencies, architecture, file association, desktop entry, sizes, and hashes. Keep CI artifacts separate from GitHub Releases until the full matrix succeeds.
 - Add AppImage clean-install/update checks and complete the DEB upgrade test.
 - Add a release artifact map, checksums, and verified provenance before creating public package links.

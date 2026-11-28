@@ -27,7 +27,7 @@
     {
       "format": "appimage",
       "distribution": "ubuntu",
-      "architectures": ["x86_64"],
+      "architectures": ["x86_64", "aarch64"],
       "tauriTarget": "appimage",
       "outputDirectory": "native-tauri/target/release/bundle/appimage",
       "fileSuffix": ".AppImage",

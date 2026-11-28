@@ -55,7 +55,7 @@ jobs:
           - runner: ubuntu-24.04-arm
             architecture: aarch64
             deb_architecture: arm64
-            appimage: false
+            appimage: true
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     steps:
@@ -137,6 +137,7 @@ jobs:
         env:
           LINUX_ARCH: ${{ matrix.architecture }}
           DEB_ARCH: ${{ matrix.deb_architecture }}
+          BUILD_APPIMAGE: ${{ matrix.appimage }}
         run: |
           set -eu
           deb=$(find native-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)
@@ -149,7 +150,7 @@ jobs:
           file "$deb"
           stat -c '%n %s bytes' "$deb" | tee "$RUNNER_TEMP/linux-evidence/package-sizes.txt"
           sha256sum "$deb" | tee "$RUNNER_TEMP/linux-evidence/package-sha256.txt"
-          if [ "$LINUX_ARCH" = x86_64 ]; then
+          if [ "$BUILD_APPIMAGE" = true ]; then
             appimage=$(find native-tauri/target/release/bundle/appimage -maxdepth 1 -iname '*.appimage' -print -quit)
             test -n "$appimage"
             sh tools/check-linux-appimage-metadata.sh "$appimage"
@@ -203,6 +204,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           LINUX_ARCH: ${{ matrix.architecture }}
+          BUILD_APPIMAGE: ${{ matrix.appimage }}
         run: |
           set -eu
           if [ "$GITHUB_REF" = "refs/tags/${GITHUB_REF_NAME}" ]; then
@@ -222,7 +224,7 @@ jobs:
           mkdir -p "$assets"
           deb=$(find native-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)
           cp "$deb" "$assets/Markdown-Vision-${version}-ubuntu-${LINUX_ARCH}.deb"
-          if [ "$LINUX_ARCH" = x86_64 ]; then
+          if [ "$BUILD_APPIMAGE" = true ]; then
             appimage=$(find native-tauri/target/release/bundle/appimage -maxdepth 1 -iname '*.appimage' -print -quit)
             cp "$appimage" "$assets/Markdown-Vision-${version}-ubuntu-${LINUX_ARCH}.AppImage"
           fi
