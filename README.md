@@ -19,7 +19,7 @@ Choose the DEB for Ubuntu or the RPM for Fedora. AppImages are available for Ubu
 - Fedora x86_64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-fedora-x86_64.rpm)
 - Fedora ARM64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-fedora-aarch64.rpm)
 
-The links download the packages directly from the GitHub release. Ubuntu users can install the matching DEB with `sudo apt install ./Markdown-Vision-2.8.31-ubuntu-x86_64.deb` or run the AppImage built for their processor architecture.
+The links download the packages directly from the GitHub release. Choose a DEB or AppImage that matches your processor architecture. To install the x86_64 DEB, run `sudo apt install ./Markdown-Vision-2.8.31-ubuntu-x86_64.deb`.
 
 ## macOS download (v2.8.31)
 
