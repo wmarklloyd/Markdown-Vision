@@ -4,28 +4,28 @@ A Markdown reader and editor for Windows, Linux, and macOS. It supports Visual, 
 
 ## Download for Windows
 
-**Current Windows version: v2.8.29**
+**Current Windows version: v2.8.31**
 
-**[Windows installer — Intel/AMD x64 (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.29/Markdown-Vision-Native-Setup-2.8.29-Intel-AMD-x64.exe)** · **[Windows installer — ARM64 (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.29/Markdown-Vision-Native-Setup-2.8.29-Windows-ARM64.exe)**
+**[Windows installer — Intel/AMD x64 (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-Native-Setup-2.8.31-Intel-AMD-x64.exe)** · **[Windows installer — ARM64 (.exe)](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-Native-Setup-2.8.31-Windows-ARM64.exe)**
 
-Portable ZIPs: [Windows x64](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.29/MarkdownVision-Native-Editor-2.8.29-win-x64.zip) · [Windows ARM64](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.29/MarkdownVision-Native-Editor-2.8.29-win-arm64.zip)
+Portable ZIPs: [Windows x64](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/MarkdownVision-Native-Editor-2.8.31-win-x64.zip) · [Windows ARM64](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/MarkdownVision-Native-Editor-2.8.31-win-arm64.zip)
 
-## Linux downloads (v2.8.29)
+## Linux downloads (v2.8.31)
 
 Choose the DEB for Ubuntu or the RPM for Fedora. The AppImage is a portable option for x86_64.
 
-- Ubuntu x86_64: [DEB package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.29/Markdown-Vision-2.8.29-ubuntu-x86_64.deb) · [AppImage](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.29/Markdown-Vision-2.8.29-ubuntu-x86_64.AppImage)
-- Ubuntu ARM64: [DEB package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.29/Markdown-Vision-2.8.29-ubuntu-aarch64.deb)
-- Fedora x86_64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.29/Markdown-Vision-2.8.29-fedora-x86_64.rpm)
-- Fedora ARM64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.29/Markdown-Vision-2.8.29-fedora-aarch64.rpm)
+- Ubuntu x86_64: [DEB package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-ubuntu-x86_64.deb) · [AppImage](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-ubuntu-x86_64.AppImage)
+- Ubuntu ARM64: [DEB package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-ubuntu-aarch64.deb)
+- Fedora x86_64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-fedora-x86_64.rpm)
+- Fedora ARM64: [RPM package](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-fedora-aarch64.rpm)
 
-The links download the packages directly from the GitHub release. Ubuntu x86_64 users can install the DEB with `sudo apt install ./Markdown-Vision-2.8.29-ubuntu-x86_64.deb` or run the AppImage.
+The links download the packages directly from the GitHub release. Ubuntu x86_64 users can install the DEB with `sudo apt install ./Markdown-Vision-2.8.31-ubuntu-x86_64.deb` or run the AppImage.
 
-## macOS download (v2.8.29)
+## macOS download (v2.8.31)
 
 Download the universal macOS disk image. This build is unsigned, so macOS may ask you to approve opening it in Privacy & Security settings:
 
-- [macOS universal DMG](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.29/Markdown-Vision-2.8.29-macos-universal.dmg)
+- [macOS universal DMG](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-macos-universal.dmg)
 
 ![Markdown Vision showing its own README five levels deep](docs/markdown-vision-recursive.png)
 
