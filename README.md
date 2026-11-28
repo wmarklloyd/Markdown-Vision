@@ -27,7 +27,17 @@ Download the universal macOS disk image. This build is unsigned, so macOS may as
 
 - [macOS universal DMG](https://github.com/wmarklloyd/Markdown-Vision/releases/download/v2.8.31/Markdown-Vision-2.8.31-macos-universal.dmg)
 
-![Markdown Vision showing its own README five levels deep](docs/markdown-vision-recursive.png)
+## Reading and editing
+
+Open [markdown-vision.md](markdown-vision.md) in the app to try the same document shown below.
+
+### Reading mode
+
+![Markdown Vision in Reading mode, showing the formatted sample document](docs/markdown-vision-reading.png)
+
+### Editing mode
+
+![Markdown Vision in Split editing mode, with Markdown source on the left and formatted text on the right](docs/markdown-vision-editing.png)
 
 Run setup to install `Markdown-Vision.exe`, add Markdown file associations, and register the Explorer Preview Pane handler. The standalone ZIP build contains a single `Markdown-Vision.exe`; extract it and run it directly. When no adjacent `web` folder is present, the app prepares its embedded web assets in your local app data folder. You can pass a Markdown file path as a command-line argument.
 
