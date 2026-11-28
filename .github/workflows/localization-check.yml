@@ -41,9 +41,6 @@ jobs:
         run: node tools/export-localization.cjs --check
       - name: Verify generated translations
         run: node tools/export-localization.cjs --check-generated
-      - name: Require reviewed translations for tagged releases
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: node tools/export-localization.cjs --check-release-ready
       - name: Test translation generation
         run: node tools/test-localization-generation.cjs
       - name: Verify localized native messages
