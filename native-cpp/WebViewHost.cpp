@@ -253,18 +253,35 @@ void SetDocumentTitle(const std::wstring& path) {
 }
 
 std::wstring PickDocument() {
-    wchar_t path[32768]{};
-    OPENFILENAMEW dialog{sizeof(dialog)};
-    dialog.hwndOwner = g_window;
-    dialog.lpstrFile = path;
-    dialog.nMaxFile = static_cast<DWORD>(std::size(path));
-    dialog.lpstrFilter =
-        L"Markdown files (*.md;*.markdown;*.mdown;*.mkd)\0*.md;*.markdown;*.mdown;*.mkd\0"
-        L"Text files (*.txt)\0*.txt\0\0";
-    dialog.lpstrTitle = L"Open Markdown file";
-    dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
-    if (!GetOpenFileNameW(&dialog)) return {};
-    return path;
+    ComPtr<IFileOpenDialog> dialog;
+    if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
+        IID_PPV_ARGS(&dialog)))) return {};
+
+    const COMDLG_FILTERSPEC filters[] = {
+        {L"Markdown files", L"*.md;*.markdown;*.mdown;*.mkd"},
+        {L"Text files", L"*.txt"},
+    };
+    // Apply the file-type filter without seeding a filename or search query.
+    if (FAILED(dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters))) return {};
+    if (FAILED(dialog->SetFileTypeIndex(1)) || FAILED(dialog->SetTitle(L"Open Markdown file"))) return {};
+
+    FILEOPENDIALOGOPTIONS options{};
+    if (FAILED(dialog->GetOptions(&options))) return {};
+    options |= FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST | FOS_FORCEFILESYSTEM;
+    if (FAILED(dialog->SetOptions(options))) return {};
+    if (dialog->Show(g_window) != S_OK) return {};
+
+    ComPtr<IShellItem> result;
+    if (FAILED(dialog->GetResult(&result))) return {};
+    PWSTR path = nullptr;
+    const HRESULT pathResult = result->GetDisplayName(SIGDN_FILESYSPATH, &path);
+    if (FAILED(pathResult) || !path) {
+        CoTaskMemFree(path);
+        return {};
+    }
+    std::wstring selectedPath(path);
+    CoTaskMemFree(path);
+    return selectedPath;
 }
 
 std::wstring PickSavePath(const OpenDocument* document) {
