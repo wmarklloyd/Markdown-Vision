@@ -28,6 +28,8 @@ on:
       - 'tools/check-linux-desktop-duplicates.cjs'
       - 'tools/test-linux-desktop-duplicates.cjs'
       - 'tools/check-linux-release-map.cjs'
+      - 'tools/check-linux-appimage-launch.sh'
+      - 'tools/check-linux-appimage-metadata.sh'
       - 'tools/check-cross-platform-metadata.cjs'
       - 'tools/test-tauri-open-queue.cjs'
   push:
@@ -58,7 +60,7 @@ jobs:
     steps:
       - name: Install Fedora build and desktop test dependencies
         run: |
-          dnf install -y git gh webkit2gtk4.1-devel openssl-devel curl wget file libappindicator-gtk3-devel librsvg2-devel libxdo-devel gcc gcc-c++ make pkgconf-pkg-config patchelf rpm-build zenity xdg-utils xorg-x11-server-Xvfb xorg-x11-xauth dbus-daemon xdotool xclip tesseract ImageMagick python3-xlib shadow-utils
+          dnf install -y git gh webkit2gtk4.1-devel openssl-devel curl wget file fuse-libs libappindicator-gtk3-devel librsvg2-devel libxdo-devel gcc gcc-c++ make pkgconf-pkg-config patchelf rpm-build zenity xdg-utils xorg-x11-server-Xvfb xorg-x11-xauth dbus-daemon xdotool xclip tesseract ImageMagick python3-xlib shadow-utils
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -97,10 +99,10 @@ jobs:
           "$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" --version | tee "$evidence/tauri-cli-version.txt"
           pkg-config --modversion webkit2gtk-4.1 | tee "$evidence/webkitgtk-version.txt"
           rpm -q --qf '%{NAME} %{VERSION} %{ARCH}\n' webkit2gtk4.1 gtk3 zenity xdg-utils | tee "$evidence/runtime-packages.txt"
-      - name: Build Fedora RPM
+      - name: Build Fedora RPM and AppImage
         working-directory: native-tauri
-        run: '"$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" build --bundles rpm -- --locked'
-      - name: Inspect RPM metadata and verify architecture
+        run: '"$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" build --bundles rpm,appimage -- --locked'
+      - name: Inspect Fedora packages and verify architecture
         env:
           LINUX_ARCH: ${{ matrix.architecture }}
           RPM_ARCH: ${{ matrix.rpm_architecture }}
@@ -108,6 +110,8 @@ jobs:
           set -eu
           rpm_package=$(find native-tauri/target/release/bundle/rpm -maxdepth 1 -name '*.rpm' -print -quit)
           test -n "$rpm_package"
+          appimage=$(find native-tauri/target/release/bundle/appimage -maxdepth 1 -iname '*.appimage' -print -quit)
+          test -n "$appimage"
           node tools/check-linux-release-map.cjs --distribution fedora --architecture "$LINUX_ARCH" --verify-outputs --manifest "$GITHUB_WORKSPACE/.tmp/fedora-linux-evidence/linux-release-manifest.json"
           expected_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' native-tauri/Cargo.toml | head -n 1)
           test -n "$expected_version"
@@ -125,6 +129,10 @@ jobs:
           mkdir -p "$evidence"
           stat -c '%n %s bytes' "$rpm_package" | tee "$evidence/package-sizes.txt"
           sha256sum "$rpm_package" | tee "$evidence/package-sha256.txt"
+          sh tools/check-linux-appimage-metadata.sh "$appimage"
+          file "$appimage"
+          stat -c '%n %s bytes' "$appimage" | tee -a "$evidence/package-sizes.txt"
+          sha256sum "$appimage" | tee -a "$evidence/package-sha256.txt"
       - name: Upgrade Fedora package and exercise desktop lifecycle
         run: |
           set -eu
@@ -151,6 +159,12 @@ jobs:
               /usr/bin/markdown-vision "$GITHUB_WORKSPACE/tests/fixtures/Markdown-total-torture-test.md" "$evidence"
           file "$evidence/linux-print.pdf"
           sha256sum "$evidence/linux-print.pdf"
+      - name: Launch Fedora AppImage in a virtual desktop
+        run: |
+          set -eu
+          appimage=$(find native-tauri/target/release/bundle/appimage -maxdepth 1 -iname '*.appimage' -print -quit)
+          xvfb-run -a dbus-run-session -- sh tools/check-linux-appimage-launch.sh \
+            "$appimage" tests/fixtures/Markdown-total-torture-test.md "$GITHUB_WORKSPACE/.tmp/fedora-linux-evidence/appimage-launch.log"
       - name: Retain Fedora RPM and validation evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -158,9 +172,10 @@ jobs:
           name: markdown-vision-fedora-${{ matrix.architecture }}-${{ github.run_id }}
           path: |
             native-tauri/target/release/bundle/rpm/*.rpm
+            native-tauri/target/release/bundle/appimage/*.AppImage
             .tmp/fedora-linux-evidence/
           if-no-files-found: warn
-      - name: Attach Fedora RPM to GitHub Release
+      - name: Attach Fedora RPM and AppImage to GitHub Release
         if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != '' || github.ref == 'refs/heads/codex/linux-matrix-build'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -184,4 +199,7 @@ jobs:
           rpm_package=$(find native-tauri/target/release/bundle/rpm -maxdepth 1 -name '*.rpm' -print -quit)
           asset="$RUNNER_TEMP/Markdown-Vision-${version}-fedora-${LINUX_ARCH}.rpm"
           cp "$rpm_package" "$asset"
-          gh release upload "$release_tag" "$asset" --clobber
+          appimage=$(find native-tauri/target/release/bundle/appimage -maxdepth 1 -iname '*.appimage' -print -quit)
+          appimage_asset="$RUNNER_TEMP/Markdown-Vision-${version}-fedora-${LINUX_ARCH}.AppImage"
+          cp "$appimage" "$appimage_asset"
+          gh release upload "$release_tag" "$asset" "$appimage_asset" --clobber

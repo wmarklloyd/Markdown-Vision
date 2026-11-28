@@ -33,6 +33,16 @@
       "fileSuffix": ".AppImage",
       "githubAssetName": "Markdown-Vision-{version}-ubuntu-{architecture}.AppImage",
       "state": "build-validation"
+    },
+    {
+      "format": "appimage",
+      "distribution": "fedora",
+      "architectures": ["x86_64", "aarch64"],
+      "tauriTarget": "appimage",
+      "outputDirectory": "native-tauri/target/release/bundle/appimage",
+      "fileSuffix": ".AppImage",
+      "githubAssetName": "Markdown-Vision-{version}-fedora-{architecture}.AppImage",
+      "state": "build-validation"
     }
   ],
   "channels": [
