@@ -29,8 +29,6 @@ Download the universal macOS disk image. This build is unsigned, so macOS may as
 
 ## Reading and editing
 
-Open [markdown-vision.md](markdown-vision.md) in the app to try the same document shown below.
-
 ### Reading mode
 
 ![Markdown Vision in Reading mode, showing the formatted sample document](docs/markdown-vision-reading.png)
